@@ -88,7 +88,7 @@ WSGI_APPLICATION = 'labour_crm.wsgi.application'
 #         'HOST': 'localhost',
 #         'PORT': '5432',
 #     }
-#}
+# }
 
 DATABASES = {
     'default': dj_database_url.config(
@@ -98,7 +98,7 @@ DATABASES = {
 }
 # --- TEMPORARY DEBUG PRINT ---
 print("\n--- DEBUG: DATABASES CONFIG ---")
-print(DATABASES['default']['ENGINE'])
+# print(DATABASES['default']['ENGINE'])
 print("--- END DEBUG ---\n")
 # --- END TEMPORARY DEBUG PRINT ---
 
@@ -132,8 +132,8 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # 
+# MEDIA_URL = '/media/'
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -163,10 +163,10 @@ PWA_APP_ICONS = [
 
 # Path to your custom service worker (create this later)
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'registration', 'js', 'serviceworker.js')
-# STATIC_URL = 'static/'
-# import os
-# import sys
-# sys.path.append(os.path.join(BASE_DIR, 'registration'))
+STATIC_URL = 'static/'
+import os
+import sys
+sys.path.append(os.path.join(BASE_DIR, 'registration'))
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
