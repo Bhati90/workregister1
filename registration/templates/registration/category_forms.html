@@ -1,0 +1,524 @@
+{% load static %} 
+
+{% if category == 'individual_labor' %}
+    <!-- Individual Labor Form -->
+    <div class="category-specific-form individual-labor-form" data-category="individual_labor">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.gender.id_for_label }}">
+                        <i class="fas fa-venus-mars me-2"></i>Gender *
+                    </label>
+                    {{ form.gender }}
+                    {% if form.gender.errors %}
+                        <div class="text-danger mt-1">{{ form.gender.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.age.id_for_label }}">
+                        <i class="fas fa-calendar me-2"></i>Age *
+                    </label>
+                    {{ form.age }}
+                    {% if form.age.errors %}
+                        <div class="text-danger mt-1">{{ form.age.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="{{ form.primary_source_income.id_for_label }}">
+                <i class="fas fa-coins me-2"></i>Primary Source of Income *
+            </label>
+            {{ form.primary_source_income }}
+            {% if form.primary_source_income.errors %}
+                <div class="text-danger mt-1">{{ form.primary_source_income.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Skills Section -->
+        <div class="form-group">
+            <label class="form-label">
+                <i class="fas fa-tools me-2"></i>Skills
+            </label>
+            <div class="skills-grid">
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="pruning" id="skill_pruning">
+                        <label class="form-check-label" for="skill_pruning">
+                            <i class="fas fa-cut me-2"></i>Pruning
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="harvesting" id="skill_harvesting">
+                        <label class="form-check-label" for="skill_harvesting">
+                            <i class="fas fa-wheat me-2"></i>Harvesting
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="dipping" id="skill_dipping">
+                        <label class="form-check-label" for="skill_dipping">
+                            <i class="fas fa-tint me-2"></i>Dipping
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="thinning" id="skill_thinning">
+                        <label class="form-check-label" for="skill_thinning">
+                            <i class="fas fa-leaf me-2"></i>Thinning
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="none" id="skill_none">
+                        <label class="form-check-label" for="skill_none">
+                            <i class="fas fa-times me-2"></i>None
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                {{ form.skill_other }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.employment_type.id_for_label }}">
+                        <i class="fas fa-briefcase me-2"></i>Employment Type *
+                    </label>
+                    {{ form.employment_type }}
+                    {% if form.employment_type.errors %}
+                        <div class="text-danger mt-1">{{ form.employment_type.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.willing_to_migrate.id_for_label }}">
+                        <i class="fas fa-route me-2"></i>Willing to Migrate *
+                    </label>
+                    {{ form.willing_to_migrate }}
+                    {% if form.willing_to_migrate.errors %}
+                        <div class="text-danger mt-1">{{ form.willing_to_migrate.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.expected_wage.id_for_label }}">
+                        <i class="fas fa-rupee-sign me-2"></i>Expected Wage (₹) *
+                    </label>
+                    {{ form.expected_wage }}
+                    {% if form.expected_wage.errors %}
+                        <div class="text-danger mt-1">{{ form.expected_wage.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <div class="form-check mt-4">
+                        {{ form.want_training }}
+                        <label class="form-check-label" for="{{ form.want_training.id_for_label }}">
+                            <i class="fas fa-graduation-cap me-2"></i>Want Training?
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="{{ form.availability.id_for_label }}">
+                <i class="fas fa-clock me-2"></i>Availability *
+            </label>
+            {{ form.availability }}
+            {% if form.availability.errors %}
+                <div class="text-danger mt-1">{{ form.availability.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Communication Preferences -->
+        <div class="form-group">
+            <label class="form-label">
+                <i class="fas fa-comments me-2"></i>Comfortable to Find Work and Receive Payment Through
+            </label>
+            <div class="skills-grid">
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="communication_preferences" value="mobile_app" id="comm_mobile_app">
+                        <label class="form-check-label" for="comm_mobile_app">
+                            <i class="fas fa-mobile-alt me-2"></i>Mobile App
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="communication_preferences" value="whatsapp" id="comm_whatsapp">
+                        <label class="form-check-label" for="comm_whatsapp">
+                            <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="communication_preferences" value="calling" id="comm_calling">
+                        <label class="form-check-label" for="comm_calling">
+                            <i class="fas fa-phone me-2"></i>Calling
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="communication_preferences" value="sms" id="comm_sms">
+                        <label class="form-check-label" for="comm_sms">
+                            <i class="fas fa-sms me-2"></i>SMS
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                {{ form.comm_other }}
+            </div>
+        </div>
+
+        {% comment %} <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.adult_men_seeking_employment.id_for_label }}">
+                        <i class="fas fa-male me-2"></i>Adult Men Seeking Employment *
+                    </label>
+                    {{ form.adult_men_seeking_employment }}
+                    {% if form.adult_men_seeking_employment.errors %}
+                        <div class="text-danger mt-1">{{ form.adult_men_seeking_employment.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.adult_women_seeking_employment.id_for_label }}">
+                        <i class="fas fa-female me-2"></i>Adult Women Seeking Employment *
+                    </label>
+                    {{ form.adult_women_seeking_employment }}
+                    {% if form.adult_women_seeking_employment.errors %}
+                        <div class="text-danger mt-1">{{ form.adult_women_seeking_employment.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div> {% endcomment %}
+
+        <div class="form-group">
+            <div class="form-check mb-3">
+                {{ form.can_refer_others }}
+                <label class="form-check-label" for="{{ form.can_refer_others.id_for_label }}">
+                    <i class="fas fa-user-friends me-2"></i>Can you refer any other laborers?
+                </label>
+            </div>
+
+            <div id="referral-fields" style="display: none;">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.referral_name.id_for_label }}">
+                                Referral Name
+                            </label>
+                            {{ form.referral_name }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.referral_contact.id_for_label }}">
+                                Referral Contact
+                            </label>
+                            {{ form.referral_contact }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% elif category == 'mukkadam' %}
+    <!-- Mukkadam Form -->
+    <div class="category-specific-form mukkadam-form" data-category="mukkadam">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.providing_labour_count.id_for_label }}">
+                        <i class="fas fa-users me-2"></i>How Many Laborers Do You Provide? *
+                    </label>
+                    {{ form.providing_labour_count }}
+                    {% if form.providing_labour_count.errors %}
+                        <div class="text-danger mt-1">{{ form.providing_labour_count.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.total_workers_peak.id_for_label }}">
+                        <i class="fas fa-chart-line me-2"></i>Total Workers You Can Mobilize at Peak? *
+                    </label>
+                    {{ form.total_workers_peak }}
+                    {% if form.total_workers_peak.errors %}
+                        <div class="text-danger mt-1">{{ form.total_workers_peak.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Skills Section -->
+        <div class="form-group">
+            <label class="form-label">
+                <i class="fas fa-tools me-2"></i>Skills Available
+            </label>
+            <div class="skills-grid">
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="pruning" id="mukkadam_skill_pruning">
+                        <label class="form-check-label" for="mukkadam_skill_pruning">
+                            <i class="fas fa-cut me-2"></i>Pruning
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="harvesting" id="mukkadam_skill_harvesting">
+                        <label class="form-check-label" for="mukkadam_skill_harvesting">
+                            <i class="fas fa-wheat me-2"></i>Harvesting
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="dipping" id="mukkadam_skill_dipping">
+                        <label class="form-check-label" for="mukkadam_skill_dipping">
+                            <i class="fas fa-tint me-2"></i>Dipping
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="thinning" id="mukkadam_skill_thinning">
+                        <label class="form-check-label" for="mukkadam_skill_thinning">
+                            <i class="fas fa-leaf me-2"></i>Thinning
+                        </label>
+                    </div>
+                </div>
+                <div class="skill-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="skills" value="none" id="mukkadam_skill_none">
+                        <label class="form-check-label" for="mukkadam_skill_none">
+                            <i class="fas fa-times me-2"></i>None
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                {{ form.skill_other }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.expected_charges.id_for_label }}">
+                        <i class="fas fa-rupee-sign me-2"></i>Expected Charges (₹) *
+                    </label>
+                    {{ form.expected_charges }}
+                    {% if form.expected_charges.errors %}
+                        <div class="text-danger mt-1">{{ form.expected_charges.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.arrange_transport.id_for_label }}">
+                        <i class="fas fa-bus me-2"></i>Do You Arrange Transport? *
+                    </label>
+                    {{ form.arrange_transport }}
+                    {% if form.arrange_transport.errors %}
+                        <div class="text-danger mt-1">{{ form.arrange_transport.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div id="transport-other-field" style="display: none;">
+            <div class="form-group">
+                <label class="form-label" for="{{ form.transport_other.id_for_label }}">
+                    Specify Other Transport Arrangement
+                </label>
+                {{ form.transport_other }}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="{{ form.labour_supply_availability.id_for_label }}">
+                <i class="fas fa-calendar-check me-2"></i>When Can You Supply Labor? *
+            </label>
+            {{ form.labour_supply_availability }}
+            {% if form.labour_supply_availability.errors %}
+                <div class="text-danger mt-1">{{ form.labour_supply_availability.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <div class="form-check mb-3">
+                {{ form.provide_tools }}
+                <label class="form-check-label" for="{{ form.provide_tools.id_for_label }}">
+                    <i class="fas fa-toolbox me-2"></i>Do you provide tools (secateurs, masks, etc.)?
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="{{ form.supply_areas.id_for_label }}">
+                <i class="fas fa-map me-2"></i>Which Areas Do You Supply Labor To? *
+            </label>
+            {{ form.supply_areas }}
+            {% if form.supply_areas.errors %}
+                <div class="text-danger mt-1">{{ form.supply_areas.errors.0 }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+{% elif category == 'transport' %}
+    <!-- Transport Form -->
+    <div class="category-specific-form transport-form" data-category="transport">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.vehicle_type.id_for_label }}">
+                        <i class="fas fa-truck me-2"></i>What Vehicle Do You Have? *
+                    </label>
+                    {{ form.vehicle_type }}
+                    {% if form.vehicle_type.errors %}
+                        <div class="text-danger mt-1">{{ form.vehicle_type.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.people_capacity.id_for_label }}">
+                        <i class="fas fa-users me-2"></i>How Many People Can It Carry? *
+                    </label>
+                    {{ form.people_capacity }}
+                    {% if form.people_capacity.errors %}
+                        <div class="text-danger mt-1">{{ form.people_capacity.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.expected_fair.id_for_label }}">
+                        <i class="fas fa-rupee-sign me-2"></i>Expected Transport Fare (₹) *
+                    </label>
+                    {{ form.expected_fair }}
+                    {% if form.expected_fair.errors %}
+                        <div class="text-danger mt-1">{{ form.expected_fair.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="{{ form.availability.id_for_label }}">
+                <i class="fas fa-clock me-2"></i>Availability *
+            </label>
+            {{ form.availability }}
+            {% if form.availability.errors %}
+                <div class="text-danger mt-1">{{ form.availability.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="{{ form.service_areas.id_for_label }}">
+                <i class="fas fa-map me-2"></i>What Areas Do You Offer Transport To? *
+            </label>
+            {{ form.service_areas }}
+            {% if form.service_areas.errors %}
+                <div class="text-danger mt-1">{{ form.service_areas.errors.0 }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+{% elif category == 'others' %}
+    <!-- Others Form -->
+    <div class="category-specific-form others-form" data-category="others">
+        <div class="form-group">
+            <label class="form-label" for="{{ form.business_name.id_for_label }}">
+                <i class="fas fa-building me-2"></i>Business Name *
+            </label>
+            {{ form.business_name }}
+            {% if form.business_name.errors %}
+                <div class="text-danger mt-1">{{ form.business_name.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <div class="form-check mb-3">
+                {{ form.interested_referrals }}
+                <label class="form-check-label" for="{{ form.interested_referrals.id_for_label }}">
+                    <i class="fas fa-handshake me-2"></i>Interested in making money through referrals?
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="{{ form.help_description.id_for_label }}">
+                <i class="fas fa-question-circle me-2"></i>How Can You Help Source Labor or Connect Us? *
+            </label>
+            {{ form.help_description }}
+            {% if form.help_description.errors %}
+                <div class="text-danger mt-1">{{ form.help_description.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <div class="form-check">
+                {{ form.know_mukadams_labourers }}
+                <label class="form-check-label" for="{{ form.know_mukadams_labourers.id_for_label }}">
+                    <i class="fas fa-user-friends me-2"></i>Do you know any mukadams/laborers?
+                </label>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Show/hide referral fields for Individual Labor
+        const canReferCheckbox = document.querySelector('input[name="can_refer_others"]');
+        const referralFields = document.getElementById('referral-fields');
+
+        if (canReferCheckbox && referralFields) {
+            canReferCheckbox.addEventListener('change', function() {
+                referralFields.style.display = this.checked ? 'block' : 'none';
+            });
+        }
+
+        // Show/hide transport other field for Mukkadam
+        const transportSelect = document.querySelector('select[name="arrange_transport"]');
+        const transportOtherField = document.getElementById('transport-other-field');
+
+        if (transportSelect && transportOtherField) {
+            transportSelect.addEventListener('change', function() {
+                transportOtherField.style.display = this.value === 'other' ? 'block' : 'none';
+            });
+        }
+    });
+</script>

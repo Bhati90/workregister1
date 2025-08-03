@@ -1,0 +1,695 @@
+{% load static %} 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labor Management Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            --warning-gradient: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            --info-gradient: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
+        }
+
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .dashboard-header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+        }
+
+        .dashboard-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .dashboard-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin: 0;
+        }
+
+        .stats-card {
+            border: none;
+            border-radius: 15px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            height: 100%;
+            position: relative;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .stats-card.primary { background: var(--primary-gradient); }
+        .stats-card.success { background: var(--success-gradient); }
+        .stats-card.warning { background: var(--warning-gradient); }
+        .stats-card.info { background: var(--info-gradient); }
+
+        .stats-card .card-body {
+            color: white;
+            padding: 25px;
+        }
+
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1;
+        }
+
+        .stats-label {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin: 5px 0 15px 0;
+        }
+
+        .stats-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 3rem;
+            opacity: 0.3;
+        }
+
+        .stats-change {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            position: relative; /* Add this */
+        }
+
+        .chart-canvas {
+            position: relative;
+            height: 300px !important; /* Enforce height */
+            width: 100% !important;   /* Enforce width */
+        }
+
+        .chart-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        .chart-title i {
+            margin-right: 10px;
+            color: #667eea;
+        }
+
+        .recent-registrations {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .registration-item {
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+            border-radius: 0 10px 10px 0;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .registration-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .registration-item.primary { border-left-color: #007bff; }
+        .registration-item.success { border-left-color: #28a745; }
+        .registration-item.warning { border-left-color: #ffc107; }
+        .registration-item.info { border-left-color: #17a2b8; }
+
+        .registration-name {
+            font-weight: 600;
+            color: #2d3748;
+            margin: 0 0 5px 0;
+        }
+
+        .registration-details {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin: 0;
+        }
+
+        .registration-time {
+            font-size: 0.8rem;
+            color: #adb5bd;
+            float: right;
+        }
+
+        .category-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+
+        .category-badge.primary { background: rgba(0, 123, 255, 0.1); color: #007bff; }
+        .category-badge.success { background: rgba(40, 167, 69, 0.1); color: #28a745; }
+        .category-badge.warning { background: rgba(255, 193, 7, 0.1); color: #ffc107; }
+        .category-badge.info { background: rgba(23, 162, 184, 0.1); color: #17a2b8; }
+
+        .action-buttons {
+            margin-bottom: 30px;
+        }
+
+        .btn-action {
+            border-radius: 25px;
+            padding: 10px 25px;
+            font-weight: 600;
+            margin-right: 15px;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .map-container {
+            height: 400px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Prevent chart canvas from overflowing */
+        canvas {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+
+        /* Ensure chart containers don't grow beyond intended size */
+        .chart-container canvas {
+            position: relative !important;
+        }
+
+        .quick-stats {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .quick-stat-item {
+            text-align: center;
+            padding: 15px;
+        }
+
+        .quick-stat-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #667eea;
+            margin: 0;
+        }
+
+        .quick-stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin: 5px 0 0 0;
+        }
+
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-title {
+                font-size: 1.8rem;
+            }
+
+            .stats-number {
+                font-size: 2rem;
+            }
+
+            .chart-container,
+            .recent-registrations,
+            .quick-stats {
+                margin-bottom: 20px;
+                padding: 20px;
+            }
+
+            .registration-time {
+                float: none;
+                display: block;
+                margin-top: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="dashboard-title">
+                        <i class="fas fa-chart-pie me-3"></i>Labor Management Dashboard
+                    </h1>
+                    <p class="dashboard-subtitle">
+                        Overview of all registrations and analytics
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex flex-wrap justify-content-end">
+                        <a href="{% url 'registration:home' %}" class="btn btn-light btn-action me-2">
+                            <i class="fas fa-home me-2"></i>Home
+                        </a>
+                        <a href="/admin/" class="btn btn-outline-light btn-action">
+                            <i class="fas fa-cog me-2"></i>Admin
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card stats-card primary">
+                    <div class="card-body">
+                        <div class="stats-icon">
+                            <i class="fas fa-user-hard-hat"></i>
+                        </div>
+                        <h2 class="stats-number">{{ stats.total_individual }}</h2>
+                        <p class="stats-label">Individual Labor</p>
+                        <p class="stats-change">
+                            <i class="fas fa-arrow-up me-1"></i>+{{ stats.recent_individual }} this week
+                        </p>
+                        <a href="{% url 'registration:category_detail' 'individual-labor' %}" class="stretched-link"></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card stats-card success">
+                    <div class="card-body">
+                        <div class="stats-icon">
+                            <i class="fas fa-users-cog"></i>
+                        </div>
+                        <h2 class="stats-number">{{ stats.total_mukkadam }}</h2>
+                        <p class="stats-label">Mukkadam</p>
+                        <p class="stats-change">
+                            <i class="fas fa-arrow-up me-1"></i>+{{ stats.recent_mukkadam }} this week
+                        </p>
+                        <a href="{% url 'registration:category_detail' 'mukkadam' %}" class="stretched-link"></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card stats-card warning">
+                    <div class="card-body">
+                        <div class="stats-icon">
+                            <i class="fas fa-truck"></i>
+                        </div>
+                        <h2 class="stats-number">{{ stats.total_transport }}</h2>
+                        <p class="stats-label">Transport</p>
+                        <p class="stats-change">
+                            <i class="fas fa-arrow-up me-1"></i>+{{ stats.recent_transport }} this week
+                        </p>
+                        <a href="{% url 'registration:category_detail' 'transport' %}" class="stretched-link"></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="card stats-card info">
+                    <div class="card-body">
+                        <div class="stats-icon">
+                            <i class="fas fa-handshake"></i>
+                        </div>
+                        <h2 class="stats-number">{{ stats.total_others }}</h2>
+                        <p class="stats-label">Others</p>
+                        <p class="stats-change">
+                            <i class="fas fa-arrow-up me-1"></i>+{{ stats.recent_others }} this week
+                        </p>
+                        <a href="{% url 'registration:category_detail' 'others' %}" class="stretched-link"></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="quick-stat-item">
+                        <h3 class="quick-stat-number">{{ stats.total_all }}</h3>
+                        <p class="quick-stat-label">Total Registrations</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="quick-stat-item">
+                        <h3 class="quick-stat-number">{{ stats.total_recent }}</h3>
+                        <p class="quick-stat-label">This Week</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="quick-stat-item">
+                        <h3 class="quick-stat-number">{{ stats.location_percentage }}%</h3>
+                        <p class="quick-stat-label">With GPS Location</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="quick-stat-item">
+                        <h3 class="quick-stat-number">{{ stats.photo_percentage }}%</h3>
+                        <p class="quick-stat-label">With Photos</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <div class="row">
+                <div class="col-12">
+                    <a href="{% url 'registration:export_all' %}" class="btn btn-primary btn-action">
+                        <i class="fas fa-download me-2"></i>Export All Data
+                    </a>
+                    <a href="{% url 'registration:registration' %}" class="btn btn-success btn-action">
+                        <i class="fas fa-plus me-2"></i>Add New Registration
+                    </a>
+                    <button class="btn btn-info btn-action" onclick="refreshData()">
+                        <i class="fas fa-sync-alt me-2"></i>Refresh Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts and Recent Data -->
+        <div class="row">
+            <!-- Charts Column -->
+            <div class="col-lg-8">
+                <!-- Category Distribution Chart -->
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-pie"></i>Category Distribution
+                    </h3>
+                    <div class="chart-canvas">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Registration Trends Chart -->
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-line"></i>Registration Trends (Last 30 Days)
+                    </h3>
+                    <div class="chart-canvas">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Location Map -->
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-map-marker-alt"></i>Registration Locations
+                    </h3>
+                    <div id="map" class="map-container"></div>
+                </div>
+            </div>
+
+            <!-- Recent Registrations Column -->
+            <div class="col-lg-4">
+                <div class="recent-registrations">
+                    <h3 class="chart-title">
+                        <i class="fas fa-clock"></i>Recent Registrations
+                    </h3>
+
+                    {% for registration in recent_registrations %}
+                    <div class="registration-item {{ registration.category_color }}">
+                        <div class="registration-time">{{ registration.created_at|timesince }} ago</div>
+                        <h5 class="registration-name">
+                            <i class="{{ registration.category_icon }} me-2"></i>{{ registration.full_name }}
+                        </h5>
+                        <p class="registration-details">
+                            <i class="fas fa-map-marker-alt me-1"></i>{{ registration.village }}, {{ registration.taluka }}
+                            <br>
+                            <i class="fas fa-phone me-1"></i>{{ registration.mobile_number }}
+                            <span class="category-badge {{ registration.category_color }}">{{ registration.category_name }}</span>
+                        </p>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>No registrations yet</p>
+                    </div>
+                    {% endfor %}
+
+                    {% if recent_registrations %}
+                    <div class="text-center mt-3">
+                        <a href="/admin/registration/" class="btn btn-outline-primary">
+                            View All in Admin <i class="fas fa-arrow-right ms-2"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Chart.js Configuration
+        Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+        Chart.defaults.font.size = 12;
+
+        // Global chart instances to prevent memory leaks
+        let categoryChartInstance = null;
+        let trendsChartInstance = null;
+
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            initializeMap();
+        });
+
+function initializeCharts() {
+    // Destroy existing charts if they exist
+    if (categoryChartInstance) {
+        categoryChartInstance.destroy();
+    }
+    if (trendsChartInstance) {
+        trendsChartInstance.destroy();
+    }
+
+    // Create Category Distribution Chart
+    const categoryCtx = document.getElementById('categoryChart');
+    if (categoryCtx) {
+        categoryChartInstance = new Chart(categoryCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Individual Labor', 'Mukkadam', 'Transport', 'Others'],
+                datasets: [{
+                    data: [{{ stats.total_individual }}, {{ stats.total_mukkadam }}, {{ stats.total_transport }}, {{ stats.total_others }}],
+                    backgroundColor: ['#007bff', '#28a745', '#ffc107', '#17a2b8'],
+                    borderWidth: 3,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Create Registration Trends Chart
+    const trendsCtx = document.getElementById('trendsChart');
+    if (trendsCtx) {
+        const trendsData = [{% for trend in trends %}{{ trend.total }}{% if not forloop.last %},{% endif %}{% endfor %}];
+        const trendsLabels = [{% for trend in trends %}'{{ trend.date|date:"M d" }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+
+        trendsChartInstance = new Chart(trendsCtx, {
+            type: 'line',
+            data: {
+                labels: trendsLabels,
+                datasets: [{
+                    label: 'Daily Registrations',
+                    data: trendsData,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#667eea',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(value) {
+                                return Number.isInteger(value) ? value : '';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            maxTicksLimit: 10 // Limit number of x-axis labels
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#667eea',
+                        borderWidth: 1,
+                        callbacks: {
+                            title: function(context) {
+                                return context[0].label;
+                            },
+                            label: function(context) {
+                                return `Registrations: ${context.parsed.y}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function initializeMap() {
+    // Initialize Map
+    const mapElement = document.getElementById('map');
+    if (!mapElement) return;
+
+    const map = L.map('map').setView([19.7515, 75.7139], 8); // Centered on Maharashtra
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Add location markers
+    const locations = {{ location_data|safe }};
+
+    if (locations && locations.length > 0) {
+        console.log(locations);
+        locations.forEach(location => {
+            const marker = L.marker([location.lat, location.lng]).addTo(map);
+
+            let popupContent = `
+                <div style="min-width: 200px;">
+                    <h6 style="color: ${location.color}; margin-bottom: 10px;">
+                        <i class="fas fa-${location.icon}"></i> ${location.name}
+                    </h6>
+                    <p style="margin: 5px 0;"><strong>Category:</strong> ${location.category}</p>
+                    <p style="margin: 5px 0;"><strong>Location:</strong> ${location.village}, ${location.taluka}</p>
+                    <p style="margin: 5px 0;"><strong>Phone:</strong> ${location.phone}</p>
+            `;
+
+            if (location.workers) {
+                popupContent += `<p style="margin: 5px 0;"><strong>Workers:</strong> ${location.workers}</p>`;
+            }
+            if (location.vehicle) {
+                popupContent += `<p style="margin: 5px 0;"><strong>Vehicle:</strong> ${location.vehicle} (${location.capacity} people)</p>`;
+            }
+            if (location.business) {
+                popupContent += `<p style="margin: 5px 0;"><strong>Business:</strong> ${location.business}</p>`;
+            }
+
+            popupContent += '</div>';
+
+            marker.bindPopup(popupContent);
+        });
+
+        // Fit map to show all markers
+        if (locations.length > 1) {
+            const group = new L.featureGroup(map._layers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+    }
+}
+        // Refresh data function
+        function refreshData() {
+            location.reload();
+        }
+
+        // Handle window resize to prevent chart issues
+        window.addEventListener('resize', function() {
+            if (categoryChartInstance) {
+                categoryChartInstance.resize();
+            }
+            if (trendsChartInstance) {
+                trendsChartInstance.resize();
+            }
+        });
+
+        // Auto-refresh every 5 minutes
+        setInterval(refreshData, 300000);
+    </script>
+</body>
+</html>

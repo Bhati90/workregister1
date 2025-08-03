@@ -1,0 +1,568 @@
+{% load static %} 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category_name }} - Labor Management Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            --warning-gradient: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            --info-gradient: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
+        }
+
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .page-header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .breadcrumb-custom {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+            padding: 8px 20px;
+            margin: 0;
+        }
+
+        .breadcrumb-custom a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+        }
+
+        .breadcrumb-custom a:hover {
+            color: white;
+        }
+
+        .stats-summary {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .summary-item {
+            text-align: center;
+            padding: 15px;
+        }
+
+        .summary-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #667eea;
+            margin: 0;
+        }
+
+        .summary-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin: 5px 0 0 0;
+        }
+
+        .search-filter-bar {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .registration-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border-left: 4px solid #667eea;
+        }
+
+        .registration-card:hover {
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .registration-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .registration-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 0;
+        }
+
+        .registration-date {
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-align: right;
+        }
+
+        .registration-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .info-icon {
+            width: 20px;
+            color: #667eea;
+            margin-right: 10px;
+        }
+
+        .info-label {
+            font-weight: 500;
+            color: #4a5568;
+            min-width: 80px;
+        }
+
+        .info-value {
+            color: #2d3748;
+        }
+
+        .registration-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-sm-custom {
+            padding: 5px 15px;
+            font-size: 0.85rem;
+            border-radius: 20px;
+        }
+
+        .location-badge {
+            background: #e8f5e8;
+            color: #28a745;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .photo-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .pagination-custom {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .export-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        @media (max-width: 768px) {
+            .page-title {
+                font-size: 1.5rem;
+            }
+
+            .registration-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .registration-date {
+                text-align: left;
+                margin-top: 5px;
+            }
+
+            .registration-info {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .registration-actions {
+                flex-direction: column;
+            }
+
+            .btn-sm-custom {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <nav class="breadcrumb-custom mb-2">
+                        <a href="{% url 'registration:dashboard' %}">Dashboard</a> / {{ category_name }}
+                    </nav>
+                    <h1 class="page-title">
+                        <i class="{{ category_icon }} me-3"></i>{{ category_name }} Registrations
+                    </h1>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="{% url 'registration:dashboard' %}" class="btn btn-light">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Statistics Summary -->
+        <div class="stats-summary">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.total_count }}</h3>
+                        <p class="summary-label">Total Registrations</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.recent_count }}</h3>
+                        <p class="summary-label">This Week</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.location_percentage }}%</h3>
+                        <p class="summary-label">With Location</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.photo_percentage }}%</h3>
+                        <p class="summary-label">With Photos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category-specific stats -->
+            {% if category == 'individual-labor' %}
+            <hr>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.avg_age|floatformat:0 }}</h3>
+                        <p class="summary-label">Average Age</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.male_count }}</h3>
+                        <p class="summary-label">Male</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.female_count }}</h3>
+                        <p class="summary-label">Female</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.want_training }}</h3>
+                        <p class="summary-label">Want Training</p>
+                    </div>
+                </div>
+            </div>
+            {% elif category == 'mukkadam' %}
+            <hr>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.avg_workers|floatformat:0 }}</h3>
+                        <p class="summary-label">Avg Workers</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.with_transport }}</h3>
+                        <p class="summary-label">Provide Transport</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.provide_tools }}</h3>
+                        <p class="summary-label">Provide Tools</p>
+                    </div>
+                </div>
+            </div>
+            {% elif category == 'transport' %}
+            <hr>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.avg_capacity|floatformat:0 }}</h3>
+                        <p class="summary-label">Avg Capacity</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.vehicle_types.count }}</h3>
+                        <p class="summary-label">Vehicle Types</p>
+                    </div>
+                </div>
+            </div>
+            {% elif category == 'others' %}
+            <hr>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.interested_referrals }}</h3>
+                        <p class="summary-label">Interested in Referrals</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="summary-item">
+                        <h3 class="summary-number">{{ category_stats.know_mukadams }}</h3>
+                        <p class="summary-label">Know Mukadams</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Search and Filter Bar -->
+        <div class="search-filter-bar">
+            <form method="get" class="row align-items-end">
+                <div class="col-md-6">
+                    <label for="search" class="form-label">Search Registrations</label>
+                    <input type="text" class="form-control" id="search" name="search" value="{{ search }}"
+                           placeholder="Search by name, phone, village, or taluka...">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-2"></i>Search
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <div class="export-dropdown">
+                        <a href="{% url 'registration:export_category' category %}" class="btn btn-success w-100">
+                            <i class="fas fa-download me-2"></i>Export CSV
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Registration Cards -->
+        {% for registration in registrations %}
+        <div class="registration-card">
+            <div class="registration-header">
+                <h4 class="registration-name">
+                    <i class="{{ category_icon }} me-2"></i>{{ registration.full_name }}
+                </h4>
+                <div class="registration-date">
+                    <i class="fas fa-calendar me-1"></i>{{ registration.created_at|date:"M d, Y" }}
+                    <br>
+                    <small>{{ registration.created_at|timesince }} ago</small>
+                </div>
+            </div>
+
+            <div class="registration-info">
+                <div class="info-item">
+                    <i class="fas fa-phone info-icon"></i>
+                    <span class="info-label">Phone:</span>
+                    <span class="info-value">{{ registration.mobile_number }}</span>
+                </div>
+                <div class="info-item">
+                    <i class="fab fa-whatsapp info-icon"></i>
+                    <span class="info-label">WhatsApp:</span>
+                    <span class="info-value">{{ registration.whatsapp_number }}</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-map-marker-alt info-icon"></i>
+                    <span class="info-label">Location:</span>
+                    <span class="info-value">{{ registration.village }}, {{ registration.taluka }}</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-home info-icon"></i>
+                    <span class="info-label">Address:</span>
+                    <span class="info-value">{{ registration.home_address|truncatechars:50 }}</span>
+                </div>
+
+                <!-- Category-specific info -->
+                {% if category == 'individual-labor' %}
+                <div class="info-item">
+                    <i class="fas fa-user info-icon"></i>
+                    <span class="info-label">Gender:</span>
+                    <span class="info-value">{{ registration.get_gender_display }}, {{ registration.age }} years</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-rupee-sign info-icon"></i>
+                    <span class="info-label">Expected:</span>
+                    <span class="info-value">₹{{ registration.expected_wage }}</span>
+                </div>
+                {% elif category == 'mukkadam' %}
+                <div class="info-item">
+                    <i class="fas fa-users info-icon"></i>
+                    <span class="info-label">Workers:</span>
+                    <span class="info-value">{{ registration.providing_labour_count }} (Peak: {{ registration.total_workers_peak }})</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-rupee-sign info-icon"></i>
+                    <span class="info-label">Charges:</span>
+                    <span class="info-value">₹{{ registration.expected_charges }}</span>
+                </div>
+                {% elif category == 'transport' %}
+                <div class="info-item">
+                    <i class="fas fa-truck info-icon"></i>
+                    <span class="info-label">Vehicle:</span>
+                    <span class="info-value">{{ registration.vehicle_type }} ({{ registration.people_capacity }} people)</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-rupee-sign info-icon"></i>
+                    <span class="info-label">Fare:</span>
+                    <span class="info-value">₹{{ registration.expected_fair }}</span>
+                </div>
+                {% elif category == 'others' %}
+                <div class="info-item">
+                    <i class="fas fa-building info-icon"></i>
+                    <span class="info-label">Business:</span>
+                    <span class="info-value">{{ registration.business_name }}</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-handshake info-icon"></i>
+                    <span class="info-label">Referrals:</span>
+                    <span class="info-value">{{ registration.interested_referrals|yesno:"Interested,Not interested" }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="registration-actions">
+                {% if registration.location %}
+                <span class="location-badge">
+                    <i class="fas fa-map-marker-alt me-1"></i>GPS Available
+                </span>
+                {% endif %}
+
+                {% if registration.photo %}
+                <span class="photo-badge">
+                    <i class="fas fa-camera me-1"></i>Photo Available
+                </span>
+                {% endif %}
+
+                <a href="/admin/registration/{{ category|cut:'-' }}/{{ registration.id }}/change/"
+                   class="btn btn-outline-primary btn-sm-custom">
+                    <i class="fas fa-edit me-1"></i>Edit
+                </a>
+
+                {% if registration.location %}
+                <a href="https://www.google.com/maps?q={{ registration.location.y }},{{ registration.location.x }}"
+                   target="_blank" class="btn btn-outline-success btn-sm-custom">
+                    <i class="fas fa-map me-1"></i>View Map
+                </a>
+                {% endif %}
+
+                {% comment %} <a href="tel:{{ registration.mobile_number }}" class="btn btn-outline-info btn-sm-custom">
+                    <i class="fas fa-phone me-1"></i>Call
+                </a>
+
+                <a href="https://wa.me/{{ registration.whatsapp_number }}" target="_blank"
+                   class="btn btn-outline-success btn-sm-custom">
+                    <i class="fab fa-whatsapp me-1"></i>WhatsApp
+                </a> {% endcomment %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="no-results">
+            <i class="fas fa-search fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">No registrations found</h4>
+            {% if search %}
+            <p class="text-muted">No results found for "{{ search }}". Try different search terms.</p>
+            <a href="?" class="btn btn-primary">Clear Search</a>
+            {% else %}
+            <p class="text-muted">No {{ category_name|lower }} registrations yet.</p>
+            <a href="{% url 'registration:registration' %}" class="btn btn-primary">Add First Registration</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <!-- Pagination -->
+        {% if registrations.has_other_pages %}
+        <div class="pagination-custom">
+            <nav aria-label="Registration pagination">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if registrations.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ registrations.previous_page_number }}{% if search %}&search={{ search }}{% endif %}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for num in registrations.paginator.page_range %}
+                    {% if registrations.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% elif num > registrations.number|add:'-3' and num < registrations.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% if registrations.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ registrations.next_page_number }}{% if search %}&search={{ search }}{% endif %}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            <div class="text-center mt-3 text-muted">
+                Showing {{ registrations.start_index }} to {{ registrations.end_index }} of {{ registrations.paginator.count }} registrations
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

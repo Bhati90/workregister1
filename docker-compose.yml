@@ -1,0 +1,31 @@
+
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: labour_crm_db
+    environment:
+      POSTGRES_DB: registration_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: work1234 # Host port 5555 -> Container port 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  web:
+    build: .
+    container_name: labour_crm_web
+    command: gunicorn labour_crm.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      POSTGRES_DB: registration_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: work1234
+      POSTGRES_HOST: db
+
+volumes:
+  pgdata:

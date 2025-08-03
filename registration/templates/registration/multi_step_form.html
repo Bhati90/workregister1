@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labor Registration - {{ step_title }}</title>
+     {% load pwa %}
+    {% progressive_web_app_meta %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .main-container {
+            padding: 20px 0;
+            min-height: 100vh;
+        }
+
+        .form-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            max-width: 800px;
+        }
+
+        .progress-container {
+            margin-bottom: 40px;
+        }
+
+        .progress {
+            height: 10px;
+            border-radius: 10px;
+            background-color: #e9ecef;
+        }
+
+        .progress-bar {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 10px;
+            transition: width 0.6s ease;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .step-item {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e9ecef;
+            color: #6c757d;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .step-item.active .step-number {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .step-item.completed .step-number {
+            background: #28a745;
+            color: white;
+        }
+
+        .step-label {
+            font-size: 12px;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .step-item.active .step-label {
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .form-title {
+            color: #2d3748;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .form-check {
+            margin-bottom: 15px;
+        }
+
+        .form-check-input {
+            margin-right: 10px;
+        }
+
+        .form-check-label {
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 30px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 30px;
+            font-weight: 600;
+        }
+
+        .btn-navigation {
+            width: 150px;
+        }
+
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .skill-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .skill-item:hover {
+            border-color: #667eea;
+        }
+
+        .alert {
+            border-radius: 12px;
+            border: none;
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .agreement-box {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        /* Camera and Location Styles */
+        .camera-container {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .camera-section {
+            margin-bottom: 20px;
+        }
+
+        .camera-video {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            border-radius: 15px;
+            background: #000;
+            object-fit: cover;
+            border: 2px solid #dee2e6;
+        }
+
+        .camera-controls {
+            margin-top: 15px;
+        }
+
+        .camera-controls .btn {
+            margin: 5px;
+            min-width: 140px;
+        }
+
+        .camera-info {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(23, 162, 184, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(23, 162, 184, 0.2);
+        }
+
+        .photo-preview {
+            text-align: center;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .preview-header {
+            margin-bottom: 20px;
+        }
+
+        .preview-image-container {
+            margin-bottom: 20px;
+        }
+
+        .preview-image {
+            max-width: 350px;
+            max-height: 350px;
+            border-radius: 15px;
+            border: 3px solid #ffc107;
+            object-fit: cover;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .preview-controls {
+            margin-bottom: 15px;
+        }
+
+        .preview-controls .btn {
+            margin: 5px;
+            min-width: 130px;
+        }
+
+        .photo-tips {
+            background: rgba(255, 193, 7, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            margin-top: 15px;
+        }
+
+        .photo-confirmed {
+            text-align: center;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .confirmed-image-container {
+            margin-bottom: 15px;
+        }
+
+        .final-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 15px;
+            border: 3px solid #28a745;
+            object-fit: cover;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .fallback-header {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .location-container {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .location-info {
+            background: rgba(40, 167, 69, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(40, 167, 69, 0.3);
+        }
+
+        .location-error {
+            background: rgba(255, 193, 7, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+        }
+
+        .location-details {
+            margin-top: 10px;
+        }
+
+        .camera-status, .location-status {
+            margin-top: 15px;
+        }
+
+        .upload-fallback {
+            background: rgba(255, 193, 7, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            text-align: left;
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .form-container {
+                margin: 10px;
+                padding: 25px;
+            }
+
+            .btn-navigation {
+                width: 120px;
+                font-size: 14px;
+            }
+
+            .skills-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .camera-video {
+                height: 250px;
+                max-width: 100%;
+            }
+
+            .camera-controls {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px;
+            }
+
+            .camera-controls .btn {
+                min-width: 100px;
+                font-size: 13px;
+                padding: 8px 12px;
+                flex: 0 1 auto;
+            }
+
+            .preview-controls {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px;
+            }
+
+            .preview-controls .btn {
+                min-width: 100px;
+                font-size: 13px;
+                flex: 0 1 auto;
+            }
+
+            .preview-image {
+                max-width: 90vw;
+                max-height: 300px;
+            }
+
+            .photo-tips {
+                text-align: left;
+                font-size: 13px;
+            }
+
+            .camera-info {
+                font-size: 13px;
+            }
+
+            .camera-switch-text {
+                display: none;
+            }
+
+            /* Show only icon on very small screens */
+            @media (max-width: 480px) {
+                .camera-controls .btn {
+                    min-width: 80px;
+                    font-size: 12px;
+                    padding: 6px 8px;
+                }
+
+                .camera-controls .btn span {
+                    display: none;
+                }
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="container">
+            <div class="form-container">
+                <div class="progress-container">
+                    <div class="step-indicator">
+                        <div class="step-item {% if step >= 1 %}active{% endif %} {% if step > 1 %}completed{% endif %}">
+                            <div class="step-number">
+                                {% if step > 1 %}<i class="fas fa-check"></i>{% else %}1{% endif %}
+                            </div>
+                            <div class="step-label">Basic Info</div>
+                        </div>
+                        <div class="step-item {% if step >= 2 %}active{% endif %} {% if step > 2 %}completed{% endif %}">
+                            <div class="step-number">
+                                {% if step > 2 %}<i class="fas fa-check"></i>{% else %}2{% endif %}
+                            </div>
+                            <div class="step-label">Category Details</div>
+                        </div>
+                        <div class="step-item {% if step >= 3 %}active{% endif %}">
+                            <div class="step-number">3</div>
+                            <div class="step-label">Agreement</div>
+                        </div>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: {{ progress_percent }}%"></div>
+                    </div>
+                </div>
+
+                <h2 class="form-title">
+                    <i class="fas fa-user-plus me-3"></i>{{ step_title }}
+                </h2>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <form method="post" enctype="multipart/form-data" id="registrationForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="step" value="{{ step }}">
+                    {# Hidden input to pass category from step 1 to subsequent GET requests in views.py #}
+                    <input type="hidden" id="currentCategoryHidden" name="current_category_from_db" value="">
+
+                    {% if step == 1 %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.full_name.id_for_label }}">
+                                        <i class="fas fa-user me-2"></i>Full Name *
+                                    </label>
+                                    {{ form.full_name }}
+                                    {% if form.full_name.errors %}
+                                        <div class="text-danger mt-1">{{ form.full_name.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.mobile_number.id_for_label }}">
+                                        <i class="fas fa-phone me-2"></i>Mobile Number *
+                                    </label>
+                                    {{ form.mobile_number }}
+                                    {% if form.mobile_number.errors %}
+                                        <div class="text-danger mt-1">{{ form.mobile_number.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.category.id_for_label }}">
+                                        <i class="fas fa-tags me-2"></i>Category *
+                                    </label>
+                                    {{ form.category }}
+                                    {% if form.category.errors %}
+                                        <div class="text-danger mt-1">{{ form.category.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.taluka.id_for_label }}">
+                                        <i class="fas fa-map-marker-alt me-2"></i>Taluka *
+                                    </label>
+                                    {{ form.taluka }}
+                                    {% if form.taluka.errors %}
+                                        <div class="text-danger mt-1">{{ form.taluka.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.village.id_for_label }}">
+                                        <i class="fas fa-home me-2"></i>Village *
+                                    </label>
+                                    {{ form.village }}
+                                    {% if form.village.errors %}
+                                        <div class="text-danger mt-1">{{ form.village.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-camera me-2"></i>Take Your Photo
+                            </label>
+
+                            <div class="camera-container">
+                                <div id="camera-section" class="camera-section">
+                                    <video id="camera-stream" autoplay playsinline class="camera-video"></video>
+                                    <canvas id="photo-canvas" style="display: none;"></canvas>
+
+                                    <div class="camera-controls">
+                                        <button type="button" id="start-camera" class="btn btn-primary">
+                                            <i class="fas fa-camera me-2"></i>Start Camera
+                                        </button>
+                                        <button type="button" id="capture-photo" class="btn btn-success" style="display: none;">
+                                            <i class="fas fa-camera-retro me-2"></i>Capture Photo
+                                        </button>
+                                        <button type="button" id="switch-camera" class="btn btn-info" style="display: none;">
+                                            <i class="fas fa-sync-alt me-2"></i>
+                                            <span class="camera-switch-text">Switch Camera</span>
+                                        </button>
+                                    </div>
+
+                                    <div id="camera-info" class="camera-info" style="display: none;">
+                                        <small class="text-muted">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Current: <span id="current-camera">Back Camera</span>
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <div id="photo-preview" class="photo-preview" style="display: none;">
+                                    <div class="preview-header">
+                                        <h5 class="text-success">
+                                            <i class="fas fa-check-circle me-2"></i>Photo Captured!
+                                        </h5>
+                                        <p class="text-muted">Review your photo below:</p>
+                                    </div>
+
+                                    <div class="preview-image-container">
+                                        <img id="captured-image" src="" alt="Captured photo" class="preview-image">
+                                    </div>
+
+                                    <div class="preview-controls">
+                                        <button type="button" id="retake-photo" class="btn btn-warning">
+                                            <i class="fas fa-redo me-2"></i>Retake Photo
+                                        </button>
+                                        <button type="button" id="confirm-photo" class="btn btn-success">
+                                            <i class="fas fa-check me-2"></i>Use This Photo
+                                        </button>
+                                    </div>
+
+                                    <div class="photo-tips">
+                                        <small class="text-muted">
+                                            <i class="fas fa-lightbulb me-1"></i>
+                                            <strong>Tips for better photos:</strong><br>
+                                            • Ensure good lighting (face natural light if possible)<br>
+                                            • Keep the camera steady<br>
+                                            • Make sure your face is clearly visible<br>
+                                            • Avoid shadows on your face<br>
+                                            • Remove sunglasses or hats if wearing any
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <div id="photo-confirmed" class="photo-confirmed" style="display: none;">
+                                    <div class="confirmed-image-container">
+                                        <img id="final-image" src="" alt="Final photo" class="final-image">
+                                    </div>
+                                    <p class="text-success mt-2">
+                                        <i class="fas fa-check-double me-2"></i>Photo confirmed and ready!
+                                    </p>
+                                    <button type="button" id="change-photo" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-edit me-2"></i>Change Photo
+                                    </button>
+                                </div>
+
+                                <div id="upload-fallback" class="upload-fallback" style="display: none;">
+                                    <div class="fallback-header">
+                                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                        <strong>Camera not available</strong>
+                                    </div>
+                                    <p class="text-muted">Please upload a photo instead:</p>
+                                    {{ form.photo }} {# This field is fine as it's the direct file input #}
+                                    <small class="form-text text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Upload a clear photo of yourself (JPG, PNG formats supported)
+                                    </small>
+                                </div>
+
+                                <div id="camera-status" class="camera-status"></div>
+                            </div>
+
+                            <input type="hidden" name="captured_photo" id="captured_photo_hidden">
+                            <input type="hidden" name="latitude" id="latitude_hidden">
+                            <input type="hidden" name="longitude" id="longitude_hidden">
+                            <input type="hidden" name="location_accuracy" id="location_accuracy_hidden">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-map-marker-alt me-2"></i>Current Location
+                            </label>
+                            <div class="location-container">
+                                <div id="location-status" class="location-status">
+                                    <button type="button" id="get-location" class="btn btn-info">
+                                        <i class="fas fa-crosshairs me-2"></i>Get My Location
+                                    </button>
+                                    <div id="location-info" class="location-info mt-3" style="display: none;">
+                                        <p class="text-success">
+                                            <i class="fas fa-check-circle me-2"></i>Location captured successfully!
+                                        </p>
+                                        <div class="location-details">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                <span id="location-coordinates"></span>
+                                                (Accuracy: <span id="location-accuracy"></span>)
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div id="location-error" class="location-error mt-2" style="display: none;">
+                                        <p class="text-warning">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <span id="location-error-message">Unable to get location</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    {% elif step == 2 %}
+                        {# This hidden input is for client-side JS on step 2 to know the category #}
+                        <input type="hidden" name="current_category" id="currentCategorySession" value="{{ category }}">
+                        {% include 'registration/category_forms.html' %}
+
+                    {% elif step == 3 %}
+                        <div class="agreement-box">
+                            <h5 class="mb-3"><i class="fas fa-file-contract me-2"></i>Data Sharing Agreement</h5>
+                            <p style="white-space: pre-line;">{{ form.agreement_text }}</p>
+                        </div>
+
+                        <div class="form-check mb-4">
+                            {{ form.data_sharing_agreement }}
+                            <label class="form-check-label" for="{{ form.data_sharing_agreement.id_for_label }}">
+                                <strong>{{ form.data_sharing_agreement.label }}</strong>
+                            </label>
+                            {% if form.data_sharing_agreement.errors %}
+                                <div class="text-danger mt-1">{{ form.data_sharing_agreement.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between mt-4">
+                        {% if step > 1 %}
+                            <button type="button" class="btn btn-secondary btn-navigation" id="prevStepBtn" onclick="goBack()">
+                                <i class="fas fa-arrow-left me-2"></i>Previous
+                            </button>
+                        {% else %}
+                            <div></div>
+                        {% endif %}
+
+                        <!-- {# CRITICAL CHANGE: type="submit" changed to type="button" for all steps.
+                           JS handleNextSubmit will control all navigation. #} -->
+                        <button type="submit" class="btn btn-primary btn-navigation" id="nextStepBtn">
+                            {% if step == 3 %}
+                                <i class="fas fa-check me-2"></i>Submit
+                            {% else %}
+                                Next<i class="fas fa-arrow-right ms-2"></i>
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- <script>
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
+
+        // Global variables for camera and location
+        let cameraStream = null;
+        let locationData = null;
+        let photoData = null;
+        let currentFacingMode = 'environment'; // Start with back camera (better for general photos)
+        let availableCameras = [];
+
+        // Initialize camera and location on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.querySelector('input[name="step"]').value === '1') {
+                initializeCameraAndLocation();
+            }
+
+            // Initialize other form elements
+            initializeFormElements();
+        });
+
+        function initializeCameraAndLocation() {
+            // Auto-request location on page load
+            setTimeout(() => {
+                getCurrentLocation();
+            }, 1000);
+
+            // Initialize camera controls
+            const startCameraBtn = document.getElementById('start-camera');
+            const capturePhotoBtn = document.getElementById('capture-photo');
+            const switchCameraBtn = document.getElementById('switch-camera');
+            const retakePhotoBtn = document.getElementById('retake-photo');
+            const confirmPhotoBtn = document.getElementById('confirm-photo');
+            const changePhotoBtn = document.getElementById('change-photo');
+            const getLocationBtn = document.getElementById('get-location');
+
+            if (startCameraBtn) {
+                startCameraBtn.addEventListener('click', startCamera);
+            }
+            if (capturePhotoBtn) {
+                capturePhotoBtn.addEventListener('click', capturePhoto);
+            }
+            if (switchCameraBtn) {
+                switchCameraBtn.addEventListener('click', switchCamera);
+            }
+            if (retakePhotoBtn) {
+                retakePhotoBtn.addEventListener('click', retakePhoto);
+            }
+            if (confirmPhotoBtn) {
+                confirmPhotoBtn.addEventListener('click', confirmPhoto);
+            }
+            if (changePhotoBtn) {
+                changePhotoBtn.addEventListener('click', changePhoto);
+            }
+            if (getLocationBtn) {
+                getLocationBtn.addEventListener('click', getCurrentLocation);
+            }
+
+            // Check available cameras on load
+            checkAvailableCameras();
+        }
+
+        // Check available cameras and set up UI accordingly
+        async function checkAvailableCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                availableCameras = devices.filter(device => device.kind === 'videoinput');
+
+                // Show switch button only if multiple cameras available
+                const switchBtn = document.getElementById('switch-camera');
+                if (availableCameras.length > 1) {
+                    // Multiple cameras available
+                    console.log(`Found ${availableCameras.length} cameras`);
+                } else {
+                    // Hide switch button if only one camera
+                    if (switchBtn) {
+                        switchBtn.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.log('Could not enumerate devices:', error);
+            }
+        }
+
+        // Camera Functions
+        async function startCamera() {
+            const video = document.getElementById('camera-stream');
+            const startBtn = document.getElementById('start-camera');
+            const captureBtn = document.getElementById('capture-photo');
+            const switchBtn = document.getElementById('switch-camera');
+            const statusDiv = document.getElementById('camera-status');
+            const cameraInfo = document.getElementById('camera-info');
+
+            try {
+                // Request camera with mobile-optimized settings
+                const constraints = {
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: currentFacingMode // 'environment' for back camera, 'user' for front
+                    }
+                };
+
+                statusDiv.innerHTML = '<div class="loading-spinner"></div>Starting camera...';
+
+                // Stop existing stream if any
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                }
+
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = cameraStream;
+
+                // Hide start button, show capture and switch buttons
+                startBtn.style.display = 'none';
+                captureBtn.style.display = 'inline-block';
+
+                // Show switch button only if multiple cameras available
+                if (availableCameras.length > 1) {
+                    switchBtn.style.display = 'inline-block';
+                }
+
+                // Show camera info
+                cameraInfo.style.display = 'block';
+                updateCameraInfo();
+
+                statusDiv.innerHTML = '<p class="text-info"><i class="fas fa-info-circle me-2"></i>Camera ready! Position yourself properly and click capture.</p>';
+
+            } catch (error) {
+                console.error('Camera error:', error);
+
+                let errorMessage = 'Camera access denied or not available.';
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = 'No camera found on this device.';
+                } else if (error.name === 'NotReadableError') {
+                    errorMessage = 'Camera is being used by another application.';
+                }
+
+                statusDiv.innerHTML = `<p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>${errorMessage}</p>`;
+
+                // Show upload fallback
+                document.getElementById('upload-fallback').style.display = 'block';
+                document.getElementById('upload-fallback').querySelector('input[type="file"]').style.display = 'block';
+            }
+        }
+
+        async function switchCamera() {
+            // Toggle between front and back camera
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+
+            // Restart camera with new facing mode
+            await startCamera();
+        }
+
+        function updateCameraInfo() {
+            const currentCameraSpan = document.getElementById('current-camera');
+            const switchButton = document.getElementById('switch-camera');
+            const switchText = switchButton ? switchButton.querySelector('.camera-switch-text') : null;
+
+            if (currentCameraSpan) {
+                const cameraName = currentFacingMode === 'environment' ? 'Back Camera' : 'Front Camera';
+                currentCameraSpan.textContent = cameraName;
+
+                // Update switch button text to show what it will switch to
+                if (switchText) {
+                    const switchTo = currentFacingMode === 'environment' ? 'Front' : 'Back';
+                    switchText.textContent = `Switch to ${switchTo}`;
+                }
+            }
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('camera-stream');
+            const canvas = document.getElementById('photo-canvas');
+            const captureBtn = document.getElementById('capture-photo');
+            const switchBtn = document.getElementById('switch-camera');
+            const cameraSection = document.getElementById('camera-section');
+            const previewDiv = document.getElementById('photo-preview');
+            const capturedImg = document.getElementById('captured-image');
+
+            // Set canvas dimensions to match video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Capture photo to canvas
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0);
+
+            // Convert to base64
+            photoData = canvas.toDataURL('image/jpeg', 0.85); // Higher quality
+
+            // Show preview
+            capturedImg.src = photoData;
+            cameraSection.style.display = 'none';
+            previewDiv.style.display = 'block';
+
+            // Stop camera stream temporarily (will restart if retake)
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+        }
+
+        function retakePhoto() {
+            const cameraSection = document.getElementById('camera-section');
+            const previewDiv = document.getElementById('photo-preview');
+            const confirmedDiv = document.getElementById('photo-confirmed');
+
+            // Reset states
+            cameraSection.style.display = 'block';
+            previewDiv.style.display = 'none';
+            confirmedDiv.style.display = 'none';
+
+            // Clear photo data
+            photoData = null;
+            document.querySelector('input[name="captured_photo"]').value = '';
+
+            // Restart camera
+            startCamera();
+        }
+
+        function confirmPhoto() {
+            const previewDiv = document.getElementById('photo-preview');
+            const confirmedDiv = document.getElementById('photo-confirmed');
+            const finalImg = document.getElementById('final-image');
+            const capturedPhotoInput = document.querySelector('input[name="captured_photo"]');
+
+            // Store photo data in hidden input
+            capturedPhotoInput.value = photoData;
+
+            // Show final confirmation
+            finalImg.src = photoData;
+            previewDiv.style.display = 'none';
+            confirmedDiv.style.display = 'block';
+
+            // Clear any error states
+            document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo captured and confirmed!</p>';
+        }
+
+        function changePhoto() {
+            // Allow user to change/retake the photo
+            retakePhoto();
+        }
+
+        // Location Functions
+        function getCurrentLocation() {
+            const locationBtn = document.getElementById('get-location');
+            const locationInfo = document.getElementById('location-info');
+            const locationError = document.getElementById('location-error');
+            const coordinatesSpan = document.getElementById('location-coordinates');
+            const accuracySpan = document.getElementById('location-accuracy');
+
+            if (!navigator.geolocation) {
+                showLocationError('Geolocation is not supported by this browser.');
+                return;
+            }
+
+            // Show loading
+            locationBtn.innerHTML = '<div class="loading-spinner"></div>Getting location...';
+            locationBtn.disabled = true;
+            locationError.style.display = 'none';
+
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000 // 1 minute
+            };
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    // Success
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+
+                    // Store location data
+                    locationData = {
+                        latitude: lat,
+                        longitude: lng,
+                        accuracy: accuracy
+                    };
+
+                    // Update hidden form fields
+                    document.querySelector('input[name="latitude"]').value = lat;
+                    document.querySelector('input[name="longitude"]').value = lng;
+                    document.querySelector('input[name="location_accuracy"]').value = accuracy;
+
+                    // Show location info
+                    coordinatesSpan.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                    accuracySpan.textContent = `${accuracy.toFixed(0)}m`;
+
+                    locationInfo.style.display = 'block';
+                    locationError.style.display = 'none';
+
+                    // Reset button
+                    locationBtn.innerHTML = '<i class="fas fa-check me-2"></i>Location Captured';
+                    locationBtn.disabled = false;
+                    locationBtn.className = 'btn btn-success';
+                },
+                function(error) {
+                    // Error
+                    let errorMessage = 'Unable to retrieve location.';
+
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage = 'Location access denied by user.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage = 'Location information unavailable.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage = 'Location request timed out.';
+                            break;
+                    }
+
+                    showLocationError(errorMessage);
+                },
+                options
+            );
+        }
+
+        function showLocationError(message) {
+            const locationBtn = document.getElementById('get-location');
+            const locationError = document.getElementById('location-error');
+            const locationInfo = document.getElementById('location-info');
+            const errorMessageSpan = document.getElementById('location-error-message');
+
+            errorMessageSpan.textContent = message;
+            locationError.style.display = 'block';
+            locationInfo.style.display = 'none';
+
+            // Reset button
+            locationBtn.innerHTML = '<i class="fas fa-crosshairs me-2"></i>Try Again';
+            locationBtn.disabled = false;
+            locationBtn.className = 'btn btn-warning';
+        }
+
+        // Form Functions
+        function initializeFormElements() {
+            // Show/hide referral fields for Individual Labor
+            const canReferCheckbox = document.querySelector('input[name="can_refer_others"]');
+            const referralFields = document.getElementById('referral-fields');
+
+            if (canReferCheckbox && referralFields) {
+                canReferCheckbox.addEventListener('change', function() {
+                    referralFields.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+
+            // Show/hide transport other field for Mukkadam
+            const transportSelect = document.querySelector('select[name="arrange_transport"]');
+            const transportOtherField = document.getElementById('transport-other-field');
+
+            if (transportSelect && transportOtherField) {
+                transportSelect.addEventListener('change', function() {
+                    transportOtherField.style.display = this.value === 'other' ? 'block' : 'none';
+                });
+            }
+
+            // Auto-format phone numbers
+            document.querySelectorAll('input[type="text"]').forEach(input => {
+                if (input.name.includes('number')) {
+                    input.addEventListener('input', function(e) {
+                        // Remove non-numeric characters except +
+                        let value = e.target.value.replace(/[^\d+]/g, '');
+
+                        // Add +91 prefix if not present and number doesn't start with +
+                        if (value && !value.startsWith('+') && !value.startsWith('91')) {
+                            value = '+91' + value;
+                        }
+
+                        e.target.value = value;
+                    });
+                }
+            });
+        }
+
+        function goBack() {
+            const currentStep = parseInt(document.querySelector('input[name="step"]').value);
+            if (currentStep > 1) {
+                window.location.href = `?step=${currentStep - 1}`;
+            }
+        }
+
+        // Enhanced form validation
+        document.getElementById('registrationForm').addEventListener('submit', function(e) {
+            const step = parseInt(document.querySelector('input[name="step"]').value);
+
+            if (step === 1) {
+                // Validate required fields in step 1
+                const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
+                let isValid = true;
+
+                requiredFields.forEach(fieldName => {
+                    const field = document.querySelector(`[name="${fieldName}"]`);
+                    if (field && !field.value.trim()) {
+                        field.classList.add('is-invalid');
+                        isValid = false;
+                    } else if (field) {
+                        field.classList.remove('is-invalid');
+                    }
+                });
+
+                // Check if photo is captured or uploaded
+                const capturedPhoto = document.querySelector('input[name="captured_photo"]').value;
+                const uploadedPhoto = document.querySelector('input[name="photo"]').files.length;
+
+                if (!capturedPhoto && !uploadedPhoto) {
+                    // Show warning but don't prevent submission
+                    if (!confirm('No photo was captured or uploaded. A photo helps with verification and improves your chances of getting work. Do you want to continue without a photo?')) {
+                        //e.preventDefault();
+                        // Show camera interface to encourage photo capture
+                        //document.getElementById('camera-section').scrollIntoView({ behavior: 'smooth' });
+                        //return;
+                    }
+                } else if (capturedPhoto) {
+                    // Check if photo is properly confirmed
+                    const photoConfirmed = document.getElementById('photo-confirmed');
+                    const photoPreview = document.getElementById('photo-preview');
+
+                    if (photoPreview.style.display !== 'none' && photoConfirmed.style.display === 'none') {
+                        // Photo captured but not confirmed
+                        alert('Please confirm your photo by clicking "Use This Photo" or retake it if you\'re not satisfied.');
+                        e.preventDefault();
+                        photoPreview.scrollIntoView({ behavior: 'smooth' });
+                        return;
+                    }
+                }
+
+                // Check location
+                const latitude = document.querySelector('input[name="latitude"]').value;
+                const longitude = document.querySelector('input[name="longitude"]').value;
+
+                if (!latitude || !longitude) {
+                    // Show warning but don't prevent submission
+                    if (!confirm('Location was not captured. This may affect service quality. Do you want to continue without location?')) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
+
+                if (!isValid) {
+                    e.preventDefault();
+                    alert('Please fill in all required fields.');
+                }
+            }
+
+            if (step === 2) {
+                // Validate category-specific required fields in step 2
+                let isValid = true;
+                let requiredFields = [];
+
+                // Get the category from session/hidden field or determine from form
+                const categoryElements = document.querySelectorAll('[data-category]');
+                let currentCategory = '';
+
+                // Determine current category from visible form elements
+                if (document.querySelector('.individual-labor-form') && document.querySelector('.individual-labor-form').style.display !== 'none') {
+                    currentCategory = 'individual_labor';
+                } else if (document.querySelector('.mukkadam-form') && document.querySelector('.mukkadam-form').style.display !== 'none') {
+                    currentCategory = 'mukkadam';
+                } else if (document.querySelector('.transport-form') && document.querySelector('.transport-form').style.display !== 'none') {
+                    currentCategory = 'transport';
+                } else if (document.querySelector('.others-form') && document.querySelector('.others-form').style.display !== 'none') {
+                    currentCategory = 'others';
+                }
+
+                // Alternative: get category from form context if available
+                if (!currentCategory) {
+                    const categoryFromContext = document.querySelector('input[name="current_category"]');
+                    if (categoryFromContext) {
+                        currentCategory = categoryFromContext.value;
+                    }
+                }
+
+                // Define required fields based on category
+                switch(currentCategory) {
+                    case 'individual_labor':
+                        requiredFields = [
+                            'gender', 'age', 'primary_source_income', 'employment_type',
+                            'willing_to_migrate', 'expected_wage', 'availability',
+                            'adult_men_seeking_employment', 'adult_women_seeking_employment'
+                        ];
+                        break;
+
+                    case 'mukkadam':
+                        requiredFields = [
+                            'providing_labour_count', 'total_workers_peak', 'expected_charges',
+                            'labour_supply_availability', 'arrange_transport', 'supply_areas'
+                        ];
+                        break;
+
+                    case 'transport':
+                        requiredFields = [
+                            'vehicle_type', 'people_capacity', 'expected_fair',
+                            'availability', 'service_areas'
+                        ];
+                        break;
+
+                    case 'others':
+                        requiredFields = [
+                            'business_name', 'help_description'
+                        ];
+                        break;
+
+                    default:
+                        console.warn('Unknown category for step 2 validation');
+                        break;
+                }
+
+                // Validate required fields
+                requiredFields.forEach(fieldName => {
+                    const field = document.querySelector(`[name="${fieldName}"]`);
+                    if (field) {
+                        let fieldValue = '';
+
+                        // Handle different input types
+                        if (field.type === 'checkbox') {
+                            // For checkboxes, we might need special handling
+                            fieldValue = field.checked ? 'checked' : '';
+                        } else if (field.type === 'number') {
+                            fieldValue = field.value && field.value !== '0' ? field.value : '';
+                        } else {
+                            fieldValue = field.value ? field.value.trim() : '';
+                        }
+
+                        // Special validation for number fields that shouldn't be 0
+                        if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
+                            if (!fieldValue || parseInt(fieldValue) <= 0) {
+                                field.classList.add('is-invalid');
+                                isValid = false;
+                            } else {
+                                field.classList.remove('is-invalid');
+                            }
+                        } else if (!fieldValue) {
+                            field.classList.add('is-invalid');
+                            isValid = false;
+                        } else {
+                            field.classList.remove('is-invalid');
+                        }
+                    }
+                });
+
+                // Special validation for Individual Labor
+                if (currentCategory === 'individual_labor') {
+                    // Check if at least one skill is selected or "None" is selected
+                    const skillCheckboxes = document.querySelectorAll('input[name="skills"]:checked');
+                    if (skillCheckboxes.length === 0) {
+                        if (!confirm('No skills selected. Are you sure you want to continue without specifying any skills?')) {
+                            e.preventDefault();
+                            return;
+                        }
+                    }
+
+                    // Check if at least one communication preference is selected
+                    const commCheckboxes = document.querySelectorAll('input[name="communication_preferences"]:checked');
+                    if (commCheckboxes.length === 0) {
+                        if (!confirm('No communication preferences selected. Please select at least one way to contact you.')) {
+                            e.preventDefault();
+                            return;
+                        }
+                    }
+                }
+
+                // Special validation for Mukkadam
+                if (currentCategory === 'mukkadam') {
+                    // Check if at least one skill is selected
+                    const skillCheckboxes = document.querySelectorAll('input[name="skills"]:checked');
+                    if (skillCheckboxes.length === 0) {
+                        if (!confirm('No skills specified for your workers. Are you sure you want to continue?')) {
+                            e.preventDefault();
+                            return;
+                        }
+                    }
+
+                    // Validate that total workers at peak >= providing labour count
+                    const providingCount = parseInt(document.querySelector('[name="providing_labour_count"]').value) || 0;
+                    const peakCount = parseInt(document.querySelector('[name="total_workers_peak"]').value) || 0;
+
+                    if (peakCount < providingCount) {
+                        alert('Total workers at peak cannot be less than regular providing labour count.');
+                        document.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
+                        e.preventDefault();
+                        return;
+                    }
+                }
+
+                if (!isValid) {
+                    e.preventDefault();
+                    alert('Please fill in all required fields correctly.');
+
+                    // Scroll to first invalid field
+                    const firstInvalid = document.querySelector('.is-invalid');
+                    if (firstInvalid) {
+                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        firstInvalid.focus();
+                    }
+                }
+            }
+
+            if (step === 3) {
+                // Validate agreement checkbox
+                const agreement = document.querySelector('input[name="data_sharing_agreement"]');
+                if (!agreement.checked) {
+                    e.preventDefault();
+                    alert('Please accept the data sharing agreement to proceed.');
+                    agreement.focus();
+                }
+            }
+        });
+
+        // Cleanup function when leaving page
+        window.addEventListener('beforeunload', function() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script> -->
+     <script type="module" src="/static/registration/js/multi_step_form_client.js"></script>
+</body>
+</html>
