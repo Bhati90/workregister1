@@ -273,21 +273,194 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 # # GEOS_LIBRARY_PATH = ...
 
 
+# from pathlib import Path
+# import os
+# import dj_database_url
+
+# # Build paths inside the project like this: BASE_DIR / 'subdir'.
+# BASE_DIR = Path(__file__).resolve().parent.parent
+# # SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
+# # DEBUG = True
+# # ALLOWED_HOSTS = ['*']
+# # Security
+# SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'a-very-long-and-random-string-for-production') # CHANGE THIS DEFAULT
+# DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
+# ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') # Use more specific default
+
+# AUTH_USER_MODEL = 'auth.User' # Ensure this is correct if you have a custom user model
+
+# # Application definition
+# INSTALLED_APPS = [
+#     'django.contrib.admin',
+#     'django.contrib.auth',
+#     'django.contrib.contenttypes',
+#     'django.contrib.sessions',
+#     'django.contrib.messages',
+#     'django.contrib.staticfiles',
+#     'django.contrib.gis',       # <--- ADDED: Crucial for GIS functionalities (Point field)
+#     # 'authentication',         # Uncomment if you have an authentication app
+#     'registration',             # Your custom app
+#     'pwa',                      # Django PWA app
+# ]
+
+# MIDDLEWARE = [
+#     'django.middleware.security.SecurityMiddleware',
+#     'whitenoise.middleware.WhiteNoiseMiddleware', # <--- CORRECTED POSITION: After SecurityMiddleware
+#     'django.contrib.sessions.middleware.SessionMiddleware',
+#     'django.middleware.common.CommonMiddleware',
+#     'django.middleware.csrf.CsrfViewMiddleware',
+#     'django.contrib.auth.middleware.AuthenticationMiddleware',
+#     'django.contrib.messages.middleware.MessageMiddleware',
+#     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+# ]
+
+# DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ROOT_URLCONF = 'labour_crm.urls'
+
+# TEMPLATES = [
+#     {
+#         'BACKEND': 'django.template.backends.django.DjangoTemplates',
+#         'DIRS': [], # Can add project-wide template dirs here: [BASE_DIR / 'templates'],
+#         'APP_DIRS': True, # This tells Django to look for 'templates' directory inside each app
+#         'OPTIONS': {
+#             'context_processors': [
+#                 'django.template.context_processors.debug', # Add this for DEBUG mode context
+#                 'django.template.context_processors.request',
+#                 'django.contrib.auth.context_processors.auth',
+#                 'django.contrib.messages.context_processors.messages',
+#             ],
+#         },
+#     },
+# ]
+
+# WSGI_APPLICATION = 'labour_crm.wsgi.application'
+
+# # Database
+# DATABASES = {
+#     'default': dj_database_url.config(
+#         default=os.environ.get('DATABASE_URL'),
+#         conn_max_age=600,
+#         ssl_require=False # Set to True if your Render DB requires SSL for connection from Docker container
+#     )
+# }
+# # --- REMOVE OR CONDITIONALISE DEBUG PRINTS FOR PRODUCTION ---
+# print("\n--- DEBUG: DATABASES CONFIG ---")
+# print(DATABASES['default']['ENGINE'])
+# print("--- END DEBUG ---\n")
+
+# # Password validation
+# AUTH_PASSWORD_VALIDATORS = [
+#     { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
+#     { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
+#     { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
+#     { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
+# ]
+
+# # DATABASES = {
+# #     'default': {
+# #         'ENGINE': 'django.contrib.gis.db.backends.postgis',
+# #         'NAME': 'registration_db',
+# #         'USER': 'postgres',
+# #         'PASSWORD': 'work1234',
+# #         'HOST': 'localhost',
+# #         'PORT': '5432',
+# #     }
+# # }
+
+
+
+
+# # Internationalization
+# LANGUAGE_CODE = 'en-us'
+# TIME_ZONE = 'UTC'
+# USE_I18N = True
+# USE_TZ = True
+
+# # Media files (for user uploads like photos)
+# MEDIA_URL = '/media/'
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# # Static files (CSS, JavaScript, Images)
+# STATIC_URL = '/static/'
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# # WhiteNoise configuration for serving static files in production
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' # <--- CORRECTED TYPO HERE
+
+# # PWA Settings
+# PWA_APP_NAME = 'AgroIntel'
+# PWA_APP_DESCRIPTION = "AgroIntel - Connecting Farmers with Labours"
+# PWA_APP_THEME_COLOR = '#2196f3'
+# PWA_APP_BACKGROUND_COLOR = '#e3f2fd'
+# PWA_APP_DISPLAY = 'standalone'
+# PWA_APP_SCOPE = '/register/'
+# PWA_APP_START_URL = '/register/'
+
+# # IMPORTANT: Ensure these paths EXACTLY match where your files are located
+# # and where collectstatic will put them under /static/
+# PWA_APP_ICONS = [
+#     {
+#         'src': '/static/registration/images/android-chrome-192x192.png', # <--- CORRECTED PATH (assuming this is your actual filename)
+#         'sizes': '192x192'
+#     },
+#     {
+#         'src': '/static/registration/images/android-chrome-512x512.png', # <--- CORRECTED PATH
+#         'sizes': '512x512'
+#     }
+# ]
+# # Path to your custom service worker
+# PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'registration', 'js', 'serviceworker.js')
+
+
+
+
+
+
+# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
+# GEOS_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\geos_c.dll"
+# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
+
+
+
 from pathlib import Path
 import os
 import dj_database_url
+import sys # Added for conditional database configuration
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-# SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
-# DEBUG = True
-# ALLOWED_HOSTS = ['*']
-# Security
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'a-very-long-and-random-string-for-production') # CHANGE THIS DEFAULT
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') # Use more specific default
 
-AUTH_USER_MODEL = 'auth.User' # Ensure this is correct if you have a custom user model
+# --- SECURITY WARNING: Keep the secret key used in production secret! ---
+# Use a strong, randomly generated key. Never hardcode it in production.
+# Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    raise ImproperlyConfigured("The DJANGO_SECRET_KEY environment variable is not set.")
+
+# --- DEBUG SETTING ---
+# Set to False in production for security and performance.
+# Set DJANGO_DEBUG=True in your environment variables for local development or specific debugging.
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
+
+# --- ALLOWED_HOSTS ---
+# This is CRUCIAL for deployment. Django will raise a SuspiciousOperation (Bad Request 400)
+# if the Host header of an incoming request is not in this list.
+# On Render, your app's public URL (e.g., your-app-name.onrender.com) MUST be here.
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+if DEBUG:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1'] + ALLOWED_HOSTS # Add local hosts for debugging
+    print(f"DEBUG is True. ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+else:
+    # In production, ensure ALLOWED_HOSTS is not empty and contains valid production domains.
+    if not ALLOWED_HOSTS:
+        raise ImproperlyConfigured("ALLOWED_HOSTS environment variable is empty in production.")
+    print(f"DEBUG is False. ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+
+
+# Custom User Model (if you have one, otherwise django.contrib.auth.models.User is default)
+# AUTH_USER_MODEL = 'authentication.CustomUser' # Uncomment and modify if you use a custom user model
+AUTH_USER_MODEL = 'auth.User' # Default Django User model
 
 # Application definition
 INSTALLED_APPS = [
@@ -297,35 +470,36 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.gis',       # <--- ADDED: Crucial for GIS functionalities (Point field)
-    # 'authentication',         # Uncomment if you have an authentication app
-    'registration',             # Your custom app
-    'pwa',                      # Django PWA app
+    'django.contrib.gis',  # Crucial for GIS functionalities (Point field)
+    'registration',        # Your custom app
+    'pwa',                 # Django PWA app
+    # 'rest_framework',      # Add if you're using Django REST Framework for your API
+    # 'corsheaders',         # Add if you need to handle CORS for API requests from different origins
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # <--- CORRECTED POSITION: After SecurityMiddleware
+    # WhiteNoise must be placed directly after SecurityMiddleware for efficient static file serving
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 'corsheaders.middleware.CorsMiddleware', # Uncomment if you added 'corsheaders' and need CORS
 ]
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 ROOT_URLCONF = 'labour_crm.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [], # Can add project-wide template dirs here: [BASE_DIR / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'], # Good practice to define a project-level templates directory
         'APP_DIRS': True, # This tells Django to look for 'templates' directory inside each app
         'OPTIONS': {
             'context_processors': [
-                'django.template.context_processors.debug', # Add this for DEBUG mode context
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -337,17 +511,29 @@ TEMPLATES = [
 WSGI_APPLICATION = 'labour_crm.wsgi.application'
 
 # Database
+# Use dj_database_url for production databases like PostgreSQL on Render.
+# Ensure GEOS, GDAL, and PROJ libraries are available in your deployment environment (e.g., Dockerfile).
 DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600,
-        ssl_require=False # Set to True if your Render DB requires SSL for connection from Docker container
+        conn_max_age=600, # Connection lifetime (seconds). Helps prevent database connection issues.
+        ssl_require=True # IMPORTANT: Set to True for production databases requiring SSL (most cloud DBs do)
     )
 }
-# --- REMOVE OR CONDITIONALISE DEBUG PRINTS FOR PRODUCTION ---
-print("\n--- DEBUG: DATABASES CONFIG ---")
-print(DATABASES['default']['ENGINE'])
-print("--- END DEBUG ---\n")
+
+# Conditionally use PostGIS engine if DATABASE_URL is set and starts with 'postgis'
+# Or if you are sure it's a PostGIS database.
+# This prevents issues if you use a non-GIS database locally or in a different environment.
+if DATABASES['default']['ENGINE'].startswith('django.contrib.gis'):
+    print("Using GIS database engine.")
+elif 'postgis' in DATABASES['default']['URL'] if 'URL' in DATABASES['default'] else False:
+    DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+    print("Detected PostGIS URL, setting GIS database engine.")
+else:
+    # Fallback to standard PostgreSQL or raise error if GIS is strictly required.
+    # If your app *requires* GIS, you might want to raise an error here for clarity.
+    print("Warning: GIS database engine not automatically detected. Ensure your DATABASE_URL is correct for GIS.")
+
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -357,66 +543,85 @@ AUTH_PASSWORD_VALIDATORS = [
     { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-#         'NAME': 'registration_db',
-#         'USER': 'postgres',
-#         'PASSWORD': 'work1234',
-#         'HOST': 'localhost',
-#         'PORT': '5432',
-#     }
-# }
-
-
-
-
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'UTC' # Use UTC and let Django handle conversions. Important for consistency.
 USE_I18N = True
-USE_TZ = True
+USE_TZ = True # Enable timezone support
 
 # Media files (for user uploads like photos)
 MEDIA_URL = '/media/'
+# Ensure MEDIA_ROOT is outside of your project's static/ directory
+# On Render, you might need an external storage solution like AWS S3 for persistent media.
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+# STATIC_ROOT is where `collectstatic` gathers all static files for deployment.
+# It should be outside your project directory or in a dedicated deployment folder.
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # WhiteNoise configuration for serving static files in production
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' # <--- CORRECTED TYPO HERE
+# This is essential for performance and reliability in production environments.
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# PWA Settings
+# CSRF_TRUSTED_ORIGINS (If you are getting CSRF errors, especially with custom domains or proxies)
+# If your frontend is making requests from a different domain or port, you might need this.
+# Example for Render:
+# CSRF_TRUSTED_ORIGINS = ['https://*.onrender.com'] # Or specifically ['https://your-app-name.onrender.com']
+# If you are serving the frontend from a different origin than the backend,
+# e.g., your-frontend.com for JS calls to your-backend.onrender.com/api/
+# CSRF_TRUSTED_ORIGINS = ['https://your-frontend.com', 'https://*.onrender.com']
+
+
+# PWA Settings (Good to see you're using this, as we discussed PWAs on 2025-08-02)
 PWA_APP_NAME = 'AgroIntel'
 PWA_APP_DESCRIPTION = "AgroIntel - Connecting Farmers with Labours"
 PWA_APP_THEME_COLOR = '#2196f3'
 PWA_APP_BACKGROUND_COLOR = '#e3f2fd'
 PWA_APP_DISPLAY = 'standalone'
-PWA_APP_SCOPE = '/register/'
-PWA_APP_START_URL = '/register/'
+PWA_APP_SCOPE = '/' # Set to root scope if your PWA should cover the entire app
+PWA_APP_START_URL = '/' # Start at root if your main app entry point is '/'
 
-# IMPORTANT: Ensure these paths EXACTLY match where your files are located
-# and where collectstatic will put them under /static/
+# IMPORTANT PWA ICONS:
+# Ensure these paths are correct relative to your `STATIC_URL` after `collectstatic`.
+# If `collectstatic` puts images directly under `static/`, then remove `registration/images/`.
 PWA_APP_ICONS = [
     {
-        'src': '/static/registration/images/android-chrome-192x192.png', # <--- CORRECTED PATH (assuming this is your actual filename)
+        'src': '/static/registration/images/android-chrome-192x192.png', # Double-check this path after collectstatic
         'sizes': '192x192'
     },
     {
-        'src': '/static/registration/images/android-chrome-512x512.png', # <--- CORRECTED PATH
+        'src': '/static/registration/images/android-chrome-512x512.png', # Double-check this path after collectstatic
         'sizes': '512x512'
     }
 ]
 # Path to your custom service worker
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'registration', 'js', 'serviceworker.js')
 
+# --- Logging (Basic setup for production) ---
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout, # Log to standard output, visible in Render logs
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'), # Set DJANGO_LOG_LEVEL to DEBUG, INFO, WARNING, ERROR, CRITICAL
+            'propagate': False,
+        },
+        '': { # Root logger
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
 
-
-
-
-
-# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
-# GEOS_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\geos_c.dll"
-# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
+# For django.core.exceptions.ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured
