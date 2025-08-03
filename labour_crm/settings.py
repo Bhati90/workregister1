@@ -548,28 +548,52 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 import dj_database_url
+import sys # Added for conditional logging and error handling
+from django.core.exceptions import ImproperlyConfigured # Added for clear errors
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-# Security
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'replace-this-in-production')
+
+# --- SECURITY WARNING: Keep the secret key used in production secret! ---
+# Use a strong, randomly generated key.
+# Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG: # Allow a fallback in DEBUG for local development ease
+        print("WARNING: DJANGO_SECRET_KEY environment variable not set. Using a fallback for local DEBUG mode.")
+        SECRET_KEY = 'a-fallback-secret-key-for-development-only-replace-this'
+    else: # Force environment variable in production
+        raise ImproperlyConfigured("The DJANGO_SECRET_KEY environment variable is not set. This is required in production.")
+
+# --- DEBUG SETTING ---
+# Set to False in production for security and performance.
+# Set DJANGO_DEBUG=True in your environment variables for local development or specific debugging.
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# --- ALLOWED_HOSTS ---
+# This is CRUCIAL for deployment. Django will raise a SuspiciousOperation (Bad Request 400)
+# if the Host header of an incoming request is not in this list.
+# On Render, your app's public URL (e.g., your-app-name.onrender.com) MUST be here.
+# Use a specific default for DEBUG, and ensure it's properly set in production.
+ALLOWED_HOSTS_ENV = os.environ.get('DJANGO_ALLOWED_HOSTS')
+if ALLOWED_HOSTS_ENV:
+    ALLOWED_HOSTS = ALLOWED_HOSTS_ENV.split(',')
+else:
+    if DEBUG:
+        ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    else:
+        # In production, if DJANGO_ALLOWED_HOSTS is not set, raise an error.
+        raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS environment variable is not set. This is required in production.")
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
+if DEBUG:
+    print(f"DEBUG is True. ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+else:
+    print(f"DEBUG is False. ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True
-
-# ALLOWED_HOSTS = ['*']
-AUTH_USER_MODEL = 'auth.User' 
+# Custom User Model (if you have one, otherwise django.contrib.auth.models.User is default)
+AUTH_USER_MODEL = 'auth.User' # Default Django User model
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -577,13 +601,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # 'authentication',       # PWA support
-    'registration',
-    'pwa',  
+    'django.contrib.gis',  # <-- UNCOMMENTED: Crucial for GIS functionalities (Point field)
+    'registration',        # Your custom app
+    'pwa',                 # Django PWA app
+    'whitenoise.runserver_nostatic', # For development only, ensures WhiteNoise serves static
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # <-- ADDED: Crucial for serving static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -597,10 +623,11 @@ ROOT_URLCONF = 'labour_crm.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
+        'DIRS': [BASE_DIR / 'templates'], # Added a project-level templates directory
+        'APP_DIRS': True, # This tells Django to look for 'templates' directory inside each app
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug', # Added for DEBUG context
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -611,80 +638,71 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'labour_crm.wsgi.application'
 
-
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-#         'NAME': 'registration_db',
-#         'USER': 'postgres',
-#         'PASSWORD': 'work1234',
-#         'HOST': 'localhost',
-#         'PORT': '5432',
-#     }
-# }
-
 DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL'),
         conn_max_age=600,
+        ssl_require=not DEBUG # Set to True in production (not DEBUG), False in debug
     )
 }
-# --- TEMPORARY DEBUG PRINT ---
-print("\n--- DEBUG: DATABASES CONFIG ---")
-# print(DATABASES['default']['ENGINE'])
-print("--- END DEBUG ---\n")
-# --- END TEMPORARY DEBUG PRINT ---
 
-# ... rest of your settings.py
+# Ensure PostGIS engine is used if django.contrib.gis is installed
+if 'django.contrib.gis' in INSTALLED_APPS:
+    db_engine = DATABASES['default'].get('ENGINE', '')
+    if 'postgis' not in db_engine:
+        # If not explicitly postgis, assume it's postgres and try to change
+        if 'postgresql' in db_engine:
+            DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+            print("INFO: Changed database engine to PostGIS for GIS support.")
+        else:
+            print("WARNING: django.contrib.gis is installed but database engine is not PostGIS. Ensure correct configuration.")
+
+
 # Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
+    { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
+    { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
+    { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
-
 # Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
+TIME_ZONE = 'Asia/Kolkata' # Changed to India's timezone based on current location
 USE_I18N = True
+USE_TZ = True # Enable timezone support
 
-USE_TZ = True
-# MEDIA_URL = '/media/'
-# MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # 
+# Media files (for user uploads like photos)
+MEDIA_URL = '/media/'
+# On Render, for persistent media storage, consider using an external service like AWS S3.
+# Otherwise, uploaded files will be lost on new deployments.
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-# Static & Media
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = '/static/' # Always use a leading slash
+STATICFILES_DIRS = [
+    BASE_DIR / 'static', # For project-wide static files (e.g., base images, favicon)
+    # BASE_DIR / 'registration' / 'static', # If you have static files directly in app's root static/
+]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build') # Changed to a unique name to avoid conflicts
 
-# PWA Settings
+# WhiteNoise configuration for serving static files in production
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# PWA Settings (We discussed PWAs on 2025-08-02)
 PWA_APP_NAME = 'AgroIntel'
 PWA_APP_DESCRIPTION = "AgroIntel - Connecting Farmers with Labours"
 PWA_APP_THEME_COLOR = '#2196f3'
 PWA_APP_BACKGROUND_COLOR = '#e3f2fd'
 PWA_APP_DISPLAY = 'standalone'
-PWA_APP_SCOPE = '/register/' # Important: This means the SW controls your entire domain
-PWA_APP_START_URL = '/register/' 
+PWA_APP_SCOPE = '/' # Recommended for full PWA experience
+PWA_APP_START_URL = '/' # Recommended for full PWA experience
+
+# PWA_APP_ICONS: Crucial to get these paths correct after `collectstatic`!
+# The `static/images/` path implies these are in your project's root `static` directory
+# (i.e., `BASE_DIR / 'static' / 'images'`).
+# If they are inside your 'registration' app's static folder, the path might be different.
 PWA_APP_ICONS = [
     {
         'src': '/static/images/android-chrome-192x192.png',
@@ -696,14 +714,90 @@ PWA_APP_ICONS = [
     }
 ]
 
-# Path to your custom service worker (create this later)
-PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'registration', 'js', 'serviceworker.js')
-STATIC_URL = 'static/'
-import os
-import sys
-sys.path.append(os.path.join(BASE_DIR, 'registration'))
+# PWA_SERVICE_WORKER_PATH: This is the most likely culprit for your service worker 404.
+# The `django-pwa` app *expects* the service worker to be served from a specific URL,
+# which defaults to `/serviceworker.js`.
+# To use your custom service worker, ensure it is available at that URL.
+# 1. Place your `serviceworker.js` in a location that `collectstatic` will put under `STATIC_ROOT`.
+#    A common place is `BASE_DIR / 'static' / 'js' / 'serviceworker.js'`
+#    OR in your app's static folder: `registration/static/registration/js/serviceworker.js`
+# 2. Make sure the PWA_SERVICE_WORKER_PATH points to the *source* file, NOT the collected one.
+#    Django-PWA's template will then *link* to the correct URL.
+# Let's adjust based on your given path: `registration/static/registration/js/serviceworker.js`
+# If this file is in `registration/static/registration/js/serviceworker.js`
+# and `STATICFILES_DIRS` does NOT include `BASE_DIR / 'registration' / 'static'`,
+# then `collectstatic` will collect it because `registration` is in `INSTALLED_APPS`.
+# It will usually be collected to `STATIC_ROOT / 'registration' / 'js' / 'serviceworker.js'`.
+# However, PWA usually expects it at `/serviceworker.js` or `/static/serviceworker.js`.
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# Option 1 (Recommended if you want it at /serviceworker.js)
+# Place your serviceworker.js directly in your project's `static` directory:
+# `BASE_DIR / 'static' / 'serviceworker.js'`
+PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'static', 'serviceworker.js')
+# Then, make sure your serviceworker.js *also* references any other static files
+# using their full `/static/...` paths.
+# And ensure your service worker itself is configured to install and cache itself from `/serviceworker.js`.
+
+
+# Option 2 (If you want it to be served from a specific /static/ path)
+# PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'registration', 'js', 'serviceworker.js')
+# If you use this option, you might need to manually configure Django to serve
+# your service worker from '/static/registration/js/serviceworker.js' or use a custom
+# PWA URL config to map it, if django-pwa doesn't handle it by default.
+# The simpler approach for Django-PWA is often to have it at a more root level.
+
+# For now, let's assume Option 1 is easier to get started with:
+# Move your serviceworker.js to `BASE_DIR / 'static' / 'serviceworker.js'`
+# And adjust your PWA_APP_ICONS if they are also nested differently.
+
+# --- Logging (Basic setup for production) ---
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout, # Log to standard output, visible in Render logs
+            'formatter': 'simple' if DEBUG else 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'), # Set DJANGO_LOG_LEVEL to DEBUG, INFO, WARNING, ERROR, CRITICAL
+            'propagate': False,
+        },
+        '': { # Root logger
+            'handlers': ['console'],
+            'level': 'INFO', # Default level for your app's logs
+            'propagate': True,
+        },
+    },
+}
+
+# Remove this, as it's not standard and generally not needed.
+# sys.path.append(os.path.join(BASE_DIR, 'registration'))
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CSRF_TRUSTED_ORIGINS (If you get "CSRF verification failed" errors)
+# If your frontend is making requests from a different origin than your Django backend.
+# CSRF_TRUSTED_ORIGINS = ['https://*.onrender.com', 'https://your-custom-frontend-domain.com']
+
+# CORS Headers (If you're making API calls from a different domain/port)
+# You'd need to install `django-cors-headers` and add it to INSTALLED_APPS and MIDDLEWARE.
+# CORS_ALLOWED_ORIGINS = [
+#     "https://your-frontend-domain.com",
+#     "https://your-app-name.onrender.com",
+# ]
+# CORS_ALLOW_ALL_ORIGINS = True # Be cautious with this in production
