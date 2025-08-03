@@ -279,7 +279,9 @@ import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+# SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
+# DEBUG = True
+# ALLOWED_HOSTS = ['*']
 # Security
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'a-very-long-and-random-string-for-production') # CHANGE THIS DEFAULT
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
@@ -341,9 +343,9 @@ DATABASES = {
     )
 }
 # --- REMOVE OR CONDITIONALISE DEBUG PRINTS FOR PRODUCTION ---
-# print("\n--- DEBUG: DATABASES CONFIG ---")
-# print(DATABASES['default']['ENGINE'])
-# print("--- END DEBUG ---\n")
+print("\n--- DEBUG: DATABASES CONFIG ---")
+print(DATABASES['default']['ENGINE'])
+print("--- END DEBUG ---\n")
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -352,6 +354,20 @@ AUTH_PASSWORD_VALIDATORS = [
     { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
     { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.contrib.gis.db.backends.postgis',
+#         'NAME': 'registration_db',
+#         'USER': 'postgres',
+#         'PASSWORD': 'work1234',
+#         'HOST': 'localhost',
+#         'PORT': '5432',
+#     }
+# }
+
+
+
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -392,23 +408,14 @@ PWA_APP_ICONS = [
     }
 ]
 
-PWA_APP_SPLASH_SCREEN = [
-    {
-        'src': '/static/registration/images/splash_screen_480x320.png', # <--- CORRECTED PATH (assuming your custom filenames)
-        'media': '(device-width: 320px) and (device-height: 480px) and (-webkit-device-pixel-ratio: 2)'
-    },
-    {
-        'src': '/static/registration/images/splash_screen_640x960.png', # <--- CORRECTED PATH
-        'media': '(device-width: 320px) and (device-height: 480px) and (-webkit-device-pixel-ratio: 2)'
-    }
-]
+
 
 # Path to your custom service worker
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'registration', 'js', 'serviceworker.js')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# GIS SETTINGS (add this section if you use PointField, etc.)
-# If GDAL is installed system-wide in Docker, Django usually finds it.
-# Only set GDAL_LIBRARY_PATH if auto-detection fails AND you need a specific path
-# GDAL_LIBRARY_PATH = '/usr/local/lib/libgdal.so' # Example for Linux in Docker, if needed.
+
+# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
+# GEOS_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\geos_c.dll"
+# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
