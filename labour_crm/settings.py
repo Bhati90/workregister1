@@ -98,7 +98,7 @@ DATABASES = {
 }
 # --- TEMPORARY DEBUG PRINT ---
 print("\n--- DEBUG: DATABASES CONFIG ---")
-# print(DATABASES['default']['ENGINE'])
+print(DATABASES['default']['ENGINE'])
 print("--- END DEBUG ---\n")
 # --- END TEMPORARY DEBUG PRINT ---
 
@@ -172,9 +172,9 @@ PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'regi
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
-GEOS_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\geos_c.dll"
-GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
+# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
+# GEOS_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\geos_c.dll"
+# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
 
 # from pathlib import Path
 # import os
