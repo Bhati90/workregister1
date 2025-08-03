@@ -273,23 +273,178 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 # # GEOS_LIBRARY_PATH = ...
 
 
+# from pathlib import Path
+# import os
+# import dj_database_url
+
+# # Build paths inside the project like this: BASE_DIR / 'subdir'.
+# BASE_DIR = Path(__file__).resolve().parent.parent
+# # SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
+# # DEBUG = True
+# # ALLOWED_HOSTS = ['*']
+# # Security
+# SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'a-very-long-and-random-string-for-production') # CHANGE THIS DEFAULT
+# DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
+# ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') # Use more specific default
+
+# AUTH_USER_MODEL = 'auth.User' # Ensure this is correct if you have a custom user model
+
+# # Application definition
+# INSTALLED_APPS = [
+#     'django.contrib.admin',
+#     'django.contrib.auth',
+#     'django.contrib.contenttypes',
+#     'django.contrib.sessions',
+#     'django.contrib.messages',
+#     'django.contrib.staticfiles',
+#     'django.contrib.gis',       # <--- ADDED: Crucial for GIS functionalities (Point field)
+#     # 'authentication',         # Uncomment if you have an authentication app
+#     'registration',             # Your custom app
+#     'pwa',                      # Django PWA app
+# ]
+
+# MIDDLEWARE = [
+#     'django.middleware.security.SecurityMiddleware',
+#     'whitenoise.middleware.WhiteNoiseMiddleware', # <--- CORRECTED POSITION: After SecurityMiddleware
+#     'django.contrib.sessions.middleware.SessionMiddleware',
+#     'django.middleware.common.CommonMiddleware',
+#     'django.middleware.csrf.CsrfViewMiddleware',
+#     'django.contrib.auth.middleware.AuthenticationMiddleware',
+#     'django.contrib.messages.middleware.MessageMiddleware',
+#     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+# ]
+
+# DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ROOT_URLCONF = 'labour_crm.urls'
+
+# TEMPLATES = [
+#     {
+#         'BACKEND': 'django.template.backends.django.DjangoTemplates',
+#         'DIRS': [], # Can add project-wide template dirs here: [BASE_DIR / 'templates'],
+#         'APP_DIRS': True, # This tells Django to look for 'templates' directory inside each app
+#         'OPTIONS': {
+#             'context_processors': [
+#                 'django.template.context_processors.debug', # Add this for DEBUG mode context
+#                 'django.template.context_processors.request',
+#                 'django.contrib.auth.context_processors.auth',
+#                 'django.contrib.messages.context_processors.messages',
+#             ],
+#         },
+#     },
+# ]
+
+# WSGI_APPLICATION = 'labour_crm.wsgi.application'
+
+# # Database
+# DATABASES = {
+#     'default': dj_database_url.config(
+#         default=os.environ.get('DATABASE_URL'),
+#         conn_max_age=600,
+#         ssl_require=False # Set to True if your Render DB requires SSL for connection from Docker container
+#     )
+# }
+# # --- REMOVE OR CONDITIONALISE DEBUG PRINTS FOR PRODUCTION ---
+# print("\n--- DEBUG: DATABASES CONFIG ---")
+# print(DATABASES['default']['ENGINE'])
+# print("--- END DEBUG ---\n")
+
+# # Password validation
+# AUTH_PASSWORD_VALIDATORS = [
+#     { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
+#     { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
+#     { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
+#     { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
+# ]
+
+# # DATABASES = {
+# #     'default': {
+# #         'ENGINE': 'django.contrib.gis.db.backends.postgis',
+# #         'NAME': 'registration_db',
+# #         'USER': 'postgres',
+# #         'PASSWORD': 'work1234',
+# #         'HOST': 'localhost',
+# #         'PORT': '5432',
+# #     }
+# # }
+
+
+
+
+# # Internationalization
+# LANGUAGE_CODE = 'en-us'
+# TIME_ZONE = 'UTC'
+# USE_I18N = True
+# USE_TZ = True
+
+# # Media files (for user uploads like photos)
+# MEDIA_URL = '/media/'
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# # Static files (CSS, JavaScript, Images)
+# STATIC_URL = '/static/'
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# # WhiteNoise configuration for serving static files in production
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' # <--- CORRECTED TYPO HERE
+
+# # PWA Settings
+# PWA_APP_NAME = 'AgroIntel'
+# PWA_APP_DESCRIPTION = "AgroIntel - Connecting Farmers with Labours"
+# PWA_APP_THEME_COLOR = '#2196f3'
+# PWA_APP_BACKGROUND_COLOR = '#e3f2fd'
+# PWA_APP_DISPLAY = 'standalone'
+# PWA_APP_SCOPE = '/register/'
+# PWA_APP_START_URL = '/register/'
+
+# # IMPORTANT: Ensure these paths EXACTLY match where your files are located
+# # and where collectstatic will put them under /static/
+# PWA_APP_ICONS = [
+#     {
+#         'src': '/static/registration/images/android-chrome-192x192.png', # <--- CORRECTED PATH (assuming this is your actual filename)
+#         'sizes': '192x192'
+#     },
+#     {
+#         'src': '/static/registration/images/android-chrome-512x512.png', # <--- CORRECTED PATH
+#         'sizes': '512x512'
+#     }
+# ]
+# # Path to your custom service worker
+# PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'registration', 'js', 'serviceworker.js')
+
+
+
+
+
+
+# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
+# GEOS_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\geos_c.dll"
+# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
 from pathlib import Path
 import os
 import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-# SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
-# DEBUG = True
-# ALLOWED_HOSTS = ['*']
 # Security
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'a-very-long-and-random-string-for-production') # CHANGE THIS DEFAULT
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'replace-this-in-production')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') # Use more specific default
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
-AUTH_USER_MODEL = 'auth.User' # Ensure this is correct if you have a custom user model
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
+
+# SECURITY WARNING: don't run with debug turned on in production!
+# DEBUG = True
+
+# ALLOWED_HOSTS = ['*']
+AUTH_USER_MODEL = 'auth.User' 
 
 # Application definition
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -297,15 +452,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.gis',       # <--- ADDED: Crucial for GIS functionalities (Point field)
-    # 'authentication',         # Uncomment if you have an authentication app
-    'registration',             # Your custom app
-    'pwa',                      # Django PWA app
+    # 'authentication',       # PWA support
+    'registration',
+    'pwa',  
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # <--- CORRECTED POSITION: After SecurityMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -319,11 +472,10 @@ ROOT_URLCONF = 'labour_crm.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [], # Can add project-wide template dirs here: [BASE_DIR / 'templates'],
-        'APP_DIRS': True, # This tells Django to look for 'templates' directory inside each app
+        'DIRS': [],
+        'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
-                'django.template.context_processors.debug', # Add this for DEBUG mode context
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -334,27 +486,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'labour_crm.wsgi.application'
 
+
 # Database
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600,
-        ssl_require=False # Set to True if your Render DB requires SSL for connection from Docker container
-    )
-}
-# --- REMOVE OR CONDITIONALISE DEBUG PRINTS FOR PRODUCTION ---
-print("\n--- DEBUG: DATABASES CONFIG ---")
-print(DATABASES['default']['ENGINE'])
-print("--- END DEBUG ---\n")
-
-# Password validation
-AUTH_PASSWORD_VALIDATORS = [
-    { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
-]
-
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.contrib.gis.db.backends.postgis',
@@ -366,25 +500,57 @@ AUTH_PASSWORD_VALIDATORS = [
 #     }
 # }
 
+DATABASES = {
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+    )
+}
+# --- TEMPORARY DEBUG PRINT ---
+print("\n--- DEBUG: DATABASES CONFIG ---")
+# print(DATABASES['default']['ENGINE'])
+print("--- END DEBUG ---\n")
+# --- END TEMPORARY DEBUG PRINT ---
 
+# ... rest of your settings.py
+# Password validation
+# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
 
 
 # Internationalization
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
+# https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-# Media files (for user uploads like photos)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+LANGUAGE_CODE = 'en-us'
+
+TIME_ZONE = 'UTC'
+
+USE_I18N = True
+
+USE_TZ = True
+# MEDIA_URL = '/media/'
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # 
 
 # Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/5.2/howto/static-files/
+# Static & Media
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-# WhiteNoise configuration for serving static files in production
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' # <--- CORRECTED TYPO HERE
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # PWA Settings
 PWA_APP_NAME = 'AgroIntel'
@@ -392,30 +558,27 @@ PWA_APP_DESCRIPTION = "AgroIntel - Connecting Farmers with Labours"
 PWA_APP_THEME_COLOR = '#2196f3'
 PWA_APP_BACKGROUND_COLOR = '#e3f2fd'
 PWA_APP_DISPLAY = 'standalone'
-PWA_APP_SCOPE = '/register/'
-PWA_APP_START_URL = '/register/'
-
-# IMPORTANT: Ensure these paths EXACTLY match where your files are located
-# and where collectstatic will put them under /static/
+PWA_APP_SCOPE = '/register/' # Important: This means the SW controls your entire domain
+PWA_APP_START_URL = '/register/' 
 PWA_APP_ICONS = [
     {
-        'src': '/static/registration/images/android-chrome-192x192.png', # <--- CORRECTED PATH (assuming this is your actual filename)
+        'src': '/static/images/android-chrome-192x192.png',
         'sizes': '192x192'
     },
     {
-        'src': '/static/registration/images/android-chrome-512x512.png', # <--- CORRECTED PATH
+        'src': '/static/images/android-chrome-512x512.png',
         'sizes': '512x512'
     }
 ]
 
-
-
-# Path to your custom service worker
+# Path to your custom service worker (create this later)
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'registration', 'js', 'serviceworker.js')
+STATIC_URL = 'static/'
+import os
+import sys
+sys.path.append(os.path.join(BASE_DIR, 'registration'))
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-
-# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
-# GEOS_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\geos_c.dll"
-# GDAL_LIBRARY_PATH = r"C:\Users\bhati\work\labour_crm\venv\Lib\site-packages\osgeo\gdal.dll"
