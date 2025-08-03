@@ -12,21 +12,25 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+# Security
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'replace-this-in-production')
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
+# SECRET_KEY = 'django-insecure-54c-xh!ea9mdtku-5bt38m7sz%lc03^p#&t0!1*u5y!nm#yi!0'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = ['*']
 AUTH_USER_MODEL = 'auth.User' 
 
 # Application definition
@@ -75,17 +79,31 @@ WSGI_APPLICATION = 'labour_crm.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'registration_db',
-        'USER': 'postgres',
-        'PASSWORD': 'work1234',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.contrib.gis.db.backends.postgis',
+#         'NAME': 'registration_db',
+#         'USER': 'postgres',
+#         'PASSWORD': 'work1234',
+#         'HOST': 'localhost',
+#         'PORT': '5432',
+#     }
+# }
+import os
 
+DATABASES = {
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+    )
+}
+# --- TEMPORARY DEBUG PRINT ---
+print("\n--- DEBUG: DATABASES CONFIG ---")
+print(DATABASES['default']['ENGINE'])
+print("--- END DEBUG ---\n")
+# --- END TEMPORARY DEBUG PRINT ---
+
+# ... rest of your settings.py
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -131,8 +149,8 @@ PWA_APP_DESCRIPTION = "AgroIntel - Connecting Farmers with Labours"
 PWA_APP_THEME_COLOR = '#2196f3'
 PWA_APP_BACKGROUND_COLOR = '#e3f2fd'
 PWA_APP_DISPLAY = 'standalone'
-PWA_APP_SCOPE = '/' # Important: This means the SW controls your entire domain
-PWA_APP_START_URL = '/register/registration/' 
+PWA_APP_SCOPE = '/register/' # Important: This means the SW controls your entire domain
+PWA_APP_START_URL = '/register/' 
 PWA_APP_ICONS = [
     {
         'src': '/static/images/android-chrome-192x192.png',
