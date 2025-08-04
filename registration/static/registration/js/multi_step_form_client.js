@@ -1,23 +1,17 @@
-// registration/static/registration/js/multi_step_form_client.js
-
-// Import idb library for easier IndexedDB access
 import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
 
-// Global variables for camera, photo, and IndexedDB instance
 let cameraStream = null;
-let photoBlob = null; // Store the captured photo as a Blob directly
-let currentFacingMode = 'environment'; // Start with back camera (better for general photos)
+let photoBlob = null;
+let currentFacingMode = 'environment';
 let availableCameras = [];
 
-// IndexedDB related constants and instance
 let db;
-const DB_NAME = 'LaborRegistrationDB'; // Name of your IndexedDB database
-const DB_VERSION = 2; // IMPORTANT: Increment this version number whenever you change the database schema
-const STORE_CURRENT_REGISTRATION = 'current_registration_form'; // Store for the single ongoing, multi-step form data (draft)
-const STORE_PENDING_REGISTRATIONS = 'pending_registrations'; // Store for completed forms awaiting synchronization
-const STORE_OFFLINE_IMAGES = 'offline_images'; // Store for captured image Blobs
+const DB_NAME = 'LaborRegistrationDB';
+const DB_VERSION = 2;
+const STORE_CURRENT_REGISTRATION = 'current_registration_form';
+const STORE_PENDING_REGISTRATIONS = 'pending_registrations';
+const STORE_OFFLINE_IMAGES = 'offline_images';
 
-// --- PWA Service Worker Registration ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/static/registration/js/serviceworker.js')
@@ -30,27 +24,17 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// --- IndexedDB Initialization ---
 async function initDB() {
     db = await openDB(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, transaction) {
-            console.log(`IndexedDB upgrade: oldVersion=${oldVersion}, newVersion=${newVersion}`);
-            if (oldVersion < 1) {
-                db.createObjectStore(STORE_CURRENT_REGISTRATION, { keyPath: 'id' });
-                db.createObjectStore(STORE_PENDING_REGISTRATIONS, { keyPath: 'id', autoIncrement: true });
-                db.createObjectStore(STORE_OFFLINE_IMAGES, { keyPath: 'id', autoIncrement: true });
-            }
-            if (oldVersion < 2) {
-                // Example of schema upgrade: add an index if needed in the future
-                // const pendingStore = transaction.objectStore(STORE_PENDING_REGISTRATIONS);
-                // pendingStore.createIndex('timestamp', 'timestamp');
-            }
+        upgrade(db) {
+            db.createObjectStore(STORE_CURRENT_REGISTRATION, { keyPath: 'id' });
+            db.createObjectStore(STORE_PENDING_REGISTRATIONS, { keyPath: 'id', autoIncrement: true });
+            db.createObjectStore(STORE_OFFLINE_IMAGES, { keyPath: 'id', autoIncrement: true });
         },
     });
     console.log('IndexedDB initialized.');
 }
 
-// --- Data Storage/Retrieval Functions (IndexedDB) ---
 async function saveCurrentRegistrationData(data) {
     if (!db) await initDB();
     const tx = db.transaction(STORE_CURRENT_REGISTRATION, 'readwrite');
@@ -91,12 +75,9 @@ async function saveForBackgroundSync(fullRegistrationData) {
     console.log('Full registration saved for background sync.');
 }
 
-// --- UI Initialization and Event Listeners ---
 document.addEventListener('DOMContentLoaded', async function() {
     await initDB();
-
     const currentStep = parseInt(document.querySelector('input[name="step"]').value);
-
     if (currentStep === 1) {
         initializeCameraAndLocation();
         await loadStep1Data();
@@ -118,21 +99,17 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 });
 
-// --- Load Data from IndexedDB (Pre-fill Forms) ---
 async function loadStep1Data() {
     const currentRegistration = await getCurrentRegistrationData();
     const step1Data = currentRegistration.step1 || {};
-
     document.querySelector('[name="full_name"]').value = step1Data.full_name || '';
     document.querySelector('[name="mobile_number"]').value = step1Data.mobile_number || '';
     document.querySelector('[name="category"]').value = step1Data.category || '';
     document.querySelector('[name="taluka"]').value = step1Data.taluka || '';
     document.querySelector('[name="village"]').value = step1Data.village || '';
-
     if (step1Data.category) {
         document.getElementById('currentCategoryHidden').value = step1Data.category;
     }
-
     if (step1Data.photoId) {
         const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readonly');
         const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
@@ -160,13 +137,11 @@ async function loadStep1Data() {
         document.getElementById('photo-confirmed').style.display = 'block';
         document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo loaded from offline storage!</p>';
     }
-
     if (step1Data.location) {
         const loc = step1Data.location;
         document.getElementById('latitude_hidden').value = loc.latitude || '';
         document.getElementById('longitude_hidden').value = loc.longitude || '';
         document.getElementById('location_accuracy_hidden').value = loc.accuracy || '';
-
         document.getElementById('location-coordinates').textContent = `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
         document.getElementById('location-accuracy').textContent = `${loc.accuracy.toFixed(0)}m`;
         document.getElementById('location-info').style.display = 'block';
@@ -181,16 +156,13 @@ async function loadStep2Data() {
     const currentRegistration = await getCurrentRegistrationData();
     const step2Data = currentRegistration.step2 || {};
     const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
-
     if (categoryFromStep1) {
         document.getElementById('currentCategoryHidden').value = categoryFromStep1;
         document.getElementById('currentCategorySession').value = categoryFromStep1;
     }
-
     if (step2Data.gender) document.querySelector('[name="gender"]').value = step2Data.gender;
     if (step2Data.age) document.querySelector('[name="age"]').value = step2Data.age;
     if (step2Data.expected_wage) document.querySelector('[name="expected_wage"]').value = step2Data.expected_wage;
-
     if (step2Data.skills && Array.isArray(step2Data.skills)) {
         step2Data.skills.forEach(skill => {
             const checkbox = document.querySelector(`input[name="skills"][value="${skill}"]`);
@@ -203,7 +175,6 @@ async function loadStep2Data() {
             if (checkbox) checkbox.checked = true;
         });
     }
-
     const transportSelect = document.querySelector('select[name="arrange_transport"]');
     if (transportSelect && step2Data.arrange_transport) {
         transportSelect.value = step2Data.arrange_transport;
@@ -212,18 +183,15 @@ async function loadStep2Data() {
     if (step2Data.arrange_transport_other) {
         document.querySelector('[name="arrange_transport_other"]').value = step2Data.arrange_transport_other;
     }
-
     if (step2Data.providing_labour_count) document.querySelector('[name="providing_labour_count"]').value = step2Data.providing_labour_count;
     if (step2Data.total_workers_peak) document.querySelector('[name="total_workers_peak"]').value = step2Data.total_workers_peak;
     if (step2Data.expected_charges) document.querySelector('[name="expected_charges"]').value = step2Data.expected_charges;
     if (step2Data.labour_supply_availability) document.querySelector('[name="labour_supply_availability"]').value = step2Data.labour_supply_availability;
     if (step2Data.supply_areas) document.querySelector('[name="supply_areas"]').value = step2Data.supply_areas;
-
     if (step2Data.vehicle_type) document.querySelector('[name="vehicle_type"]').value = step2Data.vehicle_type;
     if (step2Data.people_capacity) document.querySelector('[name="people_capacity"]').value = step2Data.people_capacity;
     if (step2Data.expected_fair) document.querySelector('[name="expected_fair"]').value = step2Data.expected_fair;
     if (step2Data.service_areas) document.querySelector('[name="service_areas"]').value = step2Data.service_areas;
-
     if (step2Data.business_name) document.querySelector('[name="business_name"]').value = step2Data.business_name;
     if (step2Data.help_description) document.querySelector('[name="help_description"]').value = step2Data.help_description;
 }
@@ -240,10 +208,8 @@ async function loadStep3Data() {
     }
 }
 
-// --- Navigation Logic (Updated for IndexedDB) ---
 async function handleNextSubmit(event) {
     event.preventDefault();
-
     const currentStep = parseInt(document.querySelector('input[name="step"]').value);
     const form = document.getElementById('registrationForm');
     let isValid = true;
@@ -253,16 +219,9 @@ async function handleNextSubmit(event) {
     function getFieldValue(name) {
         const element = form.querySelector(`[name="${name}"]`);
         if (!element) return null;
-        if (element.type === 'checkbox') {
-            return element.checked;
-        }
-        if (element.type === 'radio') {
-            const selectedRadio = form.querySelector(`[name="${name}"]:checked`);
-            return selectedRadio ? selectedRadio.value : '';
-        }
-        if (element.tagName === 'SELECT') {
-            return element.value;
-        }
+        if (element.type === 'checkbox') return element.checked;
+        if (element.type === 'radio') { const selectedRadio = form.querySelector(`[name="${name}"]:checked`); return selectedRadio ? selectedRadio.value : ''; }
+        if (element.tagName === 'SELECT') return element.value;
         return element.value.trim();
     }
 
@@ -284,10 +243,8 @@ async function handleNextSubmit(event) {
                 }
             }
         });
-
         const capturedPhotoHiddenInput = document.getElementById('captured_photo_hidden');
         const uploadedPhotoFiles = document.querySelector('input[name="photo"]').files;
-
         if (!capturedPhotoHiddenInput.value && uploadedPhotoFiles.length === 0 && !photoBlob) {
             if (!confirm('No photo was captured or uploaded. A photo helps with verification and improves your chances of getting work. Do you want to continue without a photo?')) {
                 isValid = false;
@@ -295,14 +252,12 @@ async function handleNextSubmit(event) {
         } else if (capturedPhotoHiddenInput.value) {
             const photoConfirmedDiv = document.getElementById('photo-confirmed');
             const photoPreviewDiv = document.getElementById('photo-preview');
-
             if (photoPreviewDiv.style.display !== 'none' && photoConfirmedDiv.style.display === 'none') {
                 alert('Please confirm your photo by clicking "Use This Photo" or retake it if you\'re not satisfied.');
                 isValid = false;
                 photoPreviewDiv.scrollIntoView({ behavior: 'smooth' });
             }
         }
-
         const latitude = getFieldValue('latitude');
         const longitude = getFieldValue('longitude');
         if (!latitude || !longitude) {
@@ -310,7 +265,6 @@ async function handleNextSubmit(event) {
                  isValid = false;
             }
         }
-
         if (!isValid) {
             event.preventDefault();
             if (!document.querySelector('.is-invalid')) {
@@ -323,7 +277,6 @@ async function handleNextSubmit(event) {
             }
             return;
         }
-
         stepData = {
             full_name: getFieldValue('full_name'),
             mobile_number: getFieldValue('mobile_number'),
@@ -339,7 +292,6 @@ async function handleNextSubmit(event) {
             photoId: null,
             photoBase64: capturedPhotoHiddenInput.value
         };
-
         let imageId = null;
         if (photoBlob) {
             imageId = await saveImageBlob(photoBlob, 'captured_image.jpeg', photoBlob.type);
@@ -353,42 +305,26 @@ async function handleNextSubmit(event) {
         }
         currentRegistration.step1 = stepData;
         await saveCurrentRegistrationData(currentRegistration);
-
         document.getElementById('currentCategoryHidden').value = stepData.category;
         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(stepData.category)}`;
-
     } else if (currentStep === 2) {
         const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
         const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
-
         let requiredFields = [];
         switch(currentCategory) {
             case 'individual_labor':
-                requiredFields = [
-                    'gender', 'age', 'primary_source_income', 'employment_type',
-                    'willing_to_migrate', 'expected_wage', 'availability',
-                    'adult_men_seeking_employment', 'adult_women_seeking_employment'
-                ];
+                requiredFields = [ 'gender', 'age', 'primary_source_income', 'employment_type', 'willing_to_migrate', 'expected_wage', 'availability', 'adult_men_seeking_employment', 'adult_women_seeking_employment' ];
                 break;
             case 'mukkadam':
-                requiredFields = [
-                    'providing_labour_count', 'total_workers_peak', 'expected_charges',
-                    'labour_supply_availability', 'arrange_transport', 'supply_areas'
-                ];
+                requiredFields = [ 'providing_labour_count', 'total_workers_peak', 'expected_charges', 'labour_supply_availability', 'arrange_transport', 'supply_areas' ];
                 break;
             case 'transport':
-                requiredFields = [
-                    'vehicle_type', 'people_capacity', 'expected_fair',
-                    'availability', 'service_areas'
-                ];
+                requiredFields = [ 'vehicle_type', 'people_capacity', 'expected_fair', 'availability', 'service_areas' ];
                 break;
             case 'others':
-                requiredFields = [
-                    'business_name', 'help_description'
-                ];
+                requiredFields = [ 'business_name', 'help_description' ];
                 break;
         }
-
         requiredFields.forEach(fieldName => {
             const field = form.querySelector(`[name="${fieldName}"]`);
             if (field) {
@@ -408,7 +344,6 @@ async function handleNextSubmit(event) {
                 }
             }
         });
-
         if (currentCategory === 'individual_labor') {
             const skillCheckboxes = getCheckboxValues('skills');
             if (skillCheckboxes.length === 0) {
@@ -416,7 +351,6 @@ async function handleNextSubmit(event) {
                     isValid = false;
                 }
             }
-
             const commCheckboxes = getCheckboxValues('communication_preferences');
             if (commCheckboxes.length === 0) {
                 if (!confirm('No communication preferences selected. Please select at least one way to contact you.')) {
@@ -424,7 +358,6 @@ async function handleNextSubmit(event) {
                 }
             }
         }
-
         if (currentCategory === 'mukkadam') {
             const skillCheckboxes = getCheckboxValues('skills');
             if (skillCheckboxes.length === 0) {
@@ -432,7 +365,6 @@ async function handleNextSubmit(event) {
                     isValid = false;
                 }
             }
-
             const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
             const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
             if (peakCount < providingCount) {
@@ -441,7 +373,6 @@ async function handleNextSubmit(event) {
                 isValid = false;
             }
         }
-
         if (!isValid) {
             event.preventDefault();
             if (!document.querySelector('.is-invalid')) {
@@ -454,7 +385,6 @@ async function handleNextSubmit(event) {
             }
             return;
         }
-
         if (currentCategory === 'individual_labor') {
             stepData = {
                 gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')), primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
@@ -480,11 +410,9 @@ async function handleNextSubmit(event) {
         }
         currentRegistration.step2 = stepData;
         await saveCurrentRegistrationData(currentRegistration);
-
         const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
         document.getElementById('currentCategoryHidden').value = categoryToPass;
         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
-
     } else if (currentStep === 3) {
         const agreement = document.querySelector('input[name="data_sharing_agreement"]');
         if (!agreement.checked) {
@@ -493,13 +421,12 @@ async function handleNextSubmit(event) {
             agreement.focus();
             return;
         }
-
         stepData = {
             data_sharing_agreement: agreement.checked
         };
         currentRegistration.step3 = stepData;
         await saveCurrentRegistrationData(currentRegistration);
-
+        
         await submitFullRegistration();
     }
 }
@@ -511,46 +438,85 @@ async function submitFullRegistration() {
         alert('An error occurred. Please ensure all steps are completed before submitting.');
         return;
     }
-
+    
     console.log('Attempting to submit full registration:', fullRegistrationData);
-
-    const isOnline = navigator.onLine;
-
-    if (isOnline) {
+    
+    // Create the FormData object
+    const formData = new FormData();
+    for (const key in fullRegistrationData.step1) {
+        if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
+            formData.append(key, fullRegistrationData.step1[key]);
+        }
+    }
+    if (fullRegistrationData.step1.location) {
+        formData.append('location', JSON.stringify(fullRegistrationData.step1.location));
+    }
+    
+    let photoBlobToSubmit = null;
+    if (fullRegistrationData.step1.photoId) {
+        const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readonly');
+        const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
+        const imageData = await imageStore.get(fullRegistrationData.step1.photoId);
+        if (imageData && imageData.image) {
+            photoBlobToSubmit = imageData.image;
+        }
+    } else if (fullRegistrationData.step1.photoBase64) {
         try {
-            console.log('Online, attempting immediate submission.');
-            const success = await sendRegistrationToServer(fullRegistrationData);
-            if (success) {
-                await clearCurrentRegistrationAndImage();
-                alert('Registration submitted successfully!');
-                window.location.href = '/success/';
-            } else {
-                console.log('Immediate online submission failed, saving for background sync.');
-                await saveForBackgroundSync(fullRegistrationData);
-                alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
-                // Use a proper redirect to the success page to show the user the process is done
-                window.location.href = '/success/';
+            const response = await fetch(fullRegistrationData.step1.photoBase64);
+            photoBlobToSubmit = await response.blob();
+        } catch (e) {
+            console.error('Failed to convert base64 to Blob:', e);
+        }
+    }
+    
+    if (photoBlobToSubmit) {
+        formData.append('photo', photoBlobToSubmit, 'captured_image.jpeg');
+    }
+
+    if (fullRegistrationData.step2) {
+        for (const key in fullRegistrationData.step2) {
+            if (fullRegistrationData.step2.hasOwnProperty(key)) {
+                if (Array.isArray(fullRegistrationData.step2[key]) || (typeof fullRegistrationData.step2[key] === 'object' && fullRegistrationData.step2[key] !== null)) {
+                    formData.append(key, JSON.stringify(fullRegistrationData.step2[key]));
+                } else {
+                    formData.append(key, fullRegistrationData.step2[key]);
+                }
             }
-        } catch (error) {
-            console.error('Error during online submission attempt:', error);
-            await saveForBackgroundSync(fullRegistrationData);
-            alert('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
-            window.location.href = '/success/';
         }
-    } else {
-        console.log('Offline, saving for background sync.');
-        await saveForBackgroundSync(fullRegistrationData);
-        if ('serviceWorker' in navigator && 'SyncManager' in window) {
-            const registration = await navigator.serviceWorker.ready;
-            await registration.sync.register('sync-labor-registration');
-            alert('You are offline. Your registration will be submitted when you are back online.');
+    }
+
+    if (fullRegistrationData.step3) {
+        formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
+    }
+    
+    // Now, send the request
+    try {
+        const response = await fetch('/api/submit-registration/', {
+            method: 'POST',
+            body: formData,
+            // With FormData, the browser sets the 'multipart/form-data' header automatically.
+            // No CSRF token is needed here because the server-side view is @csrf_exempt.
+        });
+        
+        if (response.ok) {
+            console.log('Online submission successful.');
+            await clearCurrentRegistrationAndImage();
+            alert('Registration submitted successfully!');
+            window.location.href = '/registration-success/';
         } else {
-            alert('You are offline, and background sync is not fully supported by your browser. Your data is saved locally, but might be lost if you clear browser data before coming online.');
+            console.error('Online submission failed with status:', response.status);
+            alert('Online submission failed. Saving for later sync.');
+            await saveForBackgroundSync(fullRegistrationData);
+            window.location.href = '/registration-success/';
         }
-        await clearCurrentRegistrationAndImage();
-        window.location.href = '/success/';
+    } catch (error) {
+        console.error('Network error during online submission:', error);
+        alert('Network error. Saving form for later sync.');
+        await saveForBackgroundSync(fullRegistrationData);
+        window.location.href = '/registration-success/';
     }
 }
+
 
 async function clearCurrentRegistrationAndImage() {
     if (!db) await initDB();
@@ -562,87 +528,6 @@ async function clearCurrentRegistrationAndImage() {
     }
     await tx.done;
     console.log('Current registration and associated image cleared from IndexedDB.');
-}
-
-async function sendRegistrationToServer(fullRegistrationData) {
-    try {
-        const formData = new FormData();
-
-        for (const key in fullRegistrationData.step1) {
-            if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
-                formData.append(key, fullRegistrationData.step1[key]);
-            }
-        }
-        if (fullRegistrationData.step1.location) {
-            formData.append('location', JSON.stringify(fullRegistrationData.step1.location));
-        }
-
-        if (fullRegistrationData.step1.photoId) {
-            const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readonly');
-            const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
-            const imageData = await imageStore.get(fullRegistrationData.step1.photoId);
-            if (imageData && imageData.image) {
-                formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
-            }
-        } else if (fullRegistrationData.step1.photoBase64) {
-            const response = await fetch(fullRegistrationData.step1.photoBase64);
-            const blob = await response.blob();
-            formData.append('photo', blob, 'captured_image.jpeg');
-        }
-
-        if (fullRegistrationData.step2) {
-            for (const key in fullRegistrationData.step2) {
-                if (fullRegistrationData.step2.hasOwnProperty(key)) {
-                    if (Array.isArray(fullRegistrationData.step2[key]) || (typeof fullRegistrationData.step2[key] === 'object' && fullRegistrationData.step2[key] !== null)) {
-                        formData.append(key, JSON.stringify(fullRegistrationData.step2[key]));
-                    } else {
-                        formData.append(key, fullRegistrationData.step2[key]);
-                    }
-                }
-            }
-        }
-
-        if (fullRegistrationData.step3) {
-            formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
-        }
-
-        const response = await fetch('.*/api/submit-registration/', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-        });
-
-        if (response.ok) {
-            const result = await response.json();
-            console.log('Registration submitted successfully to backend:', result);
-            return true;
-        } else {
-            const errorResponse = await response.json();
-            console.error('Failed to submit registration:', response.status, errorResponse);
-            return false;
-        }
-        
-    } catch (error) {
-        console.error('Error sending registration to server:', error);
-        return false;
-    }
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
 }
 
 function initializeCameraAndLocation() {
@@ -927,6 +812,13 @@ function getCurrentLocation() {
             longitudeHidden.value = lng;
             accuracyHidden.value = accuracy;
 
+            locationData = {
+                latitude: lat,
+                longitude: lng,
+                accuracy: accuracy,
+                timestamp: new Date().toISOString()
+            };
+
             coordinatesSpan.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             accuracySpan.textContent = `${accuracy.toFixed(0)}m`;
 
@@ -1020,11 +912,12 @@ async function goBack() {
     function getFieldValue(name) {
         const element = form.querySelector(`[name="${name}"]`);
         if (!element) return null;
-        if (element.type === 'checkbox') { return element.checked; }
+        if (element.type === 'checkbox') return element.checked;
         if (element.type === 'radio') { const selectedRadio = form.querySelector(`[name="${name}"]:checked`); return selectedRadio ? selectedRadio.value : ''; }
-        if (element.tagName === 'SELECT') { return element.value; }
+        if (element.tagName === 'SELECT') return element.value;
         return element.value.trim();
     }
+
     function getCheckboxValues(name) {
         const checkboxes = form.querySelectorAll(`input[name="${name}"]:checked`);
         return Array.from(checkboxes).map(cb => cb.value);
@@ -1033,7 +926,6 @@ async function goBack() {
     if (currentStep === 2) {
         const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
         const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
-
         if (currentCategory === 'individual_labor') {
             stepData = {
                 gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')), primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
@@ -1045,7 +937,7 @@ async function goBack() {
             stepData = {
                 providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || 0, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || 0, expected_charges: getFieldValue('expected_charges'),
                 labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
-                supply_areas: getFieldValue('supply_areas'), skills: getCheckboxValues('skills'),
+                supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
             };
         } else if (currentCategory === 'transport') {
             stepData = {
@@ -1064,7 +956,6 @@ async function goBack() {
         };
         currentRegistration.step3 = stepData;
     }
-
     await saveCurrentRegistrationData(currentRegistration);
     window.location.href = `?step=${currentStep - 1}`;
 }
