@@ -188,7 +188,7 @@ async function syncLaborRegistrations() {
                 formData.append('data_sharing_agreement', step3Data.data_sharing_agreement);
             }
 
-            const response = await fetch('/api/submit-registration/', {
+            const response = await fetch('.*/api/submit-registration/', {
                 method: 'POST',
                 body: formData,
                 // Do not explicitly set Content-Type for FormData

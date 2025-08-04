@@ -606,7 +606,7 @@ async function sendRegistrationToServer(fullRegistrationData) {
             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
         }
 
-        const response = await fetch('/api/submit-registration/', {
+        const response = await fetch('.*/api/submit-registration/', {
             method: 'POST',
             body: formData,
             headers: {

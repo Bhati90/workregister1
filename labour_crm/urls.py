@@ -18,12 +18,21 @@ from django.contrib import admin
 from django.urls import path,include
 from django.conf import settings
 from django.conf.urls.static import static
+from registration import views as registration_views
+from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     
     path('register/', include('registration.urls')),
      path('', include('pwa.urls')),  
+     path('.*/registration-success/', registration_views.success_view, name='registration_success'),
+
+    # A root URL that redirects to the registration home page, or just serves the home page.
+    path('', registration_views.home_view, name='root'),
+
+    # A catch-all for development if you have a separate offline page.
+    path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline_page'),
 ]
 
 
