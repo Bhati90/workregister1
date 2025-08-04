@@ -69,13 +69,6 @@ async function getCurrentRegistrationData() {
     return record ? record.data : {};
 }
 
-async function getPendingRegistrationsCount() {
-    if (!db) await initDB();
-    const tx = db.transaction(STORE_PENDING_REGISTRATIONS, 'readonly');
-    const store = tx.objectStore(STORE_PENDING_REGISTRATIONS);
-    return await store.count();
-}
-
 async function saveImageBlob(blob, fileName, mimeType) {
     if (!db) await initDB();
     const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readwrite');
@@ -97,13 +90,11 @@ async function saveForBackgroundSync(fullRegistrationData) {
     });
     await tx.done;
     console.log('Full registration saved for background sync.');
-    await updateSyncStatusUI(); // Update UI after saving
 }
 
 // --- UI Initialization and Event Listeners ---
 document.addEventListener('DOMContentLoaded', async function() {
     await initDB();
-    await updateSyncStatusUI(); // Initial check for pending forms
 
     const currentStep = parseInt(document.querySelector('input[name="step"]').value);
 
@@ -129,59 +120,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         nextBtn.addEventListener('click', handleNextSubmit);
     }
 });
-
-// --- Sync Status UI Management ---
-async function updateSyncStatusUI() {
-    const pendingCount = await getPendingRegistrationsCount();
-    const container = document.getElementById('sync-status-container');
-    if (!container) return;
-
-    if (pendingCount > 0) {
-        container.innerHTML = `
-            <div id="sync-banner" class="alert alert-warning d-flex align-items-center justify-content-between p-3 mt-3 shadow">
-                <span>
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Pending Submissions:</strong> You have ${pendingCount} registration(s) waiting to be submitted.
-                </span>
-                <button id="sync-now-btn" class="btn btn-primary btn-sm">Sync Now</button>
-            </div>
-        `;
-        document.getElementById('sync-now-btn').addEventListener('click', syncNowHandler);
-    } else {
-        container.innerHTML = ''; // Clear the banner if no pending submissions
-    }
-}
-
-async function syncNowHandler() {
-    const syncButton = document.getElementById('sync-now-btn');
-    if (!syncButton) return;
-
-    const originalText = syncButton.innerHTML;
-    syncButton.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Syncing...';
-    syncButton.disabled = true;
-
-    if ('serviceWorker' in navigator && 'SyncManager' in window) {
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            await registration.sync.register('sync-labor-registration');
-            console.log('Manual sync registered successfully.');
-            alert('Sync request sent! Your data will be submitted when a network connection is available.');
-            // Re-enable the button but don't clear the banner, as sync might take time
-            syncButton.innerHTML = originalText;
-            syncButton.disabled = false;
-        } catch (error) {
-            console.error('Failed to register background sync:', error);
-            alert('Failed to start sync. Please check your network connection and try again.');
-            syncButton.innerHTML = originalText;
-            syncButton.disabled = false;
-        }
-    } else {
-        alert('Your browser does not support background sync. Please stay on this page to submit your forms when you reconnect to the internet.');
-        syncButton.innerHTML = originalText;
-        syncButton.disabled = false;
-    }
-}
-
 
 // --- Load Data from IndexedDB (Pre-fill Forms) ---
 async function loadStep1Data() {
@@ -618,16 +556,14 @@ async function submitFullRegistration() {
                 console.log('Immediate online submission failed, saving for background sync.');
                 await saveForBackgroundSync(fullRegistrationData);
                 alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
-                // We still redirect to success page, but it should indicate the deferred nature
-                window.location.href = '/register/success/'; 
+                window.location.href = '/register/success/'; // Redirect to success page even if deferred
                 submissionAttempted = true;
             }
         } catch (error) {
             console.error('Error during online submission attempt:', error);
             await saveForBackgroundSync(fullRegistrationData);
             alert('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
-            // We still redirect to success page, but it should indicate the deferred nature
-            window.location.href = '/register/success/'; 
+            window.location.href = '/register/success/'; // Redirect to success page even if deferred
             submissionAttempted = true;
         }
     } else {
@@ -859,7 +795,9 @@ async function startCamera() {
         statusDiv.innerHTML = '<div class="loading-spinner"></div>Starting camera...';
         uploadFallback.style.display = 'none'; // Hide fallback if camera starts
 
-        stopCameraStream(); // Stop any existing stream before starting a new one
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+        }
 
         cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = cameraStream;
@@ -898,14 +836,6 @@ async function startCamera() {
         document.getElementById('switch-camera').style.display = 'none';
     }
 }
-
-function stopCameraStream() {
-    if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        cameraStream = null;
-    }
-}
-
 
 async function switchCamera() {
     currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
@@ -948,7 +878,10 @@ function capturePhoto() {
         cameraSection.style.display = 'none';
         previewDiv.style.display = 'block';
 
-        stopCameraStream(); // Stop the stream after capturing the photo
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
     }, 'image/jpeg', 0.85);
 }
 
@@ -1171,7 +1104,7 @@ async function goBack() {
             stepData = {
                 providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
                 labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
-                supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
+                supply_areas: getFieldValue('supply_areas'), skills: getCheckboxValues('skills'),
             };
         } else if (currentCategory === 'transport') {
             stepData = {
@@ -1201,5 +1134,155 @@ async function goBack() {
 }
 
 window.addEventListener('beforeunload', function() {
-    stopCameraStream(); // Clean up camera on page unload
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+    }
+});
+
+async function registerBackgroundSync() {
+    if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('sync-labor-registration');
+            console.log('[Client] Background sync registered successfully');
+        } catch (error) {
+            console.error('[Client] Failed to register background sync:', error);
+        }
+    } else {
+        console.warn('[Client] Background sync not supported');
+    }
+}
+
+// Function to manually trigger sync (useful for testing)
+async function manualSync() {
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            if (registration.active) {
+                registration.active.postMessage({ type: 'SYNC_NOW' });
+                console.log('[Client] Manual sync requested');
+            }
+        } catch (error) {
+            console.error('[Client] Failed to request manual sync:', error);
+        }
+    }
+}
+
+// Function to check online status and trigger sync
+function handleOnlineStatus() {
+    if (navigator.onLine) {
+        console.log('[Client] Back online, registering sync');
+        registerBackgroundSync();
+    } else {
+        console.log('[Client] Gone offline');
+    }
+}
+
+// Add event listeners for online/offline events
+window.addEventListener('online', handleOnlineStatus);
+window.addEventListener('offline', handleOnlineStatus);
+
+// Modified function to store data offline (add this to your existing offline storage function)
+async function storeRegistrationOffline(registrationData) {
+    try {
+        // Your existing IndexedDB storage code here...
+        // After successfully storing the data, register background sync
+        
+        console.log('[Client] Data stored offline, registering background sync');
+        await registerBackgroundSync();
+        
+        // Show user feedback
+        showOfflineMessage();
+        
+    } catch (error) {
+        console.error('[Client] Failed to store data offline:', error);
+        throw error;
+    }
+}
+
+// Function to show offline message to user
+function showOfflineMessage() {
+    // Create or update a user-visible message
+    const message = document.createElement('div');
+    message.className = 'alert alert-info offline-message';
+    message.innerHTML = `
+        <i class="fas fa-wifi"></i>
+        <strong>Stored Offline:</strong> Your registration has been saved and will be submitted automatically when you're back online.
+        <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="manualSync()">
+            Try Sync Now
+        </button>
+    `;
+    
+    // Add to top of form or wherever appropriate
+    const formContainer = document.querySelector('.form-container') || document.body;
+    formContainer.insertBefore(message, formContainer.firstChild);
+    
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+        if (message.parentNode) {
+            message.parentNode.removeChild(message);
+        }
+    }, 10000);
+}
+
+// Function to check for pending registrations and show status
+async function checkPendingRegistrations() {
+    if (!('indexedDB' in window)) return;
+    
+    try {
+        const { openDB } = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
+        const db = await openDB('LaborRegistrationDB', 2);
+        const tx = db.transaction('pending_registrations', 'readonly');
+        const store = tx.objectStore('pending_registrations');
+        const count = await store.count();
+        
+        if (count > 0) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'alert alert-warning pending-status';
+            statusDiv.innerHTML = `
+                <i class="fas fa-clock"></i>
+                <strong>Pending Submissions:</strong> You have ${count} registration(s) waiting to be submitted.
+                ${navigator.onLine ? 
+                    '<button type="button" class="btn btn-sm btn-primary ms-2" onclick="manualSync()">Sync Now</button>' : 
+                    'Will sync when online.'
+                }
+            `;
+            
+            document.body.insertBefore(statusDiv, document.body.firstChild);
+        }
+        
+    } catch (error) {
+        console.error('[Client] Failed to check pending registrations:', error);
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Check for pending registrations
+    checkPendingRegistrations();
+    
+    // Register sync if online
+    if (navigator.onLine) {
+        registerBackgroundSync();
+    }
+});
+
+// Listen for successful sync notifications from service worker
+navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SYNC_COMPLETE') {
+        // Remove any offline/pending messages
+        const offlineMessages = document.querySelectorAll('.offline-message, .pending-status');
+        offlineMessages.forEach(msg => msg.remove());
+        
+        // Show success message
+        const successMsg = document.createElement('div');
+        successMsg.className = 'alert alert-success';
+        successMsg.innerHTML = `
+            <i class="fas fa-check-circle"></i>
+            <strong>Success:</strong> Your offline registrations have been submitted!
+        `;
+        document.body.insertBefore(successMsg, document.body.firstChild);
+        
+        setTimeout(() => successMsg.remove(), 5000);
+    }
 });
