@@ -237,11 +237,22 @@ async function loadStep1Data() {
 
         document.getElementById('location-coordinates').textContent = `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
         document.getElementById('location-accuracy').textContent = `${loc.accuracy.toFixed(0)}m`;
-        document.getElementById('location-info').style.display = 'block';
-        document.getElementById('location-error').style.display = 'none';
-        document.getElementById('get-location').innerHTML = '<i class="fas fa-check me-2"></i>Location Captured';
-        document.getElementById('get-location').disabled = false;
-        document.getElementById('get-location').className = 'btn btn-success';
+
+        const locationInfoElement = document.getElementById('location-info');
+        if (locationInfoElement) {
+            locationInfoElement.style.display = 'block';
+        }
+        const locationErrorElement = document.getElementById('location-error');
+        if (locationErrorElement) {
+            locationErrorElement.style.display = 'none';
+        }
+
+        const getLocationBtn = document.getElementById('get-location');
+        if (getLocationBtn) {
+            getLocationBtn.innerHTML = '<i class="fas fa-check me-2"></i>Location Captured';
+            getLocationBtn.disabled = false;
+            getLocationBtn.className = 'btn btn-success';
+        }
     }
 }
 
@@ -364,7 +375,6 @@ async function handleNextSubmit(event) {
             const photoPreviewDiv = document.getElementById('photo-preview');
 
             if (photoPreviewDiv.style.display !== 'none' && photoConfirmedDiv.style.display === 'none') {
-                // Since `confirm` is a no-op, we'll use a custom alert here.
                 alert('Please confirm your photo by clicking "Use This Photo" or retake it if you\'re not satisfied.');
                 isValid = false;
                 photoPreviewDiv.scrollIntoView({ behavior: 'smooth' });
@@ -381,8 +391,7 @@ async function handleNextSubmit(event) {
 
         if (!isValid) {
             if (!document.querySelector('.is-invalid')) {
-                // Since `alert` is a no-op, we'll just log to the console.
-                console.error('Please fill in all required fields.'); // Generic alert if no specific invalid field
+                alert('Please fill in all required fields.'); // Generic alert if no specific invalid field
             }
             const firstInvalid = document.querySelector('.is-invalid');
             if (firstInvalid) {
@@ -516,8 +525,7 @@ async function handleNextSubmit(event) {
             const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
             const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
             if (peakCount < providingCount) {
-                // Since `alert` is a no-op, we'll log to the console.
-                console.error('Total workers at peak cannot be less than regular providing labour count.');
+                alert('Total workers at peak cannot be less than regular providing labour count.');
                 form.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
                 isValid = false;
             }
@@ -534,8 +542,7 @@ async function handleNextSubmit(event) {
 
         if (!isValid) {
             if (!document.querySelector('.is-invalid')) {
-                // Since `alert` is a no-op, we'll log to the console.
-                console.error('Please fill in all required fields correctly.');
+                alert('Please fill in all required fields correctly.');
             }
             const firstInvalid = document.querySelector('.is-invalid');
             if (firstInvalid) {
@@ -578,8 +585,7 @@ async function handleNextSubmit(event) {
     } else if (currentStep === 3) {
         const agreement = document.querySelector('input[name="data_sharing_agreement"]');
         if (!agreement.checked) {
-            // Since `alert` is a no-op, we'll log to the console.
-            console.error('Please accept the data sharing agreement to proceed.');
+            alert('Please accept the data sharing agreement to proceed.');
             agreement.focus();
             return; // Stop function execution
         }
@@ -598,8 +604,7 @@ async function submitFullRegistration() {
     const fullRegistrationData = await getCurrentRegistrationData();
     if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
         console.error('Incomplete registration data found for submission. Cannot submit.');
-        // Since `alert` is a no-op, we'll log to the console.
-        console.error('An error occurred. Please ensure all steps are completed before submitting.');
+        alert('An error occurred. Please ensure all steps are completed before submitting.');
         return;
     }
 
@@ -617,26 +622,23 @@ async function submitFullRegistration() {
             if (success) {
                 console.log('Immediate online submission successful.');
                 await clearCurrentRegistrationAndImage();
-                // Since `alert` is a no-op, we'll log to the console.
-                console.log('Registration submitted successfully!');
+                alert('Registration submitted successfully!');
                 window.location.href = '/register/success/'; // Redirect to success page
                 submissionAttempted = true;
             } else {
                 console.log('Immediate online submission failed, saving for background sync.');
                 await saveForBackgroundSync(fullRegistrationData);
-                // Since `alert` is a no-op, we'll log to the console.
-                console.log('Submission failed, but your data is saved locally and will try to sync when you are online.');
+                alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
                 // We still redirect to success page, but it should indicate the deferred nature
-                window.location.href = '/register/success/'; 
+                window.location.href = '/register/success/';
                 submissionAttempted = true;
             }
         } catch (error) {
             console.error('Error during online submission attempt:', error);
             await saveForBackgroundSync(fullRegistrationData);
-            // Since `alert` is a no-op, we'll log to the console.
-            console.error('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
+            alert('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
             // We still redirect to success page, but it should indicate the deferred nature
-            window.location.href = '/register/success/'; 
+            window.location.href = '/register/success/';
             submissionAttempted = true;
         }
     } else {
@@ -645,11 +647,9 @@ async function submitFullRegistration() {
         if ('serviceWorker' in navigator && 'SyncManager' in window) {
             const registration = await navigator.serviceWorker.ready;
             await registration.sync.register('sync-labor-registration');
-            // Since `alert` is a no-op, we'll log to the console.
-            console.log('You are offline. Your registration will be submitted when you are back online.');
+            alert('You are offline. Your registration will be submitted when you are back online.');
         } else {
-            // Since `alert` is a no-op, we'll log to the console.
-            console.error('You are offline, and background sync is not fully supported by your browser. Your data is saved locally, but might be lost if you clear browser data before coming online.');
+            alert('You are offline, and background sync is not fully supported by your browser. Your data is saved locally, but might be lost if you clear browser data before coming online.');
         }
         await clearCurrentRegistrationAndImage();
         window.location.href = '/register/success/'; // Redirect to success page
@@ -1187,7 +1187,7 @@ async function goBack() {
         } else if (currentCategory === 'transport') {
             stepData = {
                 vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
-                availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
+                availability: getFieldValue('availability'), service_areas: getCheckboxValues('service_areas'),
             };
         } else if (currentCategory === 'others') {
             stepData = {
@@ -1214,3 +1214,261 @@ async function goBack() {
 window.addEventListener('beforeunload', function() {
     stopCameraStream(); // Clean up camera on page unload
 });
+window.manualSync = manualSync;
+window.registerBackgroundSync = registerBackgroundSync;
+
+// Function to register background sync when storing data offline
+async function registerBackgroundSync() {
+    if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('sync-labor-registration');
+            console.log('[Client] Background sync registered successfully');
+            return true;
+        } catch (error) {
+            console.error('[Client] Failed to register background sync:', error);
+            return false;
+        }
+    } else {
+        console.warn('[Client] Background sync not supported');
+        return false;
+    }
+}
+
+// Function to manually trigger sync (useful for testing)
+async function manualSync() {
+    console.log('[Client] Manual sync requested');
+    
+    // Show loading state
+    const button = event?.target;
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+    }
+    
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            if (registration.active) {
+                // Try direct sync first
+                registration.active.postMessage({ type: 'SYNC_NOW' });
+                
+                // Also register background sync as fallback
+                if (registration.sync) {
+                    await registration.sync.register('sync-labor-registration');
+                }
+                
+                // Show success feedback
+                showSyncMessage('Sync initiated! Check for notifications.', 'info');
+            } else {
+                showSyncMessage('Service worker not active', 'warning');
+            }
+        } catch (error) {
+            console.error('[Client] Failed to request manual sync:', error);
+            showSyncMessage('Sync failed: ' + error.message, 'danger');
+        }
+    } else {
+        showSyncMessage('Service workers not supported', 'warning');
+    }
+    
+    // Reset button state
+    if (button) {
+        setTimeout(() => {
+            button.disabled = false;
+            button.innerHTML = 'Try Sync Now';
+        }, 2000);
+    }
+}
+
+// Function to show sync messages
+function showSyncMessage(message, type = 'info') {
+    // Remove existing sync messages
+    const existingMessages = document.querySelectorAll('.sync-message');
+    existingMessages.forEach(msg => msg.remove());
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert alert-${type} sync-message`;
+    messageDiv.innerHTML = `
+        <i class="fas fa-${type === 'info' ? 'info-circle' : type === 'danger' ? 'exclamation-triangle' : 'exclamation-circle'}"></i>
+        ${message}
+    `;
+    
+    // Add to top of page
+    document.body.insertBefore(messageDiv, document.body.firstChild);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.parentNode.removeChild(messageDiv);
+        }
+    }, 5000);
+}
+
+// Function to handle online status and trigger sync
+function handleOnlineStatus() {
+    if (navigator.onLine) {
+        console.log('[Client] Back online, registering sync');
+        registerBackgroundSync();
+        checkAndSyncPending();
+    } else {
+        console.log('[Client] Gone offline');
+    }
+}
+
+// Function to check and sync pending registrations
+async function checkAndSyncPending() {
+    try {
+        const pendingCount = await getPendingRegistrationsCount();
+        if (pendingCount > 0) {
+            console.log(`[Client] Found ${pendingCount} pending registrations, triggering sync`);
+            setTimeout(() => {
+                registerBackgroundSync();
+            }, 1000); // Small delay to ensure network is stable
+        }
+    } catch (error) {
+        console.error('[Client] Error checking pending registrations:', error);
+    }
+}
+
+
+
+// Add event listeners for online/offline events
+window.addEventListener('online', handleOnlineStatus);
+window.addEventListener('offline', handleOnlineStatus);
+
+// Modified function to store data offline
+async function storeRegistrationOffline(registrationData) {
+    try {
+        // Your existing IndexedDB storage code here...
+        console.log('[Client] Storing registration data offline...');
+        
+        // After successfully storing the data, register background sync
+        const syncRegistered = await registerBackgroundSync();
+        
+        // Show user feedback
+        showOfflineMessage(syncRegistered);
+        
+    } catch (error) {
+        console.error('[Client] Failed to store data offline:', error);
+        throw error;
+    }
+}
+
+// Function to show offline message to user
+function showOfflineMessage(syncRegistered = false) {
+    // Remove any existing offline messages
+    const existing = document.querySelectorAll('.offline-message');
+    existing.forEach(msg => msg.remove());
+    
+    const message = document.createElement('div');
+    message.className = 'alert alert-info offline-message position-fixed';
+    message.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    message.innerHTML = `
+        <i class="fas fa-wifi"></i>
+        <strong>Stored Offline:</strong> Your registration has been saved${syncRegistered ? ' and will be submitted automatically when you\'re back online.' : '.'}
+        <br>
+        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="manualSync()">
+            <i class="fas fa-sync"></i> Try Sync Now
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-2 ms-1" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i> Dismiss
+        </button>
+    `;
+    
+    document.body.appendChild(message);
+    
+    // Auto-remove after 15 seconds
+    setTimeout(() => {
+        if (message.parentNode) {
+            message.parentNode.removeChild(message);
+        }
+    }, 15000);
+}
+
+// Function to check for pending registrations and show status
+async function checkPendingRegistrations() {
+    try {
+        const count = await getPendingRegistrationsCount();
+        
+        if (count > 0) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'alert alert-warning pending-status position-fixed';
+            statusDiv.style.cssText = 'top: 20px; left: 20px; z-index: 9998; max-width: 400px;';
+            statusDiv.innerHTML = `
+                <i class="fas fa-clock"></i>
+                <strong>Pending Submissions:</strong> You have ${count} registration(s) waiting to be submitted.
+                <br>
+                ${navigator.onLine ? 
+                    '<button type="button" class="btn btn-sm btn-primary mt-2" onclick="manualSync()"><i class="fas fa-sync"></i> Sync Now</button>' : 
+                    '<small class="text-muted">Will sync when online.</small>'
+                }
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2 ms-1" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i> Dismiss
+                </button>
+            `;
+            
+            document.body.appendChild(statusDiv);
+            
+            // Auto-remove after 20 seconds
+            setTimeout(() => {
+                if (statusDiv.parentNode) {
+                    statusDiv.parentNode.removeChild(statusDiv);
+                }
+            }, 20000);
+        }
+        
+    } catch (error) {
+        console.error('[Client] Failed to check pending registrations:', error);
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[Client] Initializing sync functionality...');
+    
+    // Check for pending registrations
+    checkPendingRegistrations();
+    
+    // Register sync if online
+    if (navigator.onLine) {
+        registerBackgroundSync();
+    }
+    
+    // Check if service worker is supported
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+            console.log('[Client] Service worker ready');
+        });
+    }
+});
+
+// Listen for messages from service worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        console.log('[Client] Message from service worker:', event.data);
+        
+        if (event.data && event.data.type === 'SYNC_COMPLETE') {
+            // Remove any offline/pending messages
+            const offlineMessages = document.querySelectorAll('.offline-message, .pending-status');
+            offlineMessages.forEach(msg => msg.remove());
+            
+            // Show success message
+            showSyncMessage('Your offline registrations have been submitted successfully!', 'success');
+            
+            // Refresh pending count
+            setTimeout(checkPendingRegistrations, 1000);
+        }
+    });
+}
+
+// Export functions for use in other scripts
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        manualSync,
+        registerBackgroundSync,
+        storeRegistrationOffline,
+        checkPendingRegistrations
+    };
+}
+
+// multi_step_form_client.js - Complete implementation with background sync

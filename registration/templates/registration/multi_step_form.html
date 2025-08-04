@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Labor Registration - {{ step_title }}</title>
-     {% load pwa %}
+    {% load pwa %}
     {% progressive_web_app_meta %}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -413,6 +413,7 @@
             .preview-controls .btn {
                 min-width: 100px;
                 font-size: 13px;
+                padding: 8px 12px;
                 flex: 0 1 auto;
             }
 
@@ -450,15 +451,28 @@
     </style>
 </head>
 <body>
-  <div class="main-container">
+    <div class="main-container">
         <div class="container">
+            <div id="sync-status-container">
+                <!-- Connection status -->
+<div class="connection-status"></div>
+
+<!-- Offline indicator -->
+<div class="offline-indicator alert alert-warning" style="display: none;">
+    You are currently offline. Submissions will be saved and synced when online.
+</div>
+                <!-- The JavaScript will inject the pending submissions banner here. -->
+            </div>
             <div class="form-container">
+                <!-- Connection status -->
                 <div class="progress-container">
                     <div class="step-indicator">
+                        
                         <div class="step-item {% if step >= 1 %}active{% endif %} {% if step > 1 %}completed{% endif %}">
                             <div class="step-number">
                                 {% if step > 1 %}<i class="fas fa-check"></i>{% else %}1{% endif %}
                             </div>
+
                             <div class="step-label">Basic Info</div>
                         </div>
                         <div class="step-item {% if step >= 2 %}active{% endif %} {% if step > 2 %}completed{% endif %}">
@@ -722,7 +736,7 @@
                             <div></div> {# Placeholder to maintain flex-box spacing #}
                         {% endif %}
 
-                        <button type="button" class="btn btn-primary btn-navigation" id="nextStepBtn"> {# Changed to type="button" as JS handles submission #}
+                        <button type="submit" class="btn btn-primary btn-navigation" id="nextStepBtn"> {# Changed to type="button" as JS handles submission #}
                             {% if step == 3 %}
                                 <i class="fas fa-check me-2"></i>Submit
                             {% else %}
@@ -735,630 +749,46 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- <script>
-        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
-
-        // Global variables for camera and location
-        let cameraStream = null;
-        let locationData = null;
-        let photoData = null;
-        let currentFacingMode = 'environment'; // Start with back camera (better for general photos)
-        let availableCameras = [];
-
-        // Initialize camera and location on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            if (document.querySelector('input[name="step"]').value === '1') {
-                initializeCameraAndLocation();
-            }
-
-            // Initialize other form elements
-            initializeFormElements();
-        });
-
-        function initializeCameraAndLocation() {
-            // Auto-request location on page load
-            setTimeout(() => {
-                getCurrentLocation();
-            }, 1000);
-
-            // Initialize camera controls
-            const startCameraBtn = document.getElementById('start-camera');
-            const capturePhotoBtn = document.getElementById('capture-photo');
-            const switchCameraBtn = document.getElementById('switch-camera');
-            const retakePhotoBtn = document.getElementById('retake-photo');
-            const confirmPhotoBtn = document.getElementById('confirm-photo');
-            const changePhotoBtn = document.getElementById('change-photo');
-            const getLocationBtn = document.getElementById('get-location');
-
-            if (startCameraBtn) {
-                startCameraBtn.addEventListener('click', startCamera);
-            }
-            if (capturePhotoBtn) {
-                capturePhotoBtn.addEventListener('click', capturePhoto);
-            }
-            if (switchCameraBtn) {
-                switchCameraBtn.addEventListener('click', switchCamera);
-            }
-            if (retakePhotoBtn) {
-                retakePhotoBtn.addEventListener('click', retakePhoto);
-            }
-            if (confirmPhotoBtn) {
-                confirmPhotoBtn.addEventListener('click', confirmPhoto);
-            }
-            if (changePhotoBtn) {
-                changePhotoBtn.addEventListener('click', changePhoto);
-            }
-            if (getLocationBtn) {
-                getLocationBtn.addEventListener('click', getCurrentLocation);
-            }
-
-            // Check available cameras on load
-            checkAvailableCameras();
-        }
-
-        // Check available cameras and set up UI accordingly
-        async function checkAvailableCameras() {
+    <!-- Alternative: Inline script to ensure functions are available -->
+<script>
+// Quick fix: Define functions globally if not already available
+if (typeof manualSync === 'undefined') {
+    window.manualSync = async function() {
+        console.log('Manual sync called');
+        if ('serviceWorker' in navigator) {
             try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                availableCameras = devices.filter(device => device.kind === 'videoinput');
-
-                // Show switch button only if multiple cameras available
-                const switchBtn = document.getElementById('switch-camera');
-                if (availableCameras.length > 1) {
-                    // Multiple cameras available
-                    console.log(`Found ${availableCameras.length} cameras`);
-                } else {
-                    // Hide switch button if only one camera
-                    if (switchBtn) {
-                        switchBtn.style.display = 'none';
-                    }
+                const registration = await navigator.serviceWorker.ready;
+                if (registration.active) {
+                    registration.active.postMessage({ type: 'SYNC_NOW' });
+                    alert('Sync requested! Check console for details.');
+                }
+                if (registration.sync) {
+                    await registration.sync.register('sync-labor-registration');
                 }
             } catch (error) {
-                console.log('Could not enumerate devices:', error);
+                console.error('Manual sync failed:', error);
+                alert('Sync failed: ' + error.message);
             }
         }
-
-        // Camera Functions
-        async function startCamera() {
-            const video = document.getElementById('camera-stream');
-            const startBtn = document.getElementById('start-camera');
-            const captureBtn = document.getElementById('capture-photo');
-            const switchBtn = document.getElementById('switch-camera');
-            const statusDiv = document.getElementById('camera-status');
-            const cameraInfo = document.getElementById('camera-info');
-
-            try {
-                // Request camera with mobile-optimized settings
-                const constraints = {
-                    video: {
-                        width: { ideal: 640 },
-                        height: { ideal: 480 },
-                        facingMode: currentFacingMode // 'environment' for back camera, 'user' for front
-                    }
-                };
-
-                statusDiv.innerHTML = '<div class="loading-spinner"></div>Starting camera...';
-
-                // Stop existing stream if any
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
-                }
-
-                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = cameraStream;
-
-                // Hide start button, show capture and switch buttons
-                startBtn.style.display = 'none';
-                captureBtn.style.display = 'inline-block';
-
-                // Show switch button only if multiple cameras available
-                if (availableCameras.length > 1) {
-                    switchBtn.style.display = 'inline-block';
-                }
-
-                // Show camera info
-                cameraInfo.style.display = 'block';
-                updateCameraInfo();
-
-                statusDiv.innerHTML = '<p class="text-info"><i class="fas fa-info-circle me-2"></i>Camera ready! Position yourself properly and click capture.</p>';
-
-            } catch (error) {
-                console.error('Camera error:', error);
-
-                let errorMessage = 'Camera access denied or not available.';
-                if (error.name === 'NotAllowedError') {
-                    errorMessage = 'Camera permission denied. Please allow camera access and try again.';
-                } else if (error.name === 'NotFoundError') {
-                    errorMessage = 'No camera found on this device.';
-                } else if (error.name === 'NotReadableError') {
-                    errorMessage = 'Camera is being used by another application.';
-                }
-
-                statusDiv.innerHTML = `<p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>${errorMessage}</p>`;
-
-                // Show upload fallback
-                document.getElementById('upload-fallback').style.display = 'block';
-                document.getElementById('upload-fallback').querySelector('input[type="file"]').style.display = 'block';
-            }
-        }
-
-        async function switchCamera() {
-            // Toggle between front and back camera
-            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-
-            // Restart camera with new facing mode
-            await startCamera();
-        }
-
-        function updateCameraInfo() {
-            const currentCameraSpan = document.getElementById('current-camera');
-            const switchButton = document.getElementById('switch-camera');
-            const switchText = switchButton ? switchButton.querySelector('.camera-switch-text') : null;
-
-            if (currentCameraSpan) {
-                const cameraName = currentFacingMode === 'environment' ? 'Back Camera' : 'Front Camera';
-                currentCameraSpan.textContent = cameraName;
-
-                // Update switch button text to show what it will switch to
-                if (switchText) {
-                    const switchTo = currentFacingMode === 'environment' ? 'Front' : 'Back';
-                    switchText.textContent = `Switch to ${switchTo}`;
-                }
-            }
-        }
-
-        function capturePhoto() {
-            const video = document.getElementById('camera-stream');
-            const canvas = document.getElementById('photo-canvas');
-            const captureBtn = document.getElementById('capture-photo');
-            const switchBtn = document.getElementById('switch-camera');
-            const cameraSection = document.getElementById('camera-section');
-            const previewDiv = document.getElementById('photo-preview');
-            const capturedImg = document.getElementById('captured-image');
-
-            // Set canvas dimensions to match video
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            // Capture photo to canvas
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0);
-
-            // Convert to base64
-            photoData = canvas.toDataURL('image/jpeg', 0.85); // Higher quality
-
-            // Show preview
-            capturedImg.src = photoData;
-            cameraSection.style.display = 'none';
-            previewDiv.style.display = 'block';
-
-            // Stop camera stream temporarily (will restart if retake)
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
-                cameraStream = null;
-            }
-        }
-
-        function retakePhoto() {
-            const cameraSection = document.getElementById('camera-section');
-            const previewDiv = document.getElementById('photo-preview');
-            const confirmedDiv = document.getElementById('photo-confirmed');
-
-            // Reset states
-            cameraSection.style.display = 'block';
-            previewDiv.style.display = 'none';
-            confirmedDiv.style.display = 'none';
-
-            // Clear photo data
-            photoData = null;
-            document.querySelector('input[name="captured_photo"]').value = '';
-
-            // Restart camera
-            startCamera();
-        }
-
-        function confirmPhoto() {
-            const previewDiv = document.getElementById('photo-preview');
-            const confirmedDiv = document.getElementById('photo-confirmed');
-            const finalImg = document.getElementById('final-image');
-            const capturedPhotoInput = document.querySelector('input[name="captured_photo"]');
-
-            // Store photo data in hidden input
-            capturedPhotoInput.value = photoData;
-
-            // Show final confirmation
-            finalImg.src = photoData;
-            previewDiv.style.display = 'none';
-            confirmedDiv.style.display = 'block';
-
-            // Clear any error states
-            document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo captured and confirmed!</p>';
-        }
-
-        function changePhoto() {
-            // Allow user to change/retake the photo
-            retakePhoto();
-        }
-
-        // Location Functions
-        function getCurrentLocation() {
-            const locationBtn = document.getElementById('get-location');
-            const locationInfo = document.getElementById('location-info');
-            const locationError = document.getElementById('location-error');
-            const coordinatesSpan = document.getElementById('location-coordinates');
-            const accuracySpan = document.getElementById('location-accuracy');
-
-            if (!navigator.geolocation) {
-                showLocationError('Geolocation is not supported by this browser.');
-                return;
-            }
-
-            // Show loading
-            locationBtn.innerHTML = '<div class="loading-spinner"></div>Getting location...';
-            locationBtn.disabled = true;
-            locationError.style.display = 'none';
-
-            const options = {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 60000 // 1 minute
-            };
-
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    // Success
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    const accuracy = position.coords.accuracy;
-
-                    // Store location data
-                    locationData = {
-                        latitude: lat,
-                        longitude: lng,
-                        accuracy: accuracy
-                    };
-
-                    // Update hidden form fields
-                    document.querySelector('input[name="latitude"]').value = lat;
-                    document.querySelector('input[name="longitude"]').value = lng;
-                    document.querySelector('input[name="location_accuracy"]').value = accuracy;
-
-                    // Show location info
-                    coordinatesSpan.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-                    accuracySpan.textContent = `${accuracy.toFixed(0)}m`;
-
-                    locationInfo.style.display = 'block';
-                    locationError.style.display = 'none';
-
-                    // Reset button
-                    locationBtn.innerHTML = '<i class="fas fa-check me-2"></i>Location Captured';
-                    locationBtn.disabled = false;
-                    locationBtn.className = 'btn btn-success';
-                },
-                function(error) {
-                    // Error
-                    let errorMessage = 'Unable to retrieve location.';
-
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            errorMessage = 'Location access denied by user.';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMessage = 'Location information unavailable.';
-                            break;
-                        case error.TIMEOUT:
-                            errorMessage = 'Location request timed out.';
-                            break;
-                    }
-
-                    showLocationError(errorMessage);
-                },
-                options
-            );
-        }
-
-        function showLocationError(message) {
-            const locationBtn = document.getElementById('get-location');
-            const locationError = document.getElementById('location-error');
-            const locationInfo = document.getElementById('location-info');
-            const errorMessageSpan = document.getElementById('location-error-message');
-
-            errorMessageSpan.textContent = message;
-            locationError.style.display = 'block';
-            locationInfo.style.display = 'none';
-
-            // Reset button
-            locationBtn.innerHTML = '<i class="fas fa-crosshairs me-2"></i>Try Again';
-            locationBtn.disabled = false;
-            locationBtn.className = 'btn btn-warning';
-        }
-
-        // Form Functions
-        function initializeFormElements() {
-            // Show/hide referral fields for Individual Labor
-            const canReferCheckbox = document.querySelector('input[name="can_refer_others"]');
-            const referralFields = document.getElementById('referral-fields');
-
-            if (canReferCheckbox && referralFields) {
-                canReferCheckbox.addEventListener('change', function() {
-                    referralFields.style.display = this.checked ? 'block' : 'none';
-                });
-            }
-
-            // Show/hide transport other field for Mukkadam
-            const transportSelect = document.querySelector('select[name="arrange_transport"]');
-            const transportOtherField = document.getElementById('transport-other-field');
-
-            if (transportSelect && transportOtherField) {
-                transportSelect.addEventListener('change', function() {
-                    transportOtherField.style.display = this.value === 'other' ? 'block' : 'none';
-                });
-            }
-
-            // Auto-format phone numbers
-            document.querySelectorAll('input[type="text"]').forEach(input => {
-                if (input.name.includes('number')) {
-                    input.addEventListener('input', function(e) {
-                        // Remove non-numeric characters except +
-                        let value = e.target.value.replace(/[^\d+]/g, '');
-
-                        // Add +91 prefix if not present and number doesn't start with +
-                        if (value && !value.startsWith('+') && !value.startsWith('91')) {
-                            value = '+91' + value;
-                        }
-
-                        e.target.value = value;
-                    });
-                }
-            });
-        }
-
-        function goBack() {
-            const currentStep = parseInt(document.querySelector('input[name="step"]').value);
-            if (currentStep > 1) {
-                window.location.href = `?step=${currentStep - 1}`;
-            }
-        }
-
-        // Enhanced form validation
-        document.getElementById('registrationForm').addEventListener('submit', function(e) {
-            const step = parseInt(document.querySelector('input[name="step"]').value);
-
-            if (step === 1) {
-                // Validate required fields in step 1
-                const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
-                let isValid = true;
-
-                requiredFields.forEach(fieldName => {
-                    const field = document.querySelector(`[name="${fieldName}"]`);
-                    if (field && !field.value.trim()) {
-                        field.classList.add('is-invalid');
-                        isValid = false;
-                    } else if (field) {
-                        field.classList.remove('is-invalid');
-                    }
-                });
-
-                // Check if photo is captured or uploaded
-                const capturedPhoto = document.querySelector('input[name="captured_photo"]').value;
-                const uploadedPhoto = document.querySelector('input[name="photo"]').files.length;
-
-                if (!capturedPhoto && !uploadedPhoto) {
-                    // Show warning but don't prevent submission
-                    if (!confirm('No photo was captured or uploaded. A photo helps with verification and improves your chances of getting work. Do you want to continue without a photo?')) {
-                        //e.preventDefault();
-                        // Show camera interface to encourage photo capture
-                        //document.getElementById('camera-section').scrollIntoView({ behavior: 'smooth' });
-                        //return;
-                    }
-                } else if (capturedPhoto) {
-                    // Check if photo is properly confirmed
-                    const photoConfirmed = document.getElementById('photo-confirmed');
-                    const photoPreview = document.getElementById('photo-preview');
-
-                    if (photoPreview.style.display !== 'none' && photoConfirmed.style.display === 'none') {
-                        // Photo captured but not confirmed
-                        alert('Please confirm your photo by clicking "Use This Photo" or retake it if you\'re not satisfied.');
-                        e.preventDefault();
-                        photoPreview.scrollIntoView({ behavior: 'smooth' });
-                        return;
-                    }
-                }
-
-                // Check location
-                const latitude = document.querySelector('input[name="latitude"]').value;
-                const longitude = document.querySelector('input[name="longitude"]').value;
-
-                if (!latitude || !longitude) {
-                    // Show warning but don't prevent submission
-                    if (!confirm('Location was not captured. This may affect service quality. Do you want to continue without location?')) {
-                        e.preventDefault();
-                        return;
-                    }
-                }
-
-                if (!isValid) {
-                    e.preventDefault();
-                    alert('Please fill in all required fields.');
-                }
-            }
-
-            if (step === 2) {
-                // Validate category-specific required fields in step 2
-                let isValid = true;
-                let requiredFields = [];
-
-                // Get the category from session/hidden field or determine from form
-                const categoryElements = document.querySelectorAll('[data-category]');
-                let currentCategory = '';
-
-                // Determine current category from visible form elements
-                if (document.querySelector('.individual-labor-form') && document.querySelector('.individual-labor-form').style.display !== 'none') {
-                    currentCategory = 'individual_labor';
-                } else if (document.querySelector('.mukkadam-form') && document.querySelector('.mukkadam-form').style.display !== 'none') {
-                    currentCategory = 'mukkadam';
-                } else if (document.querySelector('.transport-form') && document.querySelector('.transport-form').style.display !== 'none') {
-                    currentCategory = 'transport';
-                } else if (document.querySelector('.others-form') && document.querySelector('.others-form').style.display !== 'none') {
-                    currentCategory = 'others';
-                }
-
-                // Alternative: get category from form context if available
-                if (!currentCategory) {
-                    const categoryFromContext = document.querySelector('input[name="current_category"]');
-                    if (categoryFromContext) {
-                        currentCategory = categoryFromContext.value;
-                    }
-                }
-
-                // Define required fields based on category
-                switch(currentCategory) {
-                    case 'individual_labor':
-                        requiredFields = [
-                            'gender', 'age', 'primary_source_income', 'employment_type',
-                            'willing_to_migrate', 'expected_wage', 'availability',
-                            'adult_men_seeking_employment', 'adult_women_seeking_employment'
-                        ];
-                        break;
-
-                    case 'mukkadam':
-                        requiredFields = [
-                            'providing_labour_count', 'total_workers_peak', 'expected_charges',
-                            'labour_supply_availability', 'arrange_transport', 'supply_areas'
-                        ];
-                        break;
-
-                    case 'transport':
-                        requiredFields = [
-                            'vehicle_type', 'people_capacity', 'expected_fair',
-                            'availability', 'service_areas'
-                        ];
-                        break;
-
-                    case 'others':
-                        requiredFields = [
-                            'business_name', 'help_description'
-                        ];
-                        break;
-
-                    default:
-                        console.warn('Unknown category for step 2 validation');
-                        break;
-                }
-
-                // Validate required fields
-                requiredFields.forEach(fieldName => {
-                    const field = document.querySelector(`[name="${fieldName}"]`);
-                    if (field) {
-                        let fieldValue = '';
-
-                        // Handle different input types
-                        if (field.type === 'checkbox') {
-                            // For checkboxes, we might need special handling
-                            fieldValue = field.checked ? 'checked' : '';
-                        } else if (field.type === 'number') {
-                            fieldValue = field.value && field.value !== '0' ? field.value : '';
-                        } else {
-                            fieldValue = field.value ? field.value.trim() : '';
-                        }
-
-                        // Special validation for number fields that shouldn't be 0
-                        if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
-                            if (!fieldValue || parseInt(fieldValue) <= 0) {
-                                field.classList.add('is-invalid');
-                                isValid = false;
-                            } else {
-                                field.classList.remove('is-invalid');
-                            }
-                        } else if (!fieldValue) {
-                            field.classList.add('is-invalid');
-                            isValid = false;
-                        } else {
-                            field.classList.remove('is-invalid');
-                        }
-                    }
-                });
-
-                // Special validation for Individual Labor
-                if (currentCategory === 'individual_labor') {
-                    // Check if at least one skill is selected or "None" is selected
-                    const skillCheckboxes = document.querySelectorAll('input[name="skills"]:checked');
-                    if (skillCheckboxes.length === 0) {
-                        if (!confirm('No skills selected. Are you sure you want to continue without specifying any skills?')) {
-                            e.preventDefault();
-                            return;
-                        }
-                    }
-
-                    // Check if at least one communication preference is selected
-                    const commCheckboxes = document.querySelectorAll('input[name="communication_preferences"]:checked');
-                    if (commCheckboxes.length === 0) {
-                        if (!confirm('No communication preferences selected. Please select at least one way to contact you.')) {
-                            e.preventDefault();
-                            return;
-                        }
-                    }
-                }
-
-                // Special validation for Mukkadam
-                if (currentCategory === 'mukkadam') {
-                    // Check if at least one skill is selected
-                    const skillCheckboxes = document.querySelectorAll('input[name="skills"]:checked');
-                    if (skillCheckboxes.length === 0) {
-                        if (!confirm('No skills specified for your workers. Are you sure you want to continue?')) {
-                            e.preventDefault();
-                            return;
-                        }
-                    }
-
-                    // Validate that total workers at peak >= providing labour count
-                    const providingCount = parseInt(document.querySelector('[name="providing_labour_count"]').value) || 0;
-                    const peakCount = parseInt(document.querySelector('[name="total_workers_peak"]').value) || 0;
-
-                    if (peakCount < providingCount) {
-                        alert('Total workers at peak cannot be less than regular providing labour count.');
-                        document.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
-                        e.preventDefault();
-                        return;
-                    }
-                }
-
-                if (!isValid) {
-                    e.preventDefault();
-                    alert('Please fill in all required fields correctly.');
-
-                    // Scroll to first invalid field
-                    const firstInvalid = document.querySelector('.is-invalid');
-                    if (firstInvalid) {
-                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        firstInvalid.focus();
-                    }
-                }
-            }
-
-            if (step === 3) {
-                // Validate agreement checkbox
-                const agreement = document.querySelector('input[name="data_sharing_agreement"]');
-                if (!agreement.checked) {
-                    e.preventDefault();
-                    alert('Please accept the data sharing agreement to proceed.');
-                    agreement.focus();
-                }
-            }
+    };
+}
+
+// Quick debug function
+window.debugSync = function() {
+    console.log('=== SYNC DEBUG INFO ===');
+    console.log('Navigator online:', navigator.onLine);
+    console.log('ServiceWorker supported:', 'serviceWorker' in navigator);
+    console.log('Background Sync supported:', 'sync' in (window.ServiceWorkerRegistration?.prototype || {}));
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+            console.log('Service Worker ready:', !!registration);
+            console.log('Active worker:', !!registration.active);
+            console.log('Sync available:', !!registration.sync);
         });
-
-        // Cleanup function when leaving page
-        window.addEventListener('beforeunload', function() {
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
-            }
-        });
-    </script> -->
-    <script>
-    const SUBMIT_REGISTRATION_URL = "{% url 'registration:submit_registration_api' %}";
-</script>  
-
+    }
+};
+</script>
     <script type="module" src="/static/registration/js/multi_step_form_client.js"></script>
-   
 </body>
 </html>

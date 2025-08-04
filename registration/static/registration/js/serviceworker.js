@@ -1,37 +1,45 @@
 // registration/static/registration/js/serviceworker.js
 
-// Import idb library statically at the top
-import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
-
-const CACHE_NAME = 'labor-registration-cache-v1'; // Keep this name consistent
-const DB_NAME = 'LaborRegistrationDB'; // Must match client-side JS
-const DB_VERSION = 2; // Must match client-side JS. Increment this if schema changes!
-const STORE_PENDING_REGISTRATIONS = 'pending_registrations'; // Must match client-side JS
-const STORE_OFFLINE_IMAGES = 'offline_images'; // Must match client-side JS
+const CACHE_NAME = 'labor-registration-cache-v1';
+const DB_NAME = 'LaborRegistrationDB';
+const DB_VERSION = 2;
+const STORE_PENDING_REGISTRATIONS = 'pending_registrations';
+const STORE_OFFLINE_IMAGES = 'offline_images';
 
 const urlsToCache = [
-    // Basic app shell URLs
-    '/register/', // The entry point for your form (home view of registration app)
-    '/register/registration/', // The multi-step form's base URL
-    '/register/registration/?step=1', // Explicitly cache query parameters if they define pages
+    '/register/',
+    '/register/registration/',
+    '/register/registration/?step=1',
     '/register/registration/?step=2',
     '/register/registration/?step=3',
-    '/register/success/', // The success page URL as used in the client-side JS
-    '/offline.html', // Your offline fallback page
-
-    // Static assets used by your templates
+    '/register/success/',
+    '/offline.html',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
-    // Corrected path for your client-side script
+    'https://cdn.jsdelivr.net/npm/idb@7/+esm', // Cache the idb library
     '/static/registration/js/multi_step_form_client.js',
-    // PWA icons
     '/static/registration/images/my_app_icon_192.png',
     '/static/registration/images/my_app_icon_512.png',
     '/static/registration/images/splash_screen_480x320.png',
     '/static/images/android-chrome-192x192.png',
     '/static/images/android-chrome-512x512.png',
 ];
+
+// Import idb at the top level (cached version)
+let idbModule = null;
+
+async function getIDB() {
+    if (!idbModule) {
+        try {
+            idbModule = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
+        } catch (error) {
+            console.error('[Service Worker] Failed to import idb:', error);
+            throw error;
+        }
+    }
+    return idbModule;
+}
 
 // Installation: Cache all essential assets
 self.addEventListener('install', (event) => {
@@ -42,9 +50,9 @@ self.addEventListener('install', (event) => {
                 console.log('[Service Worker] Caching all assets:', urlsToCache);
                 return Promise.allSettled(urlsToCache.map(url => cache.add(url)))
                     .then((results) => {
-                        results.forEach(result => {
+                        results.forEach((result, index) => {
                             if (result.status === 'rejected') {
-                                console.warn(`[Service Worker] Failed to cache ${result.reason.url || 'a URL'}: ${result.reason.message}`);
+                                console.warn(`[Service Worker] Failed to cache ${urlsToCache[index]}: ${result.reason.message}`);
                             }
                         });
                         console.log('[Service Worker] Initial caching complete.');
@@ -71,7 +79,10 @@ self.addEventListener('activate', (event) => {
                     }
                 })
             );
-        }).then(() => self.clients.claim())
+        }).then(() => {
+            console.log('[Service Worker] Activated and claiming clients');
+            return self.clients.claim();
+        })
     );
 });
 
@@ -97,11 +108,9 @@ self.addEventListener('fetch', (event) => {
                             return networkResponse;
                         })
                         .catch(() => {
-                            // If the network is unavailable and not in cache, serve offline.html for navigation requests
                             if (event.request.mode === 'navigate') {
                                 return caches.match('/offline.html');
                             }
-                            // For other requests (e.g., assets), return a generic offline response
                             return new Response('<p>You are offline and this content is not available.</p>', {
                                 headers: { 'Content-Type': 'text/html' }
                             });
@@ -113,6 +122,8 @@ self.addEventListener('fetch', (event) => {
 
 // Background Sync: Handle offline form submissions
 self.addEventListener('sync', (event) => {
+    console.log('[Service Worker] Sync event received with tag:', event.tag);
+    
     if (event.tag === 'sync-labor-registration') {
         console.log('[Service Worker] Background sync triggered for labor registration!');
         event.waitUntil(syncLaborRegistrations());
@@ -122,114 +133,165 @@ self.addEventListener('sync', (event) => {
 // Function to send offline registrations from IndexedDB to the server
 async function syncLaborRegistrations() {
     console.log('[Service Worker] Attempting to sync offline registrations...');
-
-    let db;
+    
     try {
-        // Open the database
-        db = await openDB(DB_NAME, DB_VERSION);
-    } catch (error) {
-        console.error('[Service Worker] Failed to open IndexedDB during sync:', error);
-        throw error; // Re-throw to signal sync failure
-    }
-
-    const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
-    const pendingStore = tx.objectStore(STORE_PENDING_REGISTRATIONS);
-    const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
-
-    const registrations = await pendingStore.getAll();
-
-    if (registrations.length === 0) {
-        console.log('[Service Worker] No pending registrations to sync.');
-        await tx.done;
-        return;
-    }
-
-    console.log(`[Service Worker] Found ${registrations.length} pending registrations to sync.`);
-
-    for (const reg of registrations) {
-        try {
-            const formData = new FormData();
-            const step1Data = reg.data.step1 || {};
-            const step2Data = reg.data.step2 || {};
-            const step3Data = reg.data.step3 || {};
-
-            // Append all basic_info data
-            for (const key in step1Data) {
-                if (step1Data.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
-                    formData.append(key, step1Data[key]);
-                }
-            }
-            if (step1Data.location) {
-                formData.append('location', JSON.stringify(step1Data.location));
-            }
-
-            // Handle photo file from IndexedDB (Blobs)
-            if (step1Data.photoId) {
-                const imageData = await imageStore.get(step1Data.photoId);
-                if (imageData && imageData.image) {
-                    formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
-                    console.log(`[Service Worker] Appending image ID ${step1Data.photoId} to form data.`);
-                } else {
-                    console.warn(`[Service Worker] Image with ID ${step1Data.photoId} not found in offline_images store during sync.`);
-                }
-            } else if (step1Data.photoBase64) {
-                // Convert base64 to Blob if needed
-                try {
-                    const blob = await (await fetch(step1Data.photoBase64)).blob();
-                    formData.append('photo', blob, 'captured_image.jpeg');
-                    console.log('[Service Worker] Appending base64 image to form data.');
-                } catch (e) {
-                    console.warn('[Service Worker] Failed to convert base64 to Blob for sync:', e);
-                }
-            }
-
-            // Append step 2 data
-            for (const key in step2Data) {
-                if (step2Data.hasOwnProperty(key)) {
-                    if (Array.isArray(step2Data[key]) || (typeof step2Data[key] === 'object' && step2Data[key] !== null)) {
-                        formData.append(key, JSON.stringify(step2Data[key]));
-                    } else {
-                        formData.append(key, step2Data[key]);
-                    }
-                }
-            }
-
-            // Append step 3 data
-            if (step3Data.data_sharing_agreement !== undefined) {
-                formData.append('data_sharing_agreement', step3Data.data_sharing_agreement);
-            }
-
-            // *** CRITICAL FIX: Use the correct URL including the 'register/' prefix for sync ***
-            const response = await fetch('/register/api/submit-registration/', {
-                method: 'POST',
-                body: formData,
-                // Do not explicitly set Content-Type for FormData; browser handles 'multipart/form-data'
-                // No headers are needed for CSRF in service worker sync if @csrf_exempt is used on server-side
-            });
-
-            if (response.ok) {
-                console.log(`[Service Worker] Registration ID ${reg.id} synced successfully!`);
-                await pendingStore.delete(reg.id); // Remove from pending store
-                if (step1Data.photoId) {
-                    await imageStore.delete(step1Data.photoId); // Delete associated image blob
-                }
-                self.registration.showNotification('Registration Synced!', {
-                    body: `Registration for ${step1Data.full_name || 'an applicant'} has been submitted.`,
-                    icon: '/static/registration/images/android-chrome-192x192.png' // Use correct icon path if needed
-                });
-            } else {
-                const errorText = await response.text();
-                console.error(`[Service Worker] Failed to sync registration ID ${reg.id}:`, response.status, errorText);
-                throw new Error(`Server responded with status ${response.status}: ${errorText}`); // Throw to signal sync failure
-            }
-        } catch (error) {
-            console.error(`[Service Worker] Error during sync for registration ID ${reg.id}:`, error);
-            // If an error occurs, the item remains in pendingStore to be retried later
-            // You might want to update attemptedSync count here if you track it
-            throw error; // Re-throw to signal sync failure for the current item
+        // Check if we're online
+        if (!navigator.onLine) {
+            console.log('[Service Worker] Still offline, sync will retry later');
+            throw new Error('Still offline');
         }
+
+        const { openDB } = await getIDB();
+        
+        const db = await openDB(DB_NAME, DB_VERSION, {
+            upgrade(db) {
+                // Create stores if they don't exist
+                if (!db.objectStoreNames.contains(STORE_PENDING_REGISTRATIONS)) {
+                    db.createObjectStore(STORE_PENDING_REGISTRATIONS, { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains(STORE_OFFLINE_IMAGES)) {
+                    db.createObjectStore(STORE_OFFLINE_IMAGES, { keyPath: 'id' });
+                }
+            }
+        });
+        
+        const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+        const pendingStore = tx.objectStore(STORE_PENDING_REGISTRATIONS);
+        const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
+        
+        const registrations = await pendingStore.getAll();
+        
+        if (registrations.length === 0) {
+            console.log('[Service Worker] No pending registrations to sync.');
+            return;
+        }
+        
+        console.log(`[Service Worker] Found ${registrations.length} pending registrations to sync.`);
+        
+        let syncedCount = 0;
+        let failedCount = 0;
+        
+        for (const reg of registrations) {
+            try {
+                await syncSingleRegistration(reg, pendingStore, imageStore);
+                syncedCount++;
+                console.log(`[Service Worker] Registration ID ${reg.id} synced successfully! (${syncedCount}/${registrations.length})`);
+            } catch (error) {
+                failedCount++;
+                console.error(`[Service Worker] Failed to sync registration ID ${reg.id}:`, error);
+                // Continue with other registrations instead of stopping
+            }
+        }
+        
+        // Show notification based on results
+        if (syncedCount > 0) {
+            self.registration.showNotification('Registrations Synced!', {
+                body: `${syncedCount} registration(s) successfully submitted.${failedCount > 0 ? ` ${failedCount} failed.` : ''}`,
+                icon: '/static/images/android-chrome-192x192.png',
+                badge: '/static/images/android-chrome-192x192.png',
+                tag: 'sync-complete',
+                requireInteraction: true
+            });
+        }
+        
+        console.log(`[Service Worker] Sync complete. Success: ${syncedCount}, Failed: ${failedCount}`);
+        
+    } catch (error) {
+        console.error('[Service Worker] Sync failed:', error);
+        throw error; // Re-throw to trigger retry
     }
-    await tx.done; // Ensure transaction completes
-    console.log('[Service Worker] All pending syncs attempted.');
 }
 
+async function syncSingleRegistration(reg, pendingStore, imageStore) {
+    const formData = new FormData();
+    const step1Data = reg.data.step1 || {};
+    const step2Data = reg.data.step2 || {};
+    const step3Data = reg.data.step3 || {};
+    
+    // Append step 1 data
+    for (const key in step1Data) {
+        if (step1Data.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
+            formData.append(key, step1Data[key]);
+        }
+    }
+    
+    if (step1Data.location) {
+        formData.append('location', JSON.stringify(step1Data.location));
+    }
+    
+    // Handle photo file from IndexedDB
+    if (step1Data.photoId) {
+        const imageData = await imageStore.get(step1Data.photoId);
+        if (imageData && imageData.image) {
+            formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+            console.log(`[Service Worker] Appending image ID ${step1Data.photoId} to form data.`);
+        } else {
+            console.warn(`[Service Worker] Image with ID ${step1Data.photoId} not found in offline_images store.`);
+        }
+    } else if (step1Data.photoBase64) {
+        try {
+            const response = await fetch(step1Data.photoBase64);
+            const blob = await response.blob();
+            formData.append('photo', blob, 'captured_image.jpeg');
+            console.log('[Service Worker] Appending base64 image to form data.');
+        } catch (e) {
+            console.warn('[Service Worker] Failed to convert base64 to Blob for sync:', e);
+        }
+    }
+    
+    // Append step 2 data
+    for (const key in step2Data) {
+        if (step2Data.hasOwnProperty(key)) {
+            if (Array.isArray(step2Data[key]) || (typeof step2Data[key] === 'object' && step2Data[key] !== null)) {
+                formData.append(key, JSON.stringify(step2Data[key]));
+            } else {
+                formData.append(key, step2Data[key]);
+            }
+        }
+    }
+    
+    // Append step 3 data
+    if (step3Data.data_sharing_agreement !== undefined) {
+        formData.append('data_sharing_agreement', step3Data.data_sharing_agreement);
+    }
+    
+    // Submit to server
+    const response = await fetch('/register/api/submit-registration/', {
+        method: 'POST',
+        body: formData,
+    });
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+    }
+    
+    // If successful, remove from pending store and clean up images
+    await pendingStore.delete(reg.id);
+    if (step1Data.photoId) {
+        await imageStore.delete(step1Data.photoId);
+    }
+}
+
+// Handle messages from client
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SYNC_NOW') {
+        console.log('[Service Worker] Manual sync requested from client');
+        // Manually trigger sync
+        syncLaborRegistrations().catch(error => {
+            console.error('[Service Worker] Manual sync failed:', error);
+        });
+    }
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    
+    if (event.notification.tag === 'sync-complete') {
+        // Open the app when notification is clicked
+        event.waitUntil(
+            clients.openWindow('/register/success/')
+        );
+    }
+});
