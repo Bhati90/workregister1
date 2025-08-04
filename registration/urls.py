@@ -12,11 +12,11 @@ urlpatterns = [
 
     # Multi-step registration (existing)
     path('registration/', views.MultiStepRegistrationView.as_view(), name='registration'),
-     path('registration-success/', views.success_view, name='registration_success'),
+     path('/registration-success/', views.success_view, name='registration_success'),
     path('api/submit-registration/', views.submit_registration_api, name='submit_registration_api'),
    
     # Success page (MODIFIED NAME FOR CONSISTENCY WITH JS REDIRECT)
-    path('success/', views.success_view, name='success_page'), # Changed name='success' to name='success_page'
+    # path('success/', views.success_view, name='success_page'), # Changed name='success' to name='success_page'
 
     # Dashboard URLs (existing)
     path('dashboard/', DashboardView.as_view(), name='dashboard'),

@@ -1272,6 +1272,9 @@ def submit_registration_api(request):
 
         # Save instance first if photo is a FileField (to get primary key if needed by FileField)
         instance.save()
+        # def success_view(request):
+        #     return render(request, 'registration/success.html')
+
 
         # Save photo if available (requires instance to be saved first for FileField)
         if photo_file:

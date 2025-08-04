@@ -633,6 +633,7 @@ async function sendRegistrationToServer(fullRegistrationData) {
             console.error('Failed to submit registration:', response.status, errorResponse);
             return false;
         }
+        
     } catch (error) {
         console.error('Error sending registration to server:', error);
         return false;
