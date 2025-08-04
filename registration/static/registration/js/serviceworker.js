@@ -8,11 +8,12 @@ const STORE_OFFLINE_IMAGES = 'offline_images'; // Must match client-side JS
 
 const urlsToCache = [
     // Basic app shell URLs
-    '/register/', // The entry point for your form
-    '/register/?step=1', // Explicitly cache query parameters if they define pages
-    '/register/?step=2',
-    '/register/?step=3',
-    '/success/', // The success page URL as used in the client-side JS
+    '/register/', // The entry point for your form (home view of registration app)
+    '/register/registration/', // The multi-step form's base URL
+    '/register/registration/?step=1', // Explicitly cache query parameters if they define pages
+    '/register/registration/?step=2',
+    '/register/registration/?step=3',
+    '/register/success/', // The success page URL as used in the client-side JS
     '/offline.html', // Your offline fallback page
 
     // Static assets used by your templates
@@ -20,10 +21,15 @@ const urlsToCache = [
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
     '/static/registration/js/multi_step_form_client.js',
+    // Ensure these image paths are correct if you moved them
     '/static/registration/images/my_app_icon_192.png',
     '/static/registration/images/my_app_icon_512.png',
     '/static/registration/images/splash_screen_480x320.png',
+    // From your settings.py:
+    '/static/images/android-chrome-192x192.png', // Corrected path for PWA icons
+    '/static/images/android-chrome-512x512.png', // Corrected path for PWA icons
 ];
+
 
 // Installation: Cache all essential assets
 self.addEventListener('install', (event) => {
@@ -89,9 +95,11 @@ self.addEventListener('fetch', (event) => {
                             return networkResponse;
                         })
                         .catch(() => {
+                            // If the network is unavailable and not in cache, serve offline.html for navigation requests
                             if (event.request.mode === 'navigate') {
                                 return caches.match('/offline.html');
                             }
+                            // For other requests (e.g., assets), return a generic offline response
                             return new Response('<p>You are offline and this content is not available.</p>', {
                                 headers: { 'Content-Type': 'text/html' }
                             });
@@ -112,6 +120,7 @@ self.addEventListener('sync', (event) => {
 // Function to send offline registrations from IndexedDB to the server
 async function syncLaborRegistrations() {
     console.log('[Service Worker] Attempting to sync offline registrations...');
+    // Ensure idb library is imported within the service worker for background sync
     const { openDB } = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
 
     let db;
@@ -119,7 +128,7 @@ async function syncLaborRegistrations() {
         db = await openDB(DB_NAME, DB_VERSION);
     } catch (error) {
         console.error('[Service Worker] Failed to open IndexedDB during sync:', error);
-        throw error;
+        throw error; // Re-throw to signal sync failure
     }
 
     const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
@@ -142,7 +151,7 @@ async function syncLaborRegistrations() {
             const step1Data = reg.data.step1 || {};
             const step2Data = reg.data.step2 || {};
             const step3Data = reg.data.step3 || {};
-            
+
             // Append all basic_info data
             for (const key in step1Data) {
                 if (step1Data.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
@@ -152,8 +161,8 @@ async function syncLaborRegistrations() {
             if (step1Data.location) {
                 formData.append('location', JSON.stringify(step1Data.location));
             }
-            
-            // Handle photo file from IndexedDB
+
+            // Handle photo file from IndexedDB (Blobs)
             if (step1Data.photoId) {
                 const imageData = await imageStore.get(step1Data.photoId);
                 if (imageData && imageData.image) {
@@ -163,7 +172,8 @@ async function syncLaborRegistrations() {
                     console.warn(`[Service Worker] Image with ID ${step1Data.photoId} not found in offline_images store during sync.`);
                 }
             } else if (step1Data.photoBase64) {
-                 try {
+                // Convert base64 to Blob if needed
+                try {
                     const blob = await (await fetch(step1Data.photoBase64)).blob();
                     formData.append('photo', blob, 'captured_image.jpeg');
                     console.log('[Service Worker] Appending base64 image to form data.');
@@ -182,40 +192,42 @@ async function syncLaborRegistrations() {
                     }
                 }
             }
-            
+
             // Append step 3 data
             if (step3Data.data_sharing_agreement !== undefined) {
                 formData.append('data_sharing_agreement', step3Data.data_sharing_agreement);
             }
 
-            const response = await fetch('https://workregister1-g7pf.onrender.com/api/submit-registration/', {
+            // *** CRITICAL FIX: Use the correct URL including the 'register/' prefix for sync ***
+            const response = await fetch('/register/api/submit-registration/', {
                 method: 'POST',
                 body: formData,
-                // Do not explicitly set Content-Type for FormData
-                // The browser will handle the 'multipart/form-data' header automatically
-                // No headers are needed for CSRF with @csrf_exempt on the server-side
+                // Do not explicitly set Content-Type for FormData; browser handles 'multipart/form-data'
+                // No headers are needed for CSRF in service worker sync if @csrf_exempt is used on server-side
             });
 
             if (response.ok) {
                 console.log(`[Service Worker] Registration ID ${reg.id} synced successfully!`);
-                await pendingStore.delete(reg.id);
+                await pendingStore.delete(reg.id); // Remove from pending store
                 if (step1Data.photoId) {
-                    await imageStore.delete(step1Data.photoId);
+                    await imageStore.delete(step1Data.photoId); // Delete associated image blob
                 }
                 self.registration.showNotification('Registration Synced!', {
                     body: `Registration for ${step1Data.full_name || 'an applicant'} has been submitted.`,
-                    icon: '/static/registration/images/android-chrome-192x192.png'
+                    icon: '/static/registration/images/android-chrome-192x192.png' // Use correct icon path if needed
                 });
             } else {
                 const errorText = await response.text();
                 console.error(`[Service Worker] Failed to sync registration ID ${reg.id}:`, response.status, errorText);
-                throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+                throw new Error(`Server responded with status ${response.status}: ${errorText}`); // Throw to signal sync failure
             }
         } catch (error) {
             console.error(`[Service Worker] Error during sync for registration ID ${reg.id}:`, error);
-            throw error;
+            // If an error occurs, the item remains in pendingStore to be retried later
+            // You might want to update attemptedSync count here if you track it
+            throw error; // Re-throw to signal sync failure for the current item
         }
     }
-    await tx.done;
+    await tx.done; // Ensure transaction completes
     console.log('[Service Worker] All pending syncs attempted.');
 }

@@ -450,7 +450,7 @@
     </style>
 </head>
 <body>
-    <div class="main-container">
+  <div class="main-container">
         <div class="container">
             <div class="form-container">
                 <div class="progress-container">
@@ -694,7 +694,7 @@
                     {% elif step == 2 %}
                         {# This hidden input is for client-side JS on step 2 to know the category #}
                         <input type="hidden" name="current_category" id="currentCategorySession" value="{{ category }}">
-                        {% include 'registration/category_forms.html' %}
+                        {% include 'registration/category_forms.html' %} {# This file contains your category-specific forms #}
 
                     {% elif step == 3 %}
                         <div class="agreement-box">
@@ -715,16 +715,14 @@
 
                     <div class="d-flex justify-content-between mt-4">
                         {% if step > 1 %}
-                            <button type="button" class="btn btn-secondary btn-navigation" id="prevStepBtn" onclick="goBack()">
+                            <button type="button" class="btn btn-secondary btn-navigation" id="prevStepBtn"> {# Removed onclick, added event listener in JS #}
                                 <i class="fas fa-arrow-left me-2"></i>Previous
                             </button>
                         {% else %}
-                            <div></div>
+                            <div></div> {# Placeholder to maintain flex-box spacing #}
                         {% endif %}
 
-                        <!-- {# CRITICAL CHANGE: type="submit" changed to type="button" for all steps.
-                           JS handleNextSubmit will control all navigation. #} -->
-                        <button type="submit" class="btn btn-primary btn-navigation" id="nextStepBtn">
+                        <button type="button" class="btn btn-primary btn-navigation" id="nextStepBtn"> {# Changed to type="button" as JS handles submission #}
                             {% if step == 3 %}
                                 <i class="fas fa-check me-2"></i>Submit
                             {% else %}
@@ -1356,6 +1354,9 @@
             }
         });
     </script> -->
-      <script type="module" src="/static/registration/js/multi_step_form_client.js"></script>
+    <script>
+    const SUBMIT_REGISTRATION_URL = "{% url 'registration:submit_registration_api' %}";
+</script>  
+    <script type="module" src="/static/registration/js/multi_step_form_client.js"></script>
 </body>
 </html>

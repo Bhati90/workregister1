@@ -14,27 +14,36 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# labour_crm/urls.py
 from django.contrib import admin
-from django.urls import path,include
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from registration import views as registration_views
+from registration import views as registration_views # Import your views
 from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
-    path('register/', include('registration.urls')),
-     path('', include('pwa.urls')),  
-    #  path('.*/registration-success/', registration_views.success_view, name='registration_success'),
 
-    # A root URL that redirects to the registration home page, or just serves the home page.
+    # All URLs from 'registration.urls' will be prefixed with 'register/'
+    path('register/', include('registration.urls', namespace='registration')), # Added namespace
+
+    path('', include('pwa.urls')), # PWA URLs at the root level
+
+    # A root URL that redirects to the registration home page.
+    # Be careful with conflicts here. This will match before pwa.urls if ordered higher.
+    # For now, keep it, but understand it might conflict with PWA's root handling.
+    # The PWA START_URL is /register/registration/, so this root path might be for general site landing.
     path('', registration_views.home_view, name='root'),
 
     # A catch-all for development if you have a separate offline page.
     path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline_page'),
 ]
 
+# Serve static and media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # if settings.DEBUG:
 #     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

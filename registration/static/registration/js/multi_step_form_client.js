@@ -20,6 +20,7 @@ const STORE_OFFLINE_IMAGES = 'offline_images'; // Store for captured image Blobs
 // --- PWA Service Worker Registration ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+        // Register the service worker at the correct static path
         navigator.serviceWorker.register('/static/registration/js/serviceworker.js')
             .then(registration => {
                 console.log('Service Worker registered successfully:', registration.scope);
@@ -114,6 +115,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         prevBtn.addEventListener('click', goBack);
     }
     if (nextBtn) {
+        // IMPORTANT: Attach event listener to the button, not the form submit event directly
+        // The handleNextSubmit will prevent default and control navigation
         nextBtn.addEventListener('click', handleNextSubmit);
     }
 });
@@ -133,6 +136,7 @@ async function loadStep1Data() {
         document.getElementById('currentCategoryHidden').value = step1Data.category;
     }
 
+    // Load photo from IndexedDB if photoId exists, otherwise from base64 (older format)
     if (step1Data.photoId) {
         const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readonly');
         const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
@@ -143,7 +147,7 @@ async function loadStep1Data() {
             reader.onloadend = () => {
                 document.getElementById('captured-image').src = reader.result;
                 document.getElementById('final-image').src = reader.result;
-                document.getElementById('captured_photo_hidden').value = reader.result;
+                document.getElementById('captured_photo_hidden').value = reader.result; // Still store base64 for submission convenience
                 document.getElementById('camera-section').style.display = 'none';
                 document.getElementById('photo-preview').style.display = 'none';
                 document.getElementById('photo-confirmed').style.display = 'block';
@@ -152,6 +156,7 @@ async function loadStep1Data() {
             reader.readAsDataURL(photoBlob);
         }
     } else if (step1Data.photoBase64) {
+        // Fallback for older data or if photoBlob was not saved correctly
         document.getElementById('captured-image').src = step1Data.photoBase64;
         document.getElementById('final-image').src = step1Data.photoBase64;
         document.getElementById('captured_photo_hidden').value = step1Data.photoBase64;
@@ -160,6 +165,7 @@ async function loadStep1Data() {
         document.getElementById('photo-confirmed').style.display = 'block';
         document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo loaded from offline storage!</p>';
     }
+
 
     if (step1Data.location) {
         const loc = step1Data.location;
@@ -191,6 +197,7 @@ async function loadStep2Data() {
     if (step2Data.age) document.querySelector('[name="age"]').value = step2Data.age;
     if (step2Data.expected_wage) document.querySelector('[name="expected_wage"]').value = step2Data.expected_wage;
 
+    // Load skills and communication preferences (checkboxes)
     if (step2Data.skills && Array.isArray(step2Data.skills)) {
         step2Data.skills.forEach(skill => {
             const checkbox = document.querySelector(`input[name="skills"][value="${skill}"]`);
@@ -207,7 +214,7 @@ async function loadStep2Data() {
     const transportSelect = document.querySelector('select[name="arrange_transport"]');
     if (transportSelect && step2Data.arrange_transport) {
         transportSelect.value = step2Data.arrange_transport;
-        transportSelect.dispatchEvent(new Event('change'));
+        transportSelect.dispatchEvent(new Event('change')); // Trigger change to show/hide 'other' field
     }
     if (step2Data.arrange_transport_other) {
         document.querySelector('[name="arrange_transport_other"]').value = step2Data.arrange_transport_other;
@@ -242,7 +249,7 @@ async function loadStep3Data() {
 
 // --- Navigation Logic (Updated for IndexedDB) ---
 async function handleNextSubmit(event) {
-    event.preventDefault();
+    event.preventDefault(); // Prevent default form submission
 
     const currentStep = parseInt(document.querySelector('input[name="step"]').value);
     const form = document.getElementById('registrationForm');
@@ -253,12 +260,9 @@ async function handleNextSubmit(event) {
     function getFieldValue(name) {
         const element = form.querySelector(`[name="${name}"]`);
         if (!element) return null;
-        if (element.type === 'checkbox') {
-            return element.checked;
-        }
-        if (element.type === 'radio') {
-            const selectedRadio = form.querySelector(`[name="${name}"]:checked`);
-            return selectedRadio ? selectedRadio.value : '';
+        if (element.type === 'checkbox' || element.type === 'radio') {
+            const selected = form.querySelector(`[name="${name}"]:checked`);
+            return selected ? selected.value : ''; // For radio buttons return value, for checkbox, check.
         }
         if (element.tagName === 'SELECT') {
             return element.value;
@@ -271,6 +275,9 @@ async function handleNextSubmit(event) {
         return Array.from(checkboxes).map(cb => cb.value);
     }
 
+    // Clear any previous invalid states
+    form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
     if (currentStep === 1) {
         const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
         requiredFields.forEach(fieldName => {
@@ -279,8 +286,6 @@ async function handleNextSubmit(event) {
                 if (!getFieldValue(fieldName)) {
                     field.classList.add('is-invalid');
                     isValid = false;
-                } else {
-                    field.classList.remove('is-invalid');
                 }
             }
         });
@@ -303,25 +308,24 @@ async function handleNextSubmit(event) {
             }
         }
 
-        const latitude = getFieldValue('latitude');
-        const longitude = getFieldValue('longitude');
+        const latitude = document.getElementById('latitude_hidden').value; // Use hidden input values
+        const longitude = document.getElementById('longitude_hidden').value;
         if (!latitude || !longitude) {
             if (!confirm('Location was not captured. This may affect service quality. Do you want to continue without location?')) {
-                 isValid = false;
+                isValid = false;
             }
         }
 
         if (!isValid) {
-            event.preventDefault();
             if (!document.querySelector('.is-invalid')) {
-                alert('Please fill in all required fields.');
+                alert('Please fill in all required fields.'); // Generic alert if no specific invalid field
             }
             const firstInvalid = document.querySelector('.is-invalid');
             if (firstInvalid) {
                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 firstInvalid.focus();
             }
-            return;
+            return; // Stop function execution
         }
 
         stepData = {
@@ -330,32 +334,37 @@ async function handleNextSubmit(event) {
             category: getFieldValue('category'),
             taluka: getFieldValue('taluka'),
             village: getFieldValue('village'),
-            location: latitude ? {
+            location: (latitude && longitude) ? {
                 latitude: parseFloat(latitude),
                 longitude: parseFloat(longitude),
-                accuracy: parseFloat(getFieldValue('location_accuracy')),
-                timestamp: new Date().toISOString()
+                accuracy: parseFloat(document.getElementById('location_accuracy_hidden').value),
+                timestamp: new Date().toISOString() // Store timestamp
             } : null,
-            photoId: null,
-            photoBase64: capturedPhotoHiddenInput.value
+            photoId: null, // Will be set if blob is saved
+            photoBase64: null // Will be cleared if photoId is set, or used if no blob
         };
 
         let imageId = null;
         if (photoBlob) {
             imageId = await saveImageBlob(photoBlob, 'captured_image.jpeg', photoBlob.type);
             stepData.photoId = imageId;
-            stepData.photoBase64 = null;
+            stepData.photoBase64 = null; // Clear base64 if blob is saved
         } else if (uploadedPhotoFiles.length > 0) {
             const uploadedFile = uploadedPhotoFiles[0];
             imageId = await saveImageBlob(uploadedFile, uploadedFile.name, uploadedFile.type);
             stepData.photoId = imageId;
-            stepData.photoBase64 = null;
+            stepData.photoBase64 = null; // Clear base64 if blob is saved
+        } else if (capturedPhotoHiddenInput.value) {
+            // If no blob/uploaded file, but base64 is present (e.g., loaded from IDB)
+            stepData.photoBase64 = capturedPhotoHiddenInput.value;
         }
+
         currentRegistration.step1 = stepData;
         await saveCurrentRegistrationData(currentRegistration);
 
-        document.getElementById('currentCategoryHidden').value = stepData.category;
-        window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(stepData.category)}`;
+        // Redirect to next step, passing category in URL for Django's GET view
+        const categoryToPass = stepData.category; // Always use data from current submission for redirection
+        window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
 
     } else if (currentStep === 2) {
         const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
@@ -366,8 +375,8 @@ async function handleNextSubmit(event) {
             case 'individual_labor':
                 requiredFields = [
                     'gender', 'age', 'primary_source_income', 'employment_type',
-                    'willing_to_migrate', 'expected_wage', 'availability',
-                    'adult_men_seeking_employment', 'adult_women_seeking_employment'
+                    'willing_to_migrate', 'expected_wage', 'availability'
+                    // adult_men/women are numbers, checked below for > 0
                 ];
                 break;
             case 'mukkadam':
@@ -394,17 +403,14 @@ async function handleNextSubmit(event) {
             if (field) {
                 let fieldValue = getFieldValue(fieldName);
                 if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
-                    if (!fieldValue || parseInt(fieldValue) <= 0) {
+                    // For numbers, also ensure they are > 0 if required
+                    if (!fieldValue || parseInt(fieldValue) <= 0 || isNaN(parseInt(fieldValue))) {
                         field.classList.add('is-invalid');
                         isValid = false;
-                    } else {
-                        field.classList.remove('is-invalid');
                     }
-                } else if (!fieldValue && (field.type !== 'checkbox' || !field.checked)) {
+                } else if (!fieldValue && (field.type !== 'checkbox' || !field.checked)) { // Checkboxes are special
                     field.classList.add('is-invalid');
                     isValid = false;
-                } else {
-                    field.classList.remove('is-invalid');
                 }
             }
         });
@@ -423,9 +429,19 @@ async function handleNextSubmit(event) {
                     isValid = false;
                 }
             }
-        }
+            // Additional check for adult_men/women fields (optional or mandatory based on your rules)
+            const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
+            const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
+            if (adultMen < 0) {
+                document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid');
+                isValid = false;
+            }
+            if (adultWomen < 0) {
+                document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid');
+                isValid = false;
+            }
 
-        if (currentCategory === 'mukkadam') {
+        } else if (currentCategory === 'mukkadam') {
             const skillCheckboxes = getCheckboxValues('skills');
             if (skillCheckboxes.length === 0) {
                 if (!confirm('No skills specified for your workers. Are you sure you want to continue?')) {
@@ -440,10 +456,18 @@ async function handleNextSubmit(event) {
                 form.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
                 isValid = false;
             }
+            // Check 'other' transport if selected
+            const arrangeTransport = getFieldValue('arrange_transport');
+            if (arrangeTransport === 'other') {
+                const arrangeTransportOther = getFieldValue('arrange_transport_other');
+                if (!arrangeTransportOther) {
+                    form.querySelector('[name="arrange_transport_other"]').classList.add('is-invalid');
+                    isValid = false;
+                }
+            }
         }
 
         if (!isValid) {
-            event.preventDefault();
             if (!document.querySelector('.is-invalid')) {
                 alert('Please fill in all required fields correctly.');
             }
@@ -455,22 +479,23 @@ async function handleNextSubmit(event) {
             return;
         }
 
+        // Collect step 2 data based on category
         if (currentCategory === 'individual_labor') {
             stepData = {
-                gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')), primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
-                skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate'), expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
+                gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')) || null, primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
+                skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate') === 'yes', expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
                 adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
                 communication_preferences: getCheckboxValues('communication_preferences')
             };
         } else if (currentCategory === 'mukkadam') {
             stepData = {
-                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || 0, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || 0, expected_charges: getFieldValue('expected_charges'),
+                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
                 labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
                 supply_areas: getFieldValue('supply_areas'), skills: getCheckboxValues('skills'),
             };
         } else if (currentCategory === 'transport') {
             stepData = {
-                vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || 0, expected_fair: getFieldValue('expected_fair'),
+                vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
                 availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
             };
         } else if (currentCategory === 'others') {
@@ -482,16 +507,14 @@ async function handleNextSubmit(event) {
         await saveCurrentRegistrationData(currentRegistration);
 
         const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
-        document.getElementById('currentCategoryHidden').value = categoryToPass;
         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
 
     } else if (currentStep === 3) {
         const agreement = document.querySelector('input[name="data_sharing_agreement"]');
         if (!agreement.checked) {
             alert('Please accept the data sharing agreement to proceed.');
-            event.preventDefault();
             agreement.focus();
-            return;
+            return; // Stop function execution
         }
 
         stepData = {
@@ -516,26 +539,32 @@ async function submitFullRegistration() {
 
     const isOnline = navigator.onLine;
 
+    // Use a flag to ensure we only clear IDB and redirect once after successful submission or sync
+    let submissionAttempted = false;
+
     if (isOnline) {
         try {
             console.log('Online, attempting immediate submission.');
             const success = await sendRegistrationToServer(fullRegistrationData);
             if (success) {
+                console.log('Immediate online submission successful.');
                 await clearCurrentRegistrationAndImage();
                 alert('Registration submitted successfully!');
-                window.location.href = '/success/';
+                window.location.href = '/register/success/'; // Redirect to success page
+                submissionAttempted = true;
             } else {
                 console.log('Immediate online submission failed, saving for background sync.');
                 await saveForBackgroundSync(fullRegistrationData);
                 alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
-                // Use a proper redirect to the success page to show the user the process is done
-                window.location.href = '/success/';
+                window.location.href = '/register/success/'; // Redirect to success page even if deferred
+                submissionAttempted = true;
             }
         } catch (error) {
             console.error('Error during online submission attempt:', error);
             await saveForBackgroundSync(fullRegistrationData);
             alert('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
-            window.location.href = '/success/';
+            window.location.href = '/register/success/'; // Redirect to success page even if deferred
+            submissionAttempted = true;
         }
     } else {
         console.log('Offline, saving for background sync.');
@@ -548,9 +577,16 @@ async function submitFullRegistration() {
             alert('You are offline, and background sync is not fully supported by your browser. Your data is saved locally, but might be lost if you clear browser data before coming online.');
         }
         await clearCurrentRegistrationAndImage();
-        window.location.href = '/success/';
+        window.location.href = '/register/success/'; // Redirect to success page
+        submissionAttempted = true;
+    }
+
+    // Ensure redirect happens only if a submission attempt was made
+    if (!submissionAttempted) {
+        console.warn('Submission logic finished without redirection.');
     }
 }
+
 
 async function clearCurrentRegistrationAndImage() {
     if (!db) await initDB();
@@ -558,47 +594,53 @@ async function clearCurrentRegistrationAndImage() {
     const tx = db.transaction([STORE_CURRENT_REGISTRATION, STORE_OFFLINE_IMAGES], 'readwrite');
     await tx.objectStore(STORE_CURRENT_REGISTRATION).delete('current_draft');
     if (currentRegistration && currentRegistration.step1 && currentRegistration.step1.photoId) {
-          await tx.objectStore(STORE_OFFLINE_IMAGES).delete(currentRegistration.step1.photoId);
+        await tx.objectStore(STORE_OFFLINE_IMAGES).delete(currentRegistration.step1.photoId);
     }
     await tx.done;
     console.log('Current registration and associated image cleared from IndexedDB.');
 }
 
 async function sendRegistrationToServer(fullRegistrationData) {
-    // try {
+    try {
         const formData = new FormData();
-console.log('Preparing to send registration data to server:', fullRegistrationData);
+        console.log('Preparing to send registration data to server:', fullRegistrationData);
 
+        // Append Step 1 data
         for (const key in fullRegistrationData.step1) {
-            console.log('2');
+            // Exclude photoId and photoBase64 as they are handled separately
             if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
                 formData.append(key, fullRegistrationData.step1[key]);
             }
         }
-        console.log('3');
+
+        // Append location data as JSON string
         if (fullRegistrationData.step1.location) {
             formData.append('location', JSON.stringify(fullRegistrationData.step1.location));
         }
-console.log('4');
-        if (fullRegistrationData.step1.photoId) {
+
+        // Append photo Blob/File
+        if (photoBlob) { // Use the global photoBlob if available (captured from camera or uploaded)
+            formData.append('photo', photoBlob, 'captured_image.jpeg');
+        } else if (fullRegistrationData.step1.photoId) {
+            // Retrieve image from IndexedDB if it was saved there
             const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readonly');
             const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
             const imageData = await imageStore.get(fullRegistrationData.step1.photoId);
-            console.log('5');
             if (imageData && imageData.image) {
                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
             }
         } else if (fullRegistrationData.step1.photoBase64) {
+            // Convert base64 to Blob if no photoId or photoBlob
             const response = await fetch(fullRegistrationData.step1.photoBase64);
             const blob = await response.blob();
             formData.append('photo', blob, 'captured_image.jpeg');
         }
-console.log('6');
+
+        // Append Step 2 data
         if (fullRegistrationData.step2) {
             for (const key in fullRegistrationData.step2) {
-                console.log('7');
                 if (fullRegistrationData.step2.hasOwnProperty(key)) {
-                    console.log('8');
+                    // Stringify arrays and objects (like skills, comm_preferences)
                     if (Array.isArray(fullRegistrationData.step2[key]) || (typeof fullRegistrationData.step2[key] === 'object' && fullRegistrationData.step2[key] !== null)) {
                         formData.append(key, JSON.stringify(fullRegistrationData.step2[key]));
                     } else {
@@ -607,33 +649,35 @@ console.log('6');
                 }
             }
         }
-console.log('9');
+
+        // Append Step 3 data
         if (fullRegistrationData.step3) {
             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
         }
 
-        const response = await fetch('https://workregister1-g7pf.onrender.com/api/submit-registration/', {
+        // *** CRITICAL FIX: Use the correct URL including the 'register/' prefix ***
+        const response = await fetch('/register/api/submit-registration/', {
             method: 'POST',
             body: formData,
             headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': getCookie('csrftoken'), // Get CSRF token for direct AJAX submission
             },
         });
-console.log('10');
+
         if (response.ok) {
             const result = await response.json();
-            console.log('Registration submitted successfully to backend:', result,response.status,response);
+            console.log('Registration submitted successfully to backend:', result, response.status, response);
             return true;
         } else {
             const errorResponse = await response.json();
-            console.error('Failed to submit registration:', response.status, errorResponse,response);
+            console.error('Failed to submit registration:', response.status, errorResponse, response);
             return false;
         }
-        
-    // } catch (error) {
-    //     console.error('Error sending registration to server:', error);
-    //     return false;
-    // }
+
+    } catch (error) {
+        console.error('Error sending registration to server:', error);
+        return false;
+    }
 }
 
 function getCookie(name) {
@@ -693,12 +737,12 @@ function initializeCameraAndLocation() {
         fileInput.addEventListener('change', function(e) {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
-                photoBlob = file;
+                photoBlob = file; // Store as blob for submission/indexedDB
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     document.getElementById('captured-image').src = event.target.result;
                     document.getElementById('final-image').src = event.target.result;
-                    document.getElementById('captured_photo_hidden').value = event.target.result;
+                    document.getElementById('captured_photo_hidden').value = event.target.result; // For form hidden field
                     document.getElementById('upload-fallback').style.display = 'none';
                     document.getElementById('camera-section').style.display = 'none';
                     document.getElementById('photo-preview').style.display = 'none';
@@ -749,7 +793,7 @@ async function startCamera() {
         };
 
         statusDiv.innerHTML = '<div class="loading-spinner"></div>Starting camera...';
-        uploadFallback.style.display = 'none';
+        uploadFallback.style.display = 'none'; // Hide fallback if camera starts
 
         if (cameraStream) {
             cameraStream.getTracks().forEach(track => track.stop());
@@ -784,6 +828,7 @@ async function startCamera() {
 
         statusDiv.innerHTML = `<p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>${errorMessage}</p>`;
 
+        // Show upload fallback in case of camera error
         document.getElementById('upload-fallback').style.display = 'block';
         document.querySelector('input[name="photo"]').style.display = 'block';
         document.getElementById('start-camera').style.display = 'none';
@@ -827,8 +872,8 @@ function capturePhoto() {
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob((blob) => {
-        photoBlob = blob;
-        capturedImg.src = URL.createObjectURL(photoBlob);
+        photoBlob = blob; // Store the captured photo as a Blob
+        capturedImg.src = URL.createObjectURL(photoBlob); // Display from Blob URL
 
         cameraSection.style.display = 'none';
         previewDiv.style.display = 'block';
@@ -848,14 +893,14 @@ function retakePhoto() {
     cameraSection.style.display = 'block';
     previewDiv.style.display = 'none';
     confirmedDiv.style.display = 'none';
-    document.getElementById('upload-fallback').style.display = 'none';
+    document.getElementById('upload-fallback').style.display = 'none'; // Hide upload fallback when retaking
 
     if (document.getElementById('captured-image').src && document.getElementById('captured-image').src.startsWith('blob:')) {
-        URL.revokeObjectURL(document.getElementById('captured-image').src);
+        URL.revokeObjectURL(document.getElementById('captured-image').src); // Clean up Blob URL
     }
-    photoBlob = null;
-    document.getElementById('captured_photo_hidden').value = '';
-    document.querySelector('input[name="photo"]').value = '';
+    photoBlob = null; // Clear the stored blob
+    document.getElementById('captured_photo_hidden').value = ''; // Clear hidden input
+    document.querySelector('input[name="photo"]').value = ''; // Clear file input
 
     startCamera();
 }
@@ -866,27 +911,19 @@ function confirmPhoto() {
     const finalImg = document.getElementById('final-image');
     const capturedPhotoInput = document.getElementById('captured_photo_hidden');
 
+    // Ensure photoBlob is populated (from camera or file input)
     if (photoBlob) {
         const reader = new FileReader();
         reader.onloadend = () => {
-            capturedPhotoInput.value = reader.result;
+            capturedPhotoInput.value = reader.result; // Store base64 in hidden input
             finalImg.src = reader.result;
             previewDiv.style.display = 'none';
             confirmedDiv.style.display = 'block';
             document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo captured and confirmed!</p>';
         };
         reader.readAsDataURL(photoBlob);
-    } else if (document.querySelector('input[name="photo"]').files.length > 0) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            capturedPhotoInput.value = reader.result;
-            finalImg.src = reader.result;
-            previewDiv.style.display = 'none';
-            confirmedDiv.style.display = 'block';
-            document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo uploaded and confirmed!</p>';
-          };
-          reader.readAsDataURL(document.querySelector('input[name="photo"]').files[0]);
     } else {
+        // Fallback in case photoBlob is somehow empty but an image is displayed
         finalImg.src = document.getElementById('captured-image').src;
         previewDiv.style.display = 'none';
         confirmedDiv.style.display = 'block';
@@ -985,6 +1022,7 @@ function initializeFormElements() {
         canReferCheckbox.addEventListener('change', function() {
             referralFields.style.display = this.checked ? 'block' : 'none';
         });
+        // Set initial state on load
         if (canReferCheckbox.checked) {
             referralFields.style.display = 'block';
         }
@@ -997,25 +1035,37 @@ function initializeFormElements() {
         transportSelect.addEventListener('change', function() {
             transportOtherField.style.display = this.value === 'other' ? 'block' : 'none';
         });
+        // Set initial state on load
         if (transportSelect.value === 'other') {
             transportOtherField.style.display = 'block';
         }
     }
 
-    document.querySelectorAll('input[type="text"]').forEach(input => {
-        if (input.name.includes('mobile_number')) {
-            input.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/[^\d+]/g, '');
-                if (value && !value.startsWith('+') && !value.startsWith('91') && value.length >= 10) {
-                    value = '+91' + value;
-                } else if (value.startsWith('91') && !value.startsWith('+91')) {
-                    value = '+' + value;
-                }
-                e.target.value = value;
-            });
-        }
+    document.querySelectorAll('input[type="text"], input[type="number"], select, textarea').forEach(input => {
+        // Add event listener to clear 'is-invalid' class on input
+        input.addEventListener('input', function() {
+            this.classList.remove('is-invalid');
+        });
+        input.addEventListener('change', function() {
+            this.classList.remove('is-invalid');
+        });
     });
+
+    // Specific phone number formatting
+    const mobileNumberInput = document.querySelector('[name="mobile_number"]');
+    if (mobileNumberInput) {
+        mobileNumberInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^\d+]/g, ''); // Allow '+' and digits
+            if (value && !value.startsWith('+') && !value.startsWith('91') && value.length >= 10) {
+                value = '+91' + value;
+            } else if (value.startsWith('91') && !value.startsWith('+91')) {
+                value = '+' + value;
+            }
+            e.target.value = value;
+        });
+    }
 }
+
 
 async function goBack() {
     const currentStep = parseInt(document.querySelector('input[name="step"]').value);
@@ -1026,8 +1076,10 @@ async function goBack() {
     function getFieldValue(name) {
         const element = form.querySelector(`[name="${name}"]`);
         if (!element) return null;
-        if (element.type === 'checkbox') { return element.checked; }
-        if (element.type === 'radio') { const selectedRadio = form.querySelector(`[name="${name}"]:checked`); return selectedRadio ? selectedRadio.value : ''; }
+        if (element.type === 'checkbox' || element.type === 'radio') {
+            const selected = form.querySelector(`[name="${name}"]:checked`);
+            return selected ? selected.value : (element.type === 'checkbox' ? element.checked : '');
+        }
         if (element.tagName === 'SELECT') { return element.value; }
         return element.value.trim();
     }
@@ -1036,26 +1088,27 @@ async function goBack() {
         return Array.from(checkboxes).map(cb => cb.value);
     }
 
+    // Save current step's data before navigating back
     if (currentStep === 2) {
         const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
         const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
 
         if (currentCategory === 'individual_labor') {
             stepData = {
-                gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')), primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
-                skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate'), expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
+                gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')) || null, primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
+                skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate') === 'yes', expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
                 adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
                 communication_preferences: getCheckboxValues('communication_preferences')
             };
         } else if (currentCategory === 'mukkadam') {
             stepData = {
-                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || 0, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || 0, expected_charges: getFieldValue('expected_charges'),
+                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
                 labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
                 supply_areas: getFieldValue('supply_areas'), skills: getCheckboxValues('skills'),
             };
         } else if (currentCategory === 'transport') {
             stepData = {
-                vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || 0, expected_fair: getFieldValue('expected_fair'),
+                vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
                 availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
             };
         } else if (currentCategory === 'others') {
@@ -1065,14 +1118,19 @@ async function goBack() {
         }
         currentRegistration.step2 = stepData;
     } else if (currentStep === 3) {
-          stepData = {
-            data_sharing_agreement: getFieldValue('data_sharing_agreement')
+        stepData = {
+            data_sharing_agreement: document.querySelector('input[name="data_sharing_agreement"]').checked
         };
         currentRegistration.step3 = stepData;
     }
 
     await saveCurrentRegistrationData(currentRegistration);
-    window.location.href = `?step=${currentStep - 1}`;
+
+    // Navigate back
+    if (currentStep > 1) {
+        const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
+        window.location.href = `?step=${currentStep - 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
+    }
 }
 
 window.addEventListener('beforeunload', function() {
