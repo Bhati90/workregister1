@@ -160,6 +160,71 @@ async function syncNowHandler() {
     syncButton.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Syncing...';
     syncButton.disabled = true;
 
+      // Retrieve ALL pending registrations first
+    const db = await openDB(DB_NAME, DB_VERSION);
+    const pendingRegistrations = await db.getAll(STORE_PENDING_REGISTRATIONS);
+
+    if (pendingRegistrations.length === 0) {
+        alert('No pending registrations to sync!');
+        updateSyncStatusUI();
+        return;
+    }
+
+    const isOnline = navigator.onLine;
+    if (isOnline) {
+        console.log('Online, attempting immediate sync of all pending registrations.');
+        let allSucceeded = true;
+        let syncedCount = 0;
+        let failedCount = 0;
+
+        for (const reg of pendingRegistrations) {
+            try {
+                const success = await sendRegistrationToServer(reg.data, reg.id);
+                if (success) {
+                    await db.delete(STORE_PENDING_REGISTRATIONS, reg.id);
+                    if (reg.data && reg.data.step1 && reg.data.step1.photoId) {
+                        await db.delete(STORE_OFFLINE_IMAGES, reg.data.step1.photoId);
+                    }
+                    syncedCount++;
+                } else {
+                    allSucceeded = false;
+                    failedCount++;
+                }
+            } catch (error) {
+                console.error(`Error submitting pending registration ID ${reg.id}:`, error);
+                allSucceeded = false;
+                failedCount++;
+            }
+        }
+
+        if (allSucceeded) {
+            alert(`Successfully synced all ${syncedCount} pending registration(s)!`);
+        } else {
+            alert(`Finished sync attempt. Successfully submitted ${syncedCount} and failed ${failedCount}. Please try again later.`);
+        }
+
+    } else {
+        // If offline, use the background sync API as originally intended
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                await registration.sync.register('sync-labor-registration');
+                console.log('Manual sync registered successfully.');
+                alert('You are offline. Sync request sent and will be processed when a network connection is available.');
+            } catch (error) {
+                console.error('Failed to register background sync:', error);
+                alert('Failed to start sync. Please check your network connection and try again.');
+            }
+        } else {
+            alert('Your browser does not support background sync. Please stay on this page to submit your forms when you reconnect to the internet.');
+        }
+    }
+
+    // Reset button state and update UI
+    syncButton.innerHTML = originalText;
+    syncButton.disabled = false;
+    updateSyncStatusUI();
+
     if ('serviceWorker' in navigator && 'SyncManager' in window) {
         try {
             const registration = await navigator.serviceWorker.ready;
@@ -600,6 +665,67 @@ async function handleNextSubmit(event) {
     }
 }
 
+// async function submitFullRegistration() {
+//     const fullRegistrationData = await getCurrentRegistrationData();
+//     if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
+//         console.error('Incomplete registration data found for submission. Cannot submit.');
+//         alert('An error occurred. Please ensure all steps are completed before submitting.');
+//         return;
+//     }
+
+//     console.log('Attempting to submit full registration:', fullRegistrationData);
+
+//     const isOnline = navigator.onLine;
+
+//     // Use a flag to ensure we only clear IDB and redirect once after successful submission or sync
+//     let submissionAttempted = false;
+
+//     if (isOnline) {
+//         try {
+//             console.log('Online, attempting immediate submission.');
+//             const success = await sendRegistrationToServer(fullRegistrationData);
+//             if (success) {
+//                 console.log('Immediate online submission successful.');
+//                 await clearCurrentRegistrationAndImage();
+//                 alert('Registration submitted successfully!');
+//                 window.location.href = '/register/success/'; // Redirect to success page
+//                 submissionAttempted = true;
+//             } else {
+//                 console.log('Immediate online submission failed, saving for background sync.');
+//                 await saveForBackgroundSync(fullRegistrationData);
+//                 alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
+//                 // We still redirect to success page, but it should indicate the deferred nature
+//                 window.location.href = '/register/success/';
+//                 submissionAttempted = true;
+//             }
+//         } catch (error) {
+//             console.error('Error during online submission attempt:', error);
+//             await saveForBackgroundSync(fullRegistrationData);
+//             alert('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
+//             // We still redirect to success page, but it should indicate the deferred nature
+//             window.location.href = '/register/success/';
+//             submissionAttempted = true;
+//         }
+//     } else {
+//         console.log('Offline, saving for background sync.');
+//         await saveForBackgroundSync(fullRegistrationData);
+//         if ('serviceWorker' in navigator && 'SyncManager' in window) {
+//             const registration = await navigator.serviceWorker.ready;
+//             await registration.sync.register('sync-labor-registration');
+//             alert('You are offline. Your registration will be submitted when you are back online.');
+//         } else {
+//             alert('You are offline, and background sync is not fully supported by your browser. Your data is saved locally, but might be lost if you clear browser data before coming online.');
+//         }
+//         await clearCurrentRegistrationAndImage();
+//         window.location.href = '/register/success/'; // Redirect to success page
+//         submissionAttempted = true;
+//     }
+
+//     // Ensure redirect happens only if a submission attempt was made
+//     if (!submissionAttempted) {
+//         console.warn('Submission logic finished without redirection.');
+//     }
+// }
 async function submitFullRegistration() {
     const fullRegistrationData = await getCurrentRegistrationData();
     if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
@@ -608,60 +734,35 @@ async function submitFullRegistration() {
         return;
     }
 
-    console.log('Attempting to submit full registration:', fullRegistrationData);
-
     const isOnline = navigator.onLine;
 
-    // Use a flag to ensure we only clear IDB and redirect once after successful submission or sync
-    let submissionAttempted = false;
-
     if (isOnline) {
-        try {
-            console.log('Online, attempting immediate submission.');
-            const success = await sendRegistrationToServer(fullRegistrationData);
-            if (success) {
-                console.log('Immediate online submission successful.');
-                await clearCurrentRegistrationAndImage();
-                alert('Registration submitted successfully!');
-                window.location.href = '/register/success/'; // Redirect to success page
-                submissionAttempted = true;
-            } else {
-                console.log('Immediate online submission failed, saving for background sync.');
-                await saveForBackgroundSync(fullRegistrationData);
-                alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
-                // We still redirect to success page, but it should indicate the deferred nature
-                window.location.href = '/register/success/';
-                submissionAttempted = true;
-            }
-        } catch (error) {
-            console.error('Error during online submission attempt:', error);
-            await saveForBackgroundSync(fullRegistrationData);
-            alert('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
-            // We still redirect to success page, but it should indicate the deferred nature
+        console.log('Online, attempting immediate submission.');
+        const success = await processAndSendRegistration(fullRegistrationData);
+        if (success) {
+            await clearCurrentRegistrationAndImage();
+            alert('Registration submitted successfully!');
             window.location.href = '/register/success/';
-            submissionAttempted = true;
+            return;
         }
+        // If immediate submission fails, fall back to offline storage
+        console.log('Immediate online submission failed, falling back to background sync.');
+    }
+
+    // This block runs if offline OR if the online attempt failed
+    await saveForBackgroundSync(fullRegistrationData);
+    await clearCurrentRegistrationAndImage();
+
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.sync.register('sync-labor-registration');
+        alert('You are offline. Your registration will be submitted when you are back online.');
     } else {
-        console.log('Offline, saving for background sync.');
-        await saveForBackgroundSync(fullRegistrationData);
-        if ('serviceWorker' in navigator && 'SyncManager' in window) {
-            const registration = await navigator.serviceWorker.ready;
-            await registration.sync.register('sync-labor-registration');
-            alert('You are offline. Your registration will be submitted when you are back online.');
-        } else {
-            alert('You are offline, and background sync is not fully supported by your browser. Your data is saved locally, but might be lost if you clear browser data before coming online.');
-        }
-        await clearCurrentRegistrationAndImage();
-        window.location.href = '/register/success/'; // Redirect to success page
-        submissionAttempted = true;
+        alert('Your data is saved locally. It might be lost if you clear browser data.');
     }
-
-    // Ensure redirect happens only if a submission attempt was made
-    if (!submissionAttempted) {
-        console.warn('Submission logic finished without redirection.');
-    }
+    
+    window.location.href = '/register/success/';
 }
-
 
 async function clearCurrentRegistrationAndImage() {
     if (!db) await initDB();
@@ -675,40 +776,134 @@ async function clearCurrentRegistrationAndImage() {
     console.log('Current registration and associated image cleared from IndexedDB.');
 }
 
-async function sendRegistrationToServer(fullRegistrationData) {
+// async function sendRegistrationToServer(fullRegistrationData) {
+//     try {
+//         const formData = new FormData();
+//         console.log('Preparing to send registration data to server:', fullRegistrationData);
+
+//         // Append Step 1 data
+//         for (const key in fullRegistrationData.step1) {
+//             // Exclude photoId and photoBase64 as they are handled separately
+//             if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
+//                 formData.append(key, fullRegistrationData.step1[key]);
+//             }
+//         }
+
+//         // Append location data as JSON string
+//         if (fullRegistrationData.step1.location) {
+//             formData.append('location', JSON.stringify(fullRegistrationData.step1.location));
+//         }
+
+//         // Append photo Blob/File
+//         if (photoBlob) { // Use the global photoBlob if available (captured from camera or uploaded)
+//             formData.append('photo', photoBlob, 'captured_image.jpeg');
+//         } else if (fullRegistrationData.step1.photoId) {
+//             // Retrieve image from IndexedDB if it was saved there
+//             const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readonly');
+//             const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
+//             const imageData = await imageStore.get(fullRegistrationData.step1.photoId);
+//             if (imageData && imageData.image) {
+//                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+//             }
+//         } else if (fullRegistrationData.step1.photoBase64) {
+//             // Convert base64 to Blob if no photoId or photoBlob
+//             const response = await fetch(fullRegistrationData.step1.photoBase64);
+//             const blob = await response.blob();
+//             formData.append('photo', blob, 'captured_image.jpeg');
+//         }
+
+//         // Append Step 2 data
+//         if (fullRegistrationData.step2) {
+//             for (const key in fullRegistrationData.step2) {
+//                 if (fullRegistrationData.step2.hasOwnProperty(key)) {
+//                     // Stringify arrays and objects (like skills, comm_preferences)
+//                     if (Array.isArray(fullRegistrationData.step2[key]) || (typeof fullRegistrationData.step2[key] === 'object' && fullRegistrationData.step2[key] !== null)) {
+//                         formData.append(key, JSON.stringify(fullRegistrationData.step2[key]));
+//                     } else {
+//                         formData.append(key, fullRegistrationData.step2[key]);
+//                     }
+//                 }
+//             }
+//         }
+
+//         // Append Step 3 data
+//         if (fullRegistrationData.step3) {
+//             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
+//         }
+
+//         // *** CRITICAL FIX: Use the correct URL including the 'register/' prefix ***
+//         const response = await fetch('/register/api/submit-registration/', {
+//             method: 'POST',
+//             body: formData,
+//             headers: {
+//                 'X-CSRFToken': getCookie('csrftoken'), // Get CSRF token for direct AJAX submission
+//             },
+//         });
+
+//         if (response.ok) {
+//             const result = await response.json();
+//             console.log('Registration submitted successfully to backend:', result, response.status, response);
+//             return true;
+//         } else {
+//             const errorResponse = await response.json();
+//             console.error('Failed to submit registration:', response.status, errorResponse, response);
+//             return false;
+//         }
+
+//     } catch (error) {
+//         console.error('Error sending registration to server:', error);
+//         return false;
+//     }
+// }
+async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
+    /**
+     * Prepares and sends a single registration to the server.
+     * If a dbKey is provided, it will clean up the corresponding data from IndexedDB on success.
+     *
+     * @param {object} fullRegistrationData - The complete registration object to be submitted.
+     * @param {string|number|null} dbKey - The key of the record in IndexedDB, if applicable.
+     * @returns {Promise<boolean>} - True if submission was successful, false otherwise.
+     */
     try {
         const formData = new FormData();
         console.log('Preparing to send registration data to server:', fullRegistrationData);
 
         // Append Step 1 data
-        for (const key in fullRegistrationData.step1) {
-            // Exclude photoId and photoBase64 as they are handled separately
-            if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
-                formData.append(key, fullRegistrationData.step1[key]);
+        if (fullRegistrationData.step1) {
+            for (const key in fullRegistrationData.step1) {
+                if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
+                    formData.append(key, fullRegistrationData.step1[key]);
+                }
             }
         }
 
         // Append location data as JSON string
-        if (fullRegistrationData.step1.location) {
+        if (fullRegistrationData.step1 && fullRegistrationData.step1.location) {
             formData.append('location', JSON.stringify(fullRegistrationData.step1.location));
         }
 
-        // Append photo Blob/File
-        if (photoBlob) { // Use the global photoBlob if available (captured from camera or uploaded)
-            formData.append('photo', photoBlob, 'captured_image.jpeg');
-        } else if (fullRegistrationData.step1.photoId) {
-            // Retrieve image from IndexedDB if it was saved there
-            const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readonly');
-            const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
-            const imageData = await imageStore.get(fullRegistrationData.step1.photoId);
+        // Handle photo from the offline images store using photoId
+        if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+            const db = await openDB(DB_NAME, DB_VERSION);
+            const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
             if (imageData && imageData.image) {
                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+            } else {
+                console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
+                // Note: Consider what to do here. For now, it will submit without a photo.
             }
-        } else if (fullRegistrationData.step1.photoBase64) {
-            // Convert base64 to Blob if no photoId or photoBlob
-            const response = await fetch(fullRegistrationData.step1.photoBase64);
-            const blob = await response.blob();
-            formData.append('photo', blob, 'captured_image.jpeg');
+        }
+        
+        // Fallback: Handle photo from base64 if no photoId is present
+        else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
+            try {
+                const response = await fetch(fullRegistrationData.step1.photoBase64);
+                const blob = await response.blob();
+                formData.append('photo', blob, 'captured_image.jpeg');
+                console.log('[Client] Appending base64 image to form data.');
+            } catch (e) {
+                console.warn('[Client] Failed to convert base64 to Blob for sync:', e);
+            }
         }
 
         // Append Step 2 data
@@ -730,22 +925,31 @@ async function sendRegistrationToServer(fullRegistrationData) {
             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
         }
 
-        // *** CRITICAL FIX: Use the correct URL including the 'register/' prefix ***
         const response = await fetch('/register/api/submit-registration/', {
             method: 'POST',
             body: formData,
             headers: {
-                'X-CSRFToken': getCookie('csrftoken'), // Get CSRF token for direct AJAX submission
+                'X-CSRFToken': getCookie('csrftoken'),
             },
         });
 
         if (response.ok) {
-            const result = await response.json();
-            console.log('Registration submitted successfully to backend:', result, response.status, response);
+            console.log('Registration submitted successfully.');
+            // Clean up data from IndexedDB if a key was provided
+            if (dbKey) {
+                const db = await openDB(DB_NAME, DB_VERSION);
+                const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+                await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
+                if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+                    await tx.objectStore(STORE_OFFLINE_IMAGES).delete(fullRegistrationData.step1.photoId);
+                }
+                await tx.done;
+                console.log(`Pending registration ID ${dbKey} and image cleared from IndexedDB.`);
+            }
             return true;
         } else {
             const errorResponse = await response.json();
-            console.error('Failed to submit registration:', response.status, errorResponse, response);
+            console.error('Failed to submit registration:', response.status, errorResponse);
             return false;
         }
 
