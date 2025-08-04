@@ -33,4 +33,4 @@ RUN python manage.py collectstatic --noinput
 EXPOSE 8000
 
 # Run Django with Gunicorn
-CMD  python manage.py makemigrations python manage.py migrate && gunicorn labour_crm.wsgi:application --bind 0.0.0.0:8000
+CMD  python manage.py migrate && gunicorn labour_crm.wsgi:application --bind 0.0.0.0:8000
