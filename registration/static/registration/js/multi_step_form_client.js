@@ -606,7 +606,7 @@ async function sendRegistrationToServer(fullRegistrationData) {
             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
         }
 
-        const response = await fetch('.*/api/submit-registration/', {
+        const response = await fetch('https://workregister1-g7pf.onrender.com/api/submit-registration/', {
             method: 'POST',
             body: formData,
             headers: {
@@ -616,11 +616,11 @@ async function sendRegistrationToServer(fullRegistrationData) {
 
         if (response.ok) {
             const result = await response.json();
-            console.log('Registration submitted successfully to backend:', result);
+            console.log('Registration submitted successfully to backend:', result,response.status,response);
             return true;
         } else {
             const errorResponse = await response.json();
-            console.error('Failed to submit registration:', response.status, errorResponse);
+            console.error('Failed to submit registration:', response.status, errorResponse,response);
             return false;
         }
         
