@@ -257,8 +257,8 @@ async function handleNextSubmit(event) {
             return element.checked;
         }
         if (element.type === 'radio') {
-             const selectedRadio = form.querySelector(`[name="${name}"]:checked`);
-             return selectedRadio ? selectedRadio.value : '';
+            const selectedRadio = form.querySelector(`[name="${name}"]:checked`);
+            return selectedRadio ? selectedRadio.value : '';
         }
         if (element.tagName === 'SELECT') {
             return element.value;
@@ -354,10 +354,7 @@ async function handleNextSubmit(event) {
         currentRegistration.step1 = stepData;
         await saveCurrentRegistrationData(currentRegistration);
 
-        // Set the value of the hidden input that Django's GET method will read
         document.getElementById('currentCategoryHidden').value = stepData.category;
-
-        // Construct the URL for the next step, including the category as a GET parameter
         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(stepData.category)}`;
 
     } else if (currentStep === 2) {
@@ -460,49 +457,32 @@ async function handleNextSubmit(event) {
 
         if (currentCategory === 'individual_labor') {
             stepData = {
-                gender: getFieldValue('gender'),
-                age: parseInt(getFieldValue('age')),
-                primary_source_income: getFieldValue('primary_source_income'),
-                employment_type: getFieldValue('employment_type'),
-                skills: getCheckboxValues('skills'),
-                willing_to_migrate: getFieldValue('willing_to_migrate'),
-                expected_wage: getFieldValue('expected_wage'),
-                availability: getFieldValue('availability'),
-                adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0,
-                adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
+                gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')), primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
+                skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate'), expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
+                adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
                 communication_preferences: getCheckboxValues('communication_preferences')
             };
         } else if (currentCategory === 'mukkadam') {
             stepData = {
-                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || 0,
-                total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || 0,
-                expected_charges: getFieldValue('expected_charges'),
-                labour_supply_availability: getFieldValue('labour_supply_availability'),
-                arrange_transport: getFieldValue('arrange_transport'),
-                arrange_transport_other: getFieldValue('arrange_transport_other'),
-                supply_areas: getFieldValue('supply_areas'),
-                skills: getCheckboxValues('skills'),
+                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || 0, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || 0, expected_charges: getFieldValue('expected_charges'),
+                labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
+                supply_areas: getFieldValue('supply_areas'), skills: getCheckboxValues('skills'),
             };
         } else if (currentCategory === 'transport') {
             stepData = {
-                vehicle_type: getFieldValue('vehicle_type'),
-                people_capacity: parseInt(getFieldValue('people_capacity')) || 0,
-                expected_fair: getFieldValue('expected_fair'),
-                availability: getFieldValue('availability'),
-                service_areas: getFieldValue('service_areas'),
+                vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || 0, expected_fair: getFieldValue('expected_fair'),
+                availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
             };
         } else if (currentCategory === 'others') {
             stepData = {
-                business_name: getFieldValue('business_name'),
-                help_description: getFieldValue('help_description'),
+                business_name: getFieldValue('business_name'), help_description: getFieldValue('help_description'),
             };
         }
         currentRegistration.step2 = stepData;
         await saveCurrentRegistrationData(currentRegistration);
 
         const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
-        document.getElementById('currentCategoryHidden').value = categoryToPass; // Update hidden input for Django's GET
-
+        document.getElementById('currentCategoryHidden').value = categoryToPass;
         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
 
     } else if (currentStep === 3) {
@@ -534,23 +514,33 @@ async function submitFullRegistration() {
 
     console.log('Attempting to submit full registration:', fullRegistrationData);
 
-    if (navigator.onLine) {
-        console.log('Online, attempting immediate submission.');
-        const success = await sendRegistrationToServer(fullRegistrationData);
-        if (success) {
-            await clearCurrentRegistrationAndImage();
-            alert('Registration submitted successfully!');
-            window.location.href = '/register/registration-success/';
-        } else {
-            console.log('Immediate online submission failed, saving for background sync.');
+    const isOnline = navigator.onLine;
+
+    if (isOnline) {
+        try {
+            console.log('Online, attempting immediate submission.');
+            const success = await sendRegistrationToServer(fullRegistrationData);
+            if (success) {
+                await clearCurrentRegistrationAndImage();
+                alert('Registration submitted successfully!');
+                window.location.href = '/registration-success/';
+            } else {
+                console.log('Immediate online submission failed, saving for background sync.');
+                await saveForBackgroundSync(fullRegistrationData);
+                alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
+                // Use a proper redirect to the success page to show the user the process is done
+                window.location.href = '/registration-success/';
+            }
+        } catch (error) {
+            console.error('Error during online submission attempt:', error);
             await saveForBackgroundSync(fullRegistrationData);
-            alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
-            window.location.href = '/register/registration-success/';
+            alert('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
+            window.location.href = '/registration-success/';
         }
     } else {
         console.log('Offline, saving for background sync.');
+        await saveForBackgroundSync(fullRegistrationData);
         if ('serviceWorker' in navigator && 'SyncManager' in window) {
-            await saveForBackgroundSync(fullRegistrationData);
             const registration = await navigator.serviceWorker.ready;
             await registration.sync.register('sync-labor-registration');
             alert('You are offline. Your registration will be submitted when you are back online.');
@@ -568,7 +558,7 @@ async function clearCurrentRegistrationAndImage() {
     const tx = db.transaction([STORE_CURRENT_REGISTRATION, STORE_OFFLINE_IMAGES], 'readwrite');
     await tx.objectStore(STORE_CURRENT_REGISTRATION).delete('current_draft');
     if (currentRegistration && currentRegistration.step1 && currentRegistration.step1.photoId) {
-         await tx.objectStore(STORE_OFFLINE_IMAGES).delete(currentRegistration.step1.photoId);
+          await tx.objectStore(STORE_OFFLINE_IMAGES).delete(currentRegistration.step1.photoId);
     }
     await tx.done;
     console.log('Current registration and associated image cleared from IndexedDB.');
@@ -616,7 +606,7 @@ async function sendRegistrationToServer(fullRegistrationData) {
             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
         }
 
-        const response = await fetch('/register/api/submit-registration/', {
+        const response = await fetch('/api/submit-registration/', {
             method: 'POST',
             body: formData,
             headers: {
@@ -881,20 +871,20 @@ function confirmPhoto() {
         };
         reader.readAsDataURL(photoBlob);
     } else if (document.querySelector('input[name="photo"]').files.length > 0) {
-         const reader = new FileReader();
-         reader.onloadend = () => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
             capturedPhotoInput.value = reader.result;
             finalImg.src = reader.result;
             previewDiv.style.display = 'none';
             confirmedDiv.style.display = 'block';
             document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo uploaded and confirmed!</p>';
-         };
-         reader.readAsDataURL(document.querySelector('input[name="photo"]').files[0]);
+          };
+          reader.readAsDataURL(document.querySelector('input[name="photo"]').files[0]);
     } else {
-         finalImg.src = document.getElementById('captured-image').src;
-         previewDiv.style.display = 'none';
-         confirmedDiv.style.display = 'block';
-         document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo confirmed!</p>';
+        finalImg.src = document.getElementById('captured-image').src;
+        previewDiv.style.display = 'none';
+        confirmedDiv.style.display = 'block';
+        document.getElementById('camera-status').innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Photo confirmed!</p>';
     }
 }
 
@@ -1069,7 +1059,7 @@ async function goBack() {
         }
         currentRegistration.step2 = stepData;
     } else if (currentStep === 3) {
-         stepData = {
+          stepData = {
             data_sharing_agreement: getFieldValue('data_sharing_agreement')
         };
         currentRegistration.step3 = stepData;

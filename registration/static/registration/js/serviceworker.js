@@ -12,20 +12,17 @@ const urlsToCache = [
     '/register/?step=1', // Explicitly cache query parameters if they define pages
     '/register/?step=2',
     '/register/?step=3',
-    '/registration-success/', // Your success page
+    '/registration-success/', // The success page URL as used in the client-side JS
     '/offline.html', // Your offline fallback page
 
     // Static assets used by your templates
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
-    // Assuming your main JS is moved to a separate file within your static folder
     '/static/registration/js/multi_step_form_client.js',
     '/static/registration/images/my_app_icon_192.png',
     '/static/registration/images/my_app_icon_512.png',
     '/static/registration/images/splash_screen_480x320.png',
-    // Add other common static assets like your custom CSS file if you have one
-    // '/static/registration/css/style.css',
 ];
 
 // Installation: Cache all essential assets
@@ -35,7 +32,6 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('[Service Worker] Caching all assets:', urlsToCache);
-                // Use Promise.allSettled to ensure all are attempted, even if some fail
                 return Promise.allSettled(urlsToCache.map(url => cache.add(url)))
                     .then((results) => {
                         results.forEach(result => {
@@ -46,7 +42,7 @@ self.addEventListener('install', (event) => {
                         console.log('[Service Worker] Initial caching complete.');
                     });
             })
-            .then(() => self.skipWaiting()) // Activates the new service worker immediately
+            .then(() => self.skipWaiting())
             .catch(error => {
                 console.error('[Service Worker] Install failed:', error);
             })
@@ -67,25 +63,21 @@ self.addEventListener('activate', (event) => {
                     }
                 })
             );
-        }).then(() => self.clients.claim()) // Takes control of existing clients immediately
+        }).then(() => self.clients.claim())
     );
 });
 
 // Fetch: Serve from cache or network
 self.addEventListener('fetch', (event) => {
-    // Only handle GET requests for navigation and static assets
     if (event.request.method === 'GET') {
         event.respondWith(
             caches.match(event.request)
                 .then((response) => {
-                    // Cache hit - return response
                     if (response) {
                         return response;
                     }
-                    // No cache hit - fetch from network
                     return fetch(event.request)
                         .then((networkResponse) => {
-                            // Check if we received a valid response
                             if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
                                 return networkResponse;
                             }
@@ -97,7 +89,6 @@ self.addEventListener('fetch', (event) => {
                             return networkResponse;
                         })
                         .catch(() => {
-                            // If network fails for a navigation request, serve offline fallback
                             if (event.request.mode === 'navigate') {
                                 return caches.match('/offline.html');
                             }
@@ -128,7 +119,7 @@ async function syncLaborRegistrations() {
         db = await openDB(DB_NAME, DB_VERSION);
     } catch (error) {
         console.error('[Service Worker] Failed to open IndexedDB during sync:', error);
-        throw error; // Re-throw to make the sync event retry
+        throw error;
     }
 
     const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
@@ -139,32 +130,30 @@ async function syncLaborRegistrations() {
 
     if (registrations.length === 0) {
         console.log('[Service Worker] No pending registrations to sync.');
+        await tx.done;
         return;
     }
 
     console.log(`[Service Worker] Found ${registrations.length} pending registrations to sync.`);
 
-    // Process each registration one by one
     for (const reg of registrations) {
         try {
             const formData = new FormData();
-
-            // Get nested step data
             const step1Data = reg.data.step1 || {};
             const step2Data = reg.data.step2 || {};
             const step3Data = reg.data.step3 || {};
-
+            
             // Append all basic_info data
             for (const key in step1Data) {
                 if (step1Data.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
                     formData.append(key, step1Data[key]);
                 }
             }
-            if (step1Data.location) { // Location object
+            if (step1Data.location) {
                 formData.append('location', JSON.stringify(step1Data.location));
             }
-
-            // Handle photo file
+            
+            // Handle photo file from IndexedDB
             if (step1Data.photoId) {
                 const imageData = await imageStore.get(step1Data.photoId);
                 if (imageData && imageData.image) {
@@ -174,10 +163,8 @@ async function syncLaborRegistrations() {
                     console.warn(`[Service Worker] Image with ID ${step1Data.photoId} not found in offline_images store during sync.`);
                 }
             } else if (step1Data.photoBase64) {
-                // Fallback for base64 if it was stored this way
-                try {
-                    const response = await fetch(step1Data.photoBase64);
-                    const blob = await response.blob();
+                 try {
+                    const blob = await (await fetch(step1Data.photoBase64)).blob();
                     formData.append('photo', blob, 'captured_image.jpeg');
                     console.log('[Service Worker] Appending base64 image to form data.');
                 } catch (e) {
@@ -188,7 +175,6 @@ async function syncLaborRegistrations() {
             // Append step 2 data
             for (const key in step2Data) {
                 if (step2Data.hasOwnProperty(key)) {
-                    // Convert arrays (like skills, comm_preferences) and other objects to JSON strings
                     if (Array.isArray(step2Data[key]) || (typeof step2Data[key] === 'object' && step2Data[key] !== null)) {
                         formData.append(key, JSON.stringify(step2Data[key]));
                     } else {
@@ -196,35 +182,29 @@ async function syncLaborRegistrations() {
                     }
                 }
             }
-
+            
             // Append step 3 data
             if (step3Data.data_sharing_agreement !== undefined) {
                 formData.append('data_sharing_agreement', step3Data.data_sharing_agreement);
             }
 
-            // Attempt to fetch a CSRF token from a cached page.
-            const csrfToken = await getCsrfTokenFromCachedPage('/register/');
-            const headers = {};
-            if (csrfToken) {
-                headers['X-CSRFToken'] = csrfToken;
-            }
-
-            console(`[Service Worker] Sending registration ID ${reg.id} to server...`);
-            const response = await fetch('/register/api/submit-registration/', {
+            const response = await fetch('/api/submit-registration/', {
                 method: 'POST',
                 body: formData,
-                headers: headers
+                // Do not explicitly set Content-Type for FormData
+                // The browser will handle the 'multipart/form-data' header automatically
+                // No headers are needed for CSRF with @csrf_exempt on the server-side
             });
 
             if (response.ok) {
                 console.log(`[Service Worker] Registration ID ${reg.id} synced successfully!`);
-                await pendingStore.delete(reg.id); // Remove from pending store
-                if (step1Data.photoId) { // Also remove the image if it was associated and uploaded
+                await pendingStore.delete(reg.id);
+                if (step1Data.photoId) {
                     await imageStore.delete(step1Data.photoId);
                 }
                 self.registration.showNotification('Registration Synced!', {
                     body: `Registration for ${step1Data.full_name || 'an applicant'} has been submitted.`,
-                    icon: '/static/registration/images/my_app_icon_192.png'
+                    icon: '/static/registration/images/android-chrome-192x192.png'
                 });
             } else {
                 const errorText = await response.text();
@@ -238,22 +218,4 @@ async function syncLaborRegistrations() {
     }
     await tx.done;
     console.log('[Service Worker] All pending syncs attempted.');
-}
-
-// Helper to try and get CSRF token from a cached page
-async function getCsrfTokenFromCachedPage(pageUrl) {
-    try {
-        const cache = await caches.open(CACHE_NAME);
-        const response = await cache.match(pageUrl);
-        if (response) {
-            const html = await response.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const csrfInput = doc.querySelector('input[name="csrfmiddlewaretoken"]');
-            return csrfInput ? csrfInput.value : null;
-        }
-    } catch (error) {
-        console.warn('[Service Worker] Could not retrieve CSRF token from cache for URL:', pageUrl, error);
-    }
-    return null;
 }
