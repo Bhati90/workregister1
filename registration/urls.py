@@ -12,7 +12,7 @@ urlpatterns = [
 
     # Multi-step registration (existing)
     path('registration/', views.MultiStepRegistrationView.as_view(), name='registration'),
-     path('/registration-success/', views.success_view, name='registration_success'),
+     path('register/registration-success/', views.success_view, name='registration_success'),
     path('api/submit-registration/', views.submit_registration_api, name='submit_registration_api'),
    
     # Success page (MODIFIED NAME FOR CONSISTENCY WITH JS REDIRECT)

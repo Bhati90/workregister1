@@ -210,7 +210,7 @@ async function syncLaborRegistrations() {
             }
 
             console(`[Service Worker] Sending registration ID ${reg.id} to server...`);
-            const response = await fetch('/api/submit-registration/', {
+            const response = await fetch('/register/api/submit-registration/', {
                 method: 'POST',
                 body: formData,
                 headers: headers

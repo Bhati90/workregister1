@@ -540,12 +540,12 @@ async function submitFullRegistration() {
         if (success) {
             await clearCurrentRegistrationAndImage();
             alert('Registration submitted successfully!');
-            window.location.href = '/registration-success/';
+            window.location.href = '/register/registration-success/';
         } else {
             console.log('Immediate online submission failed, saving for background sync.');
             await saveForBackgroundSync(fullRegistrationData);
             alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
-            window.location.href = '/registration-success/';
+            window.location.href = '/register/registration-success/';
         }
     } else {
         console.log('Offline, saving for background sync.');
@@ -616,7 +616,7 @@ async function sendRegistrationToServer(fullRegistrationData) {
             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
         }
 
-        const response = await fetch('/api/submit-registration/', {
+        const response = await fetch('/register/api/submit-registration/', {
             method: 'POST',
             body: formData,
             headers: {
