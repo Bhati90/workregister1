@@ -567,20 +567,24 @@ async function clearCurrentRegistrationAndImage() {
 async function sendRegistrationToServer(fullRegistrationData) {
     try {
         const formData = new FormData();
+console.log('Preparing to send registration data to server:', fullRegistrationData);
 
         for (const key in fullRegistrationData.step1) {
+            console.log('2');
             if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
                 formData.append(key, fullRegistrationData.step1[key]);
             }
         }
+        console.log('3');
         if (fullRegistrationData.step1.location) {
             formData.append('location', JSON.stringify(fullRegistrationData.step1.location));
         }
-
+console.log('4');
         if (fullRegistrationData.step1.photoId) {
             const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readonly');
             const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
             const imageData = await imageStore.get(fullRegistrationData.step1.photoId);
+            console.log('5');
             if (imageData && imageData.image) {
                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
             }
@@ -589,10 +593,12 @@ async function sendRegistrationToServer(fullRegistrationData) {
             const blob = await response.blob();
             formData.append('photo', blob, 'captured_image.jpeg');
         }
-
+console.log('6');
         if (fullRegistrationData.step2) {
             for (const key in fullRegistrationData.step2) {
+                console.log('7');
                 if (fullRegistrationData.step2.hasOwnProperty(key)) {
+                    console.log('8');
                     if (Array.isArray(fullRegistrationData.step2[key]) || (typeof fullRegistrationData.step2[key] === 'object' && fullRegistrationData.step2[key] !== null)) {
                         formData.append(key, JSON.stringify(fullRegistrationData.step2[key]));
                     } else {
@@ -601,7 +607,7 @@ async function sendRegistrationToServer(fullRegistrationData) {
                 }
             }
         }
-
+console.log('9');
         if (fullRegistrationData.step3) {
             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
         }
@@ -613,7 +619,7 @@ async function sendRegistrationToServer(fullRegistrationData) {
                 'X-CSRFToken': getCookie('csrftoken'),
             },
         });
-
+console.log('10');
         if (response.ok) {
             const result = await response.json();
             console.log('Registration submitted successfully to backend:', result,response.status,response);
