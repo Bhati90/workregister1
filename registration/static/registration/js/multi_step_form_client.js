@@ -152,6 +152,101 @@ async function updateSyncStatusUI() {
     }
 }
 
+// async function syncNowHandler() {
+//     const syncButton = document.getElementById('sync-now-btn');
+//     if (!syncButton) return;
+
+//     const originalText = syncButton.innerHTML;
+//     syncButton.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Syncing...';
+//     syncButton.disabled = true;
+
+//       // Retrieve ALL pending registrations first
+//     const db = await openDB(DB_NAME, DB_VERSION);
+//     const pendingRegistrations = await db.getAll(STORE_PENDING_REGISTRATIONS);
+
+//     if (pendingRegistrations.length === 0) {
+//         alert('No pending registrations to sync!');
+//         updateSyncStatusUI();
+//         return;
+//     }
+
+//     const isOnline = navigator.onLine;
+//     if (isOnline) {
+//         console.log('Online, attempting immediate sync of all pending registrations.');
+//         let allSucceeded = true;
+//         let syncedCount = 0;
+//         let failedCount = 0;
+
+//         for (const reg of pendingRegistrations) {
+//             try {
+//                 const success = await sendRegistrationToServer(reg.data, reg.id);
+//                 if (success) {
+//                     await db.delete(STORE_PENDING_REGISTRATIONS, reg.id);
+//                     if (reg.data && reg.data.step1 && reg.data.step1.photoId) {
+//                         await db.delete(STORE_OFFLINE_IMAGES, reg.data.step1.photoId);
+//                     }
+//                     syncedCount++;
+//                 } else {
+//                     allSucceeded = false;
+//                     failedCount++;
+//                 }
+//             } catch (error) {
+//                 console.error(`Error submitting pending registration ID ${reg.id}:`, error);
+//                 allSucceeded = false;
+//                 failedCount++;
+//             }
+//         }
+
+//         if (allSucceeded) {
+//             alert(`Successfully synced all ${syncedCount} pending registration(s)!`);
+//         } else {
+//             alert(`Finished sync attempt. Successfully submitted ${syncedCount} and failed ${failedCount}. Please try again later.`);
+//         }
+
+//     } else {
+//         // If offline, use the background sync API as originally intended
+//         if ('serviceWorker' in navigator && 'SyncManager' in window) {
+//             try {
+//                 const registration = await navigator.serviceWorker.ready;
+//                 await registration.sync.register('sync-labor-registration');
+//                 console.log('Manual sync registered successfully.');
+//                 alert('You are offline. Sync request sent and will be processed when a network connection is available.');
+//             } catch (error) {
+//                 console.error('Failed to register background sync:', error);
+//                 alert('Failed to start sync. Please check your network connection and try again.');
+//             }
+//         } else {
+//             alert('Your browser does not support background sync. Please stay on this page to submit your forms when you reconnect to the internet.');
+//         }
+//     }
+
+//     // Reset button state and update UI
+//     syncButton.innerHTML = originalText;
+//     syncButton.disabled = false;
+//     updateSyncStatusUI();
+
+//     if ('serviceWorker' in navigator && 'SyncManager' in window) {
+//         try {
+//             const registration = await navigator.serviceWorker.ready;
+//             await registration.sync.register('sync-labor-registration');
+//             console.log('Manual sync registered successfully.');
+//             alert('Sync request sent! Your data will be submitted when a network connection is available.');
+//             // Re-enable the button but don't clear the banner, as sync might take time
+//             syncButton.innerHTML = originalText;
+//             syncButton.disabled = false;
+//         } catch (error) {
+//             console.error('Failed to register background sync:', error);
+//             alert('Failed to start sync. Please check your network connection and try again.');
+//             syncButton.innerHTML = originalText;
+//             syncButton.disabled = false;
+//         }
+//     } else {
+//         alert('Your browser does not support background sync. Please stay on this page to submit your forms when you reconnect to the internet.');
+//         syncButton.innerHTML = originalText;
+//         syncButton.disabled = false;
+//     }
+// }
+// Corrected syncNowHandler function
 async function syncNowHandler() {
     const syncButton = document.getElementById('sync-now-btn');
     if (!syncButton) return;
@@ -160,93 +255,67 @@ async function syncNowHandler() {
     syncButton.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Syncing...';
     syncButton.disabled = true;
 
-      // Retrieve ALL pending registrations first
     const db = await openDB(DB_NAME, DB_VERSION);
     const pendingRegistrations = await db.getAll(STORE_PENDING_REGISTRATIONS);
 
     if (pendingRegistrations.length === 0) {
         alert('No pending registrations to sync!');
         updateSyncStatusUI();
+        syncButton.innerHTML = originalText;
+        syncButton.disabled = false;
         return;
     }
 
     const isOnline = navigator.onLine;
+
     if (isOnline) {
         console.log('Online, attempting immediate sync of all pending registrations.');
-        let allSucceeded = true;
         let syncedCount = 0;
         let failedCount = 0;
 
         for (const reg of pendingRegistrations) {
             try {
-                const success = await sendRegistrationToServer(reg.data, reg.id);
+                // This is the critical line that needs to be updated.
+                const success = await processAndSendRegistration(reg.data, reg.id);
                 if (success) {
-                    await db.delete(STORE_PENDING_REGISTRATIONS, reg.id);
-                    if (reg.data && reg.data.step1 && reg.data.step1.photoId) {
-                        await db.delete(STORE_OFFLINE_IMAGES, reg.data.step1.photoId);
-                    }
                     syncedCount++;
                 } else {
-                    allSucceeded = false;
                     failedCount++;
                 }
             } catch (error) {
                 console.error(`Error submitting pending registration ID ${reg.id}:`, error);
-                allSucceeded = false;
                 failedCount++;
             }
         }
 
-        if (allSucceeded) {
-            alert(`Successfully synced all ${syncedCount} pending registration(s)!`);
-        } else {
-            alert(`Finished sync attempt. Successfully submitted ${syncedCount} and failed ${failedCount}. Please try again later.`);
+        if (syncedCount > 0) {
+            alert(`Sync complete! Successfully submitted ${syncedCount} registration(s).`);
         }
+        if (failedCount > 0) {
+            alert(`Warning: Failed to submit ${failedCount} registration(s). They will remain in offline storage.`);
+        }
+        updateSyncStatusUI();
 
     } else {
-        // If offline, use the background sync API as originally intended
+        // ... (rest of the offline logic remains the same) ...
         if ('serviceWorker' in navigator && 'SyncManager' in window) {
             try {
                 const registration = await navigator.serviceWorker.ready;
                 await registration.sync.register('sync-labor-registration');
-                console.log('Manual sync registered successfully.');
                 alert('You are offline. Sync request sent and will be processed when a network connection is available.');
             } catch (error) {
                 console.error('Failed to register background sync:', error);
                 alert('Failed to start sync. Please check your network connection and try again.');
             }
         } else {
-            alert('Your browser does not support background sync. Please stay on this page to submit your forms when you reconnect to the internet.');
+            alert('Your browser does not support background sync. Data is saved locally, but will not auto-sync.');
         }
     }
 
-    // Reset button state and update UI
     syncButton.innerHTML = originalText;
     syncButton.disabled = false;
     updateSyncStatusUI();
-
-    if ('serviceWorker' in navigator && 'SyncManager' in window) {
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            await registration.sync.register('sync-labor-registration');
-            console.log('Manual sync registered successfully.');
-            alert('Sync request sent! Your data will be submitted when a network connection is available.');
-            // Re-enable the button but don't clear the banner, as sync might take time
-            syncButton.innerHTML = originalText;
-            syncButton.disabled = false;
-        } catch (error) {
-            console.error('Failed to register background sync:', error);
-            alert('Failed to start sync. Please check your network connection and try again.');
-            syncButton.innerHTML = originalText;
-            syncButton.disabled = false;
-        }
-    } else {
-        alert('Your browser does not support background sync. Please stay on this page to submit your forms when you reconnect to the internet.');
-        syncButton.innerHTML = originalText;
-        syncButton.disabled = false;
-    }
 }
-
 
 // --- Load Data from IndexedDB (Pre-fill Forms) ---
 async function loadStep1Data() {
