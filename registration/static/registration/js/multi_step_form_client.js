@@ -565,7 +565,7 @@ async function clearCurrentRegistrationAndImage() {
 }
 
 async function sendRegistrationToServer(fullRegistrationData) {
-    try {
+    // try {
         const formData = new FormData();
 console.log('Preparing to send registration data to server:', fullRegistrationData);
 
@@ -630,10 +630,10 @@ console.log('10');
             return false;
         }
         
-    } catch (error) {
-        console.error('Error sending registration to server:', error);
-        return false;
-    }
+    // } catch (error) {
+    //     console.error('Error sending registration to server:', error);
+    //     return false;
+    // }
 }
 
 function getCookie(name) {
