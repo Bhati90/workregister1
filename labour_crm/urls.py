@@ -29,10 +29,10 @@ urlpatterns = [
     #  path('.*/registration-success/', registration_views.success_view, name='registration_success'),
 
     # A root URL that redirects to the registration home page, or just serves the home page.
-    # path('', registration_views.home_view, name='root'),
+    path('', registration_views.home_view, name='root'),
 
     # A catch-all for development if you have a separate offline page.
-    # path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline_page'),
+    path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline_page'),
 ]
 
 
