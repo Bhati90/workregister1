@@ -1,3 +1,5 @@
+
+
 // registration/static/registration/js/serviceworker.js
 
 const CACHE_NAME = 'labor-registration-cache-v1';
