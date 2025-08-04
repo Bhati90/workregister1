@@ -1138,3 +1138,151 @@ window.addEventListener('beforeunload', function() {
         cameraStream.getTracks().forEach(track => track.stop());
     }
 });
+
+async function registerBackgroundSync() {
+    if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('sync-labor-registration');
+            console.log('[Client] Background sync registered successfully');
+        } catch (error) {
+            console.error('[Client] Failed to register background sync:', error);
+        }
+    } else {
+        console.warn('[Client] Background sync not supported');
+    }
+}
+
+// Function to manually trigger sync (useful for testing)
+async function manualSync() {
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            if (registration.active) {
+                registration.active.postMessage({ type: 'SYNC_NOW' });
+                console.log('[Client] Manual sync requested');
+            }
+        } catch (error) {
+            console.error('[Client] Failed to request manual sync:', error);
+        }
+    }
+}
+
+// Function to check online status and trigger sync
+function handleOnlineStatus() {
+    if (navigator.onLine) {
+        console.log('[Client] Back online, registering sync');
+        registerBackgroundSync();
+    } else {
+        console.log('[Client] Gone offline');
+    }
+}
+
+// Add event listeners for online/offline events
+window.addEventListener('online', handleOnlineStatus);
+window.addEventListener('offline', handleOnlineStatus);
+
+// Modified function to store data offline (add this to your existing offline storage function)
+async function storeRegistrationOffline(registrationData) {
+    try {
+        // Your existing IndexedDB storage code here...
+        // After successfully storing the data, register background sync
+        
+        console.log('[Client] Data stored offline, registering background sync');
+        await registerBackgroundSync();
+        
+        // Show user feedback
+        showOfflineMessage();
+        
+    } catch (error) {
+        console.error('[Client] Failed to store data offline:', error);
+        throw error;
+    }
+}
+
+// Function to show offline message to user
+function showOfflineMessage() {
+    // Create or update a user-visible message
+    const message = document.createElement('div');
+    message.className = 'alert alert-info offline-message';
+    message.innerHTML = `
+        <i class="fas fa-wifi"></i>
+        <strong>Stored Offline:</strong> Your registration has been saved and will be submitted automatically when you're back online.
+        <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="manualSync()">
+            Try Sync Now
+        </button>
+    `;
+    
+    // Add to top of form or wherever appropriate
+    const formContainer = document.querySelector('.form-container') || document.body;
+    formContainer.insertBefore(message, formContainer.firstChild);
+    
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+        if (message.parentNode) {
+            message.parentNode.removeChild(message);
+        }
+    }, 10000);
+}
+
+// Function to check for pending registrations and show status
+async function checkPendingRegistrations() {
+    if (!('indexedDB' in window)) return;
+    
+    try {
+        const { openDB } = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
+        const db = await openDB('LaborRegistrationDB', 2);
+        const tx = db.transaction('pending_registrations', 'readonly');
+        const store = tx.objectStore('pending_registrations');
+        const count = await store.count();
+        
+        if (count > 0) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'alert alert-warning pending-status';
+            statusDiv.innerHTML = `
+                <i class="fas fa-clock"></i>
+                <strong>Pending Submissions:</strong> You have ${count} registration(s) waiting to be submitted.
+                ${navigator.onLine ? 
+                    '<button type="button" class="btn btn-sm btn-primary ms-2" onclick="manualSync()">Sync Now</button>' : 
+                    'Will sync when online.'
+                }
+            `;
+            
+            document.body.insertBefore(statusDiv, document.body.firstChild);
+        }
+        
+    } catch (error) {
+        console.error('[Client] Failed to check pending registrations:', error);
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Check for pending registrations
+    checkPendingRegistrations();
+    
+    // Register sync if online
+    if (navigator.onLine) {
+        registerBackgroundSync();
+    }
+});
+
+// Listen for successful sync notifications from service worker
+navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SYNC_COMPLETE') {
+        // Remove any offline/pending messages
+        const offlineMessages = document.querySelectorAll('.offline-message, .pending-status');
+        offlineMessages.forEach(msg => msg.remove());
+        
+        // Show success message
+        const successMsg = document.createElement('div');
+        successMsg.className = 'alert alert-success';
+        successMsg.innerHTML = `
+            <i class="fas fa-check-circle"></i>
+            <strong>Success:</strong> Your offline registrations have been submitted!
+        `;
+        document.body.insertBefore(successMsg, document.body.firstChild);
+        
+        setTimeout(() => successMsg.remove(), 5000);
+    }
+});
