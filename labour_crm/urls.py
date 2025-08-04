@@ -26,7 +26,7 @@ urlpatterns = [
     
     path('register/', include('registration.urls')),
      path('', include('pwa.urls')),  
-     path('.*/registration-success/', registration_views.success_view, name='registration_success'),
+    #  path('.*/registration-success/', registration_views.success_view, name='registration_success'),
 
     # A root URL that redirects to the registration home page, or just serves the home page.
     path('', registration_views.home_view, name='root'),

@@ -12,7 +12,7 @@ const urlsToCache = [
     '/register/?step=1', // Explicitly cache query parameters if they define pages
     '/register/?step=2',
     '/register/?step=3',
-    '/registration-success/', // The success page URL as used in the client-side JS
+    '/success/', // The success page URL as used in the client-side JS
     '/offline.html', // Your offline fallback page
 
     // Static assets used by your templates

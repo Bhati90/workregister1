@@ -523,19 +523,19 @@ async function submitFullRegistration() {
             if (success) {
                 await clearCurrentRegistrationAndImage();
                 alert('Registration submitted successfully!');
-                window.location.href = '/registration-success/';
+                window.location.href = '/success/';
             } else {
                 console.log('Immediate online submission failed, saving for background sync.');
                 await saveForBackgroundSync(fullRegistrationData);
                 alert('Submission failed, but your data is saved locally and will try to sync when you are online.');
                 // Use a proper redirect to the success page to show the user the process is done
-                window.location.href = '/registration-success/';
+                window.location.href = '/success/';
             }
         } catch (error) {
             console.error('Error during online submission attempt:', error);
             await saveForBackgroundSync(fullRegistrationData);
             alert('An unexpected network error occurred. Your data is saved locally and will try to sync when you are back online.');
-            window.location.href = '/registration-success/';
+            window.location.href = '/success/';
         }
     } else {
         console.log('Offline, saving for background sync.');
@@ -548,7 +548,7 @@ async function submitFullRegistration() {
             alert('You are offline, and background sync is not fully supported by your browser. Your data is saved locally, but might be lost if you clear browser data before coming online.');
         }
         await clearCurrentRegistrationAndImage();
-        window.location.href = '/registration-success/';
+        window.location.href = '/success/';
     }
 }
 
