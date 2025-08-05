@@ -31,12 +31,12 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'django.contrib.staticfiles',
     'corsheaders',
     # 'authentication', 
     #       # PWA support
     'cloudinary',
     'cloudinary_storage',
-    'django.contrib.staticfiles',
     'registration',
     'pwa',  
     'whitenoise',  # For serving static files in production
