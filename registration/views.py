@@ -12,7 +12,7 @@ from django.shortcuts import render, redirect
 from django.views import View
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.core.files.base import ContentFile
 from django.contrib.gis.geos import Point
 from django.core.files.storage import default_storage
