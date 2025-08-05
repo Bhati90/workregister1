@@ -33,7 +33,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
-    # 'authentication',       # PWA support
+    # 'authentication', 
+    #       # PWA support
+    'cloudinary',
+    'cloudinary_storage',
+    'django.contrib.staticfiles',
     'registration',
     'pwa',  
     'whitenoise',  # For serving static files in production
@@ -167,6 +171,14 @@ PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'regi
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = True
 
+# --- Cloudinary Storage Configuration ---
+CLOUDINARY_STORAGE = {
+    'CLOUDINARY_URL': 'cloudinary://123456789012345:abcDeFgHiJkLmNoPqRsTuVwXyZ@my_cloud_name',
+    # It's recommended to store this URL in an environment variable for security
+}
+
+# Set Cloudinary as the default file storage
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # from pathlib import Path
 # import os

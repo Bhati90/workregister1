@@ -310,6 +310,10 @@ def submit_registration_api(request):
         elif photo_base64:
             # This handles the offline sync where we get a base64 string
             try:
+                data = ContentFile(base64.b64decode(imgstr), name=filename)
+    
+    # You send the prepared file to the *EXACT SAME* Cloudinary "printer".
+                instance.photo.save(filename, data, save=True)
                 # The string will be in the format 'data:image/jpeg;base64,L2...=='
                 # We need to strip the header and decode the rest
                 format, imgstr = photo_base64.split(';base64,')
