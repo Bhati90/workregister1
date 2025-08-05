@@ -173,7 +173,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 # --- Cloudinary Storage Configuration ---
 CLOUDINARY_STORAGE = {
-    'CLOUDINARY_URL': 'cloudinary://123456789012345:abcDeFgHiJkLmNoPqRsTuVwXyZ@my_cloud_name',
+    'CLOUDINARY_URL':'cloudinary://196762722111821:nKpyWbKl0UAdaqgkjI9W0HpQkR4@df8f5bxfp'
     # It's recommended to store this URL in an environment variable for security
 }
 
