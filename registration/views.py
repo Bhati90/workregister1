@@ -253,7 +253,7 @@ def submit_registration_api(request):
                 clean_mobile = clean_mobile[-10:]  # Take last 10 digits
                 
                 # Check for existing registration
-                existing_registration = LaborRegistration.objects.filter(
+                existing_registration = Transport.objects.filter(
                     mobile_number__icontains=clean_mobile
                 ).first()
                 
@@ -267,7 +267,7 @@ def submit_registration_api(request):
                     }, status=400)
         
         # Create new registration instance
-        registration = LaborRegistration()
+        registration = Transport()
         
         # Handle image upload - Priority system for offline sync compatibility
         photo_file = None
@@ -527,12 +527,12 @@ def check_mobile_number_api(request):
         clean_mobile = clean_mobile[-10:]
         
         # Check if this mobile number exists in the database
-        exists = LaborRegistration.objects.filter(
+        exists = Transport.objects.filter(
             mobile_number__icontains=clean_mobile
         ).exists()
         
         if exists:
-            existing_reg = LaborRegistration.objects.filter(
+            existing_reg = Transport.objects.filter(
                 mobile_number__icontains=clean_mobile
             ).first()
             
