@@ -2,6 +2,7 @@
 
 import base64
 import uuid
+import time
 import json
 import logging
 from decimal import Decimal, InvalidOperation
@@ -11,7 +12,7 @@ from django.shortcuts import render, redirect
 from django.views import View
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.http import require_POST
 from django.core.files.base import ContentFile
 from django.contrib.gis.geos import Point
 from django.core.files.storage import default_storage
@@ -573,20 +574,20 @@ def location_status_api(request):
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
 
 
-# def mobile_number_exists(mobile_number):
-#     """Checks if a mobile number exists in ANY of the registration models."""
-#     # This function is preserved exactly as you had it.
-#     if not mobile_number:
-#         return False
-#     cleaned_number = str(mobile_number).strip().replace('+91', '')
-#     if not cleaned_number.isdigit():
-#         return False
-#     if IndividualLabor.objects.filter(mobile_number__endswith=cleaned_number).exists():
-#         return True
-#     if Mukkadam.objects.filter(mobile_number__endswith=cleaned_number).exists():
-#         return True
-#     if Transport.objects.filter(mobile_number__endswith=cleaned_number).exists():
-#         return True
-#     if Others.objects.filter(mobile_number__endswith=cleaned_number).exists():
-#         return True
-#     return False
+def mobile_number_exists(mobile_number):
+    """Checks if a mobile number exists in ANY of the registration models."""
+    # This function is preserved exactly as you had it.
+    if not mobile_number:
+        return False
+    cleaned_number = str(mobile_number).strip().replace('+91', '')
+    if not cleaned_number.isdigit():
+        return False
+    if IndividualLabor.objects.filter(mobile_number__endswith=cleaned_number).exists():
+        return True
+    if Mukkadam.objects.filter(mobile_number__endswith=cleaned_number).exists():
+        return True
+    if Transport.objects.filter(mobile_number__endswith=cleaned_number).exists():
+        return True
+    if Others.objects.filter(mobile_number__endswith=cleaned_number).exists():
+        return True
+    return False
