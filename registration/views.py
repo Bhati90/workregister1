@@ -1,4 +1,5 @@
 
+
 # registration/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -94,6 +95,41 @@ class MultiStepRegistrationView(View):
 
         return render(request, self.template_name, context)
 
+# NEW API endpoint to check mobile number
+@csrf_exempt
+@require_POST
+def check_mobile_number_api(request):
+    """
+    API endpoint to check if a mobile number already exists in the database.
+    Returns: {"exists": true/false, "message": "..."}
+    """
+    try:
+        data = json.loads(request.body)
+        mobile_number = data.get('mobile_number', '').strip()
+        
+        if not mobile_number:
+            return JsonResponse({'exists': False, 'message': 'No mobile number provided'})
+        
+        # Clean the number (remove +91, spaces, etc.)
+        cleaned_number = mobile_number.replace('+91', '').replace(' ', '').replace('-', '')
+        
+        if not cleaned_number.isdigit() or len(cleaned_number) != 10:
+            return JsonResponse({'exists': False, 'message': 'Invalid mobile number format'})
+        
+        # Check if number exists in any model
+        exists = mobile_number_exists(mobile_number)
+        
+        return JsonResponse({
+            'exists': exists,
+            'message': 'Mobile number already registered' if exists else 'Mobile number available'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'exists': False, 'message': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Error checking mobile number: {e}")
+        return JsonResponse({'exists': False, 'message': 'Server error'}, status=500)
+
 @csrf_exempt
 # @method_decorator(require_POST, name='dispatch')
 @require_POST
@@ -126,6 +162,15 @@ def submit_registration_api(request):
         taluka = request.POST.get('taluka')
         village = request.POST.get('village')
         photo_file = request.FILES.get('photo') # Photo is a file, not text/base64
+
+        # CHECK FOR DUPLICATE MOBILE NUMBER BEFORE PROCESSING
+        if mobile_number_exists(mobile_number):
+            logger.warning(f"Duplicate mobile number attempted: {mobile_number}")
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'This mobile number is already registered. Please use a different number.',
+                'error_type': 'duplicate_mobile'
+            }, status=400)
 
         location_str = request.POST.get('location')
         location_data = {}
@@ -316,62 +361,3 @@ def mobile_number_exists(mobile_number):
         return True
         
     return False
-
-# --- NEW: API view for the optimistic check ---
-@require_GET
-def check_mobile_number(request):
-    """
-    API endpoint to check if a mobile number already exists.
-    Expects a query parameter: ?mobile_number=...
-    """
-    mobile_number = request.GET.get('mobile_number', None)
-    if not mobile_number:
-        return JsonResponse({'error': 'Mobile number not provided'}, status=400)
-
-    exists = mobile_number_exists(mobile_number)
-    return JsonResponse({'exists': exists})
-
-
-# --- FULLY REVISED: API view to handle submissions ---
-class SubmitRegistrationAPI(APIView):
-    """
-    Handles the submission of the multi-step registration form.
-    It routes data to the correct model based on the 'category' field.
-    """
-    parser_classes = [MultiPartParser, FormParser]
-
-    def get_serializer_class(self, category):
-        """Returns the correct serializer class based on the category string."""
-        serializer_map = {
-            'individual_labor': IndividualLaborSerializer,
-            'mukkadam': MukkadamSerializer,
-            'transport': TransportSerializer,
-            'others': OthersSerializer
-        }
-        return serializer_map.get(category)
-
-    def post(self, request, *args, **kwargs):
-        category = request.data.get('category')
-        if not category:
-            return Response({'error': 'Category not provided'}, status=status.HTTP_400_BAD_REQUEST)
-
-        SerializerClass = self.get_serializer_class(category)
-        if not SerializerClass:
-            return Response({'error': f'Invalid category: {category}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = SerializerClass(data=request.data)
-        
-        if serializer.is_valid():
-            mobile_number = serializer.validated_data.get('mobile_number')
-
-            # --- Definitive duplicate check before saving ---
-            if mobile_number_exists(mobile_number):
-                 return Response(
-                    {'error': 'This mobile number is already registered.'}, 
-                    status=status.HTTP_409_CONFLICT
-                )
-            
-            serializer.save()
-            return Response({'message': 'Registration successful'}, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

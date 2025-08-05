@@ -1,25 +1,26 @@
-// File: registration/static/registration/js/multi_step_form_client.js
-// --- FINAL VERSION ---
+// registration/static/registration/js/multi_step_form_client.js
 
 // Import idb library for easier IndexedDB access
 import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
 
-// --- Global variables and DB Constants ---
+// Global variables for camera, photo, and IndexedDB instance
 let cameraStream = null;
-let photoBlob = null;
-let currentFacingMode = 'environment';
+let photoBlob = null; // Store the captured photo as a Blob directly
+let currentFacingMode = 'environment'; // Start with back camera (better for general photos)
 let availableCameras = [];
-let db;
-const DB_NAME = 'LaborRegistrationDB';
-const DB_VERSION = 2;
-const STORE_CURRENT_REGISTRATION = 'current_registration_form';
-const STORE_PENDING_REGISTRATIONS = 'pending_registrations';
-const STORE_OFFLINE_IMAGES = 'offline_images';
 
+// IndexedDB related constants and instance
+let db;
+const DB_NAME = 'LaborRegistrationDB'; // Name of your IndexedDB database
+const DB_VERSION = 2; // IMPORTANT: Increment this version number whenever you change the database schema
+const STORE_CURRENT_REGISTRATION = 'current_registration_form'; // Store for the single ongoing, multi-step form data (draft)
+const STORE_PENDING_REGISTRATIONS = 'pending_registrations'; // Store for completed forms awaiting synchronization
+const STORE_OFFLINE_IMAGES = 'offline_images'; // Store for captured image Blobs
 
 // --- PWA Service Worker Registration ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+        // Register the service worker as a module to allow for import statements
         navigator.serviceWorker.register('/static/registration/js/serviceworker.js', { type: 'module' })
             .then(registration => {
                 console.log('Service Worker registered successfully:', registration.scope);
@@ -30,10 +31,8 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-
 // --- IndexedDB Initialization ---
 async function initDB() {
-    if (db) return;
     db = await openDB(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion, transaction) {
             console.log(`IndexedDB upgrade: oldVersion=${oldVersion}, newVersion=${newVersion}`);
@@ -42,69 +41,75 @@ async function initDB() {
                 db.createObjectStore(STORE_PENDING_REGISTRATIONS, { keyPath: 'id', autoIncrement: true });
                 db.createObjectStore(STORE_OFFLINE_IMAGES, { keyPath: 'id', autoIncrement: true });
             }
+            if (oldVersion < 2) {
+                // Example of schema upgrade: add an index if needed in the future
+                // const pendingStore = transaction.objectStore(STORE_PENDING_REGISTRATIONS);
+                // pendingStore.createIndex('timestamp', 'timestamp');
+            }
         },
     });
     console.log('IndexedDB initialized.');
 }
 
-
-// --- Data Storage/Retrieval Functions (Unchanged) ---
+// --- Data Storage/Retrieval Functions (IndexedDB) ---
 async function saveCurrentRegistrationData(data) {
     if (!db) await initDB();
     const tx = db.transaction(STORE_CURRENT_REGISTRATION, 'readwrite');
-    await tx.objectStore(STORE_CURRENT_REGISTRATION).put({ id: 'current_draft', data: data });
+    const store = tx.objectStore(STORE_CURRENT_REGISTRATION);
+    await store.put({ id: 'current_draft', data: data });
     await tx.done;
+    console.log('Current registration data saved to IndexedDB.');
 }
 
 async function getCurrentRegistrationData() {
     if (!db) await initDB();
-    const record = await db.get(STORE_CURRENT_REGISTRATION, 'current_draft');
+    const tx = db.transaction(STORE_CURRENT_REGISTRATION, 'readonly');
+    const store = tx.objectStore(STORE_CURRENT_REGISTRATION);
+    const record = await store.get('current_draft');
     return record ? record.data : {};
 }
 
 async function getPendingRegistrationsCount() {
     if (!db) await initDB();
-    return await db.count(STORE_PENDING_REGISTRATIONS);
+    const tx = db.transaction(STORE_PENDING_REGISTRATIONS, 'readonly');
+    const store = tx.objectStore(STORE_PENDING_REGISTRATIONS);
+    return await store.count();
 }
 
 async function saveImageBlob(blob, fileName, mimeType) {
     if (!db) await initDB();
-    const imageId = await db.add(STORE_OFFLINE_IMAGES, { image: blob, name: fileName, type: mimeType });
+    const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readwrite');
+    const store = tx.objectStore(STORE_OFFLINE_IMAGES);
+    const imageId = await store.add({ image: blob, name: fileName, type: mimeType });
+    await tx.done;
     console.log('Image Blob saved to IndexedDB with ID:', imageId);
     return imageId;
 }
 
 async function saveForBackgroundSync(fullRegistrationData) {
     if (!db) await initDB();
-    await db.add(STORE_PENDING_REGISTRATIONS, {
+    const tx = db.transaction(STORE_PENDING_REGISTRATIONS, 'readwrite');
+    const store = tx.objectStore(STORE_PENDING_REGISTRATIONS);
+    await store.add({
         data: fullRegistrationData,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        attemptedSync: 0
     });
+    await tx.done;
     console.log('Full registration saved for background sync.');
-    await updateSyncStatusUI();
+    await updateSyncStatusUI(); // Update UI after saving
 }
-
 
 // --- UI Initialization and Event Listeners ---
 document.addEventListener('DOMContentLoaded', async function() {
     await initDB();
-    await updateSyncStatusUI();
+    await updateSyncStatusUI(); // Initial check for pending forms
 
-    const form = document.getElementById('registrationForm');
-    if (!form) return;
-    
-    const currentStepInput = form.querySelector('input[name="step"]');
-    if (!currentStepInput) return;
-    const currentStep = parseInt(currentStepInput.value);
+    const currentStep = parseInt(document.querySelector('input[name="step"]').value);
 
     if (currentStep === 1) {
         initializeCameraAndLocation();
         await loadStep1Data();
-        // --- ADDED: Attach listener for duplicate number check ---
-        const mobileInput = document.querySelector('[name="mobile_number"]');
-        if (mobileInput) {
-            mobileInput.addEventListener('blur', checkMobileNumberExists);
-        }
     } else if (currentStep === 2) {
         await loadStep2Data();
         initializeFormElements();
@@ -114,42 +119,16 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     const prevBtn = document.getElementById('prevStepBtn');
     const nextBtn = document.getElementById('nextStepBtn');
-    if (prevBtn) prevBtn.addEventListener('click', goBack);
-    if (nextBtn) nextBtn.addEventListener('click', handleNextSubmit);
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', goBack);
+    }
+    if (nextBtn) {
+        // IMPORTANT: Attach event listener to the button, not the form submit event directly
+        // The handleNextSubmit will prevent default and control navigation
+        nextBtn.addEventListener('click', handleNextSubmit);
+    }
 });
-
-
-// --- NEW: Function for optimistic duplicate check ---
-async function checkMobileNumberExists() {
-    const mobileInput = document.querySelector('[name="mobile_number"]');
-    const errorDiv = document.getElementById('mobile-number-error');
-    if (!mobileInput || !errorDiv) return;
-
-    const mobileNumber = mobileInput.value.trim();
-
-    // Reset state before checking
-    mobileInput.classList.remove('is-invalid');
-    errorDiv.style.display = 'none';
-
-    if (mobileNumber.length < 10 || !navigator.onLine) {
-        return; // Don't check if offline or number is too short
-    }
-
-    try {
-        const response = await fetch(`/register/api/check-mobile/?mobile_number=${encodeURIComponent(mobileNumber)}`);
-        if (!response.ok) return;
-        
-        const data = await response.json();
-        if (data.exists) {
-            errorDiv.textContent = 'This mobile number is already registered.';
-            errorDiv.style.display = 'block';
-            mobileInput.classList.add('is-invalid');
-        }
-    } catch (error) {
-        console.warn('Could not check mobile number:', error);
-    }
-}
-
 
 // --- Sync Status UI Management ---
 async function updateSyncStatusUI() {
@@ -161,7 +140,7 @@ async function updateSyncStatusUI() {
         container.innerHTML = `
             <div id="sync-banner" class="alert alert-warning d-flex align-items-center justify-content-between p-3 mt-3 shadow">
                 <span>
-                    <i class="fas fa-sync-alt me-2"></i>
+                    <i class="fas fa-exclamation-triangle me-2"></i>
                     <strong>Pending Submissions:</strong> You have ${pendingCount} registration(s) waiting to be submitted.
                 </span>
                 <button id="sync-now-btn" class="btn btn-primary btn-sm">Sync Now</button>
@@ -169,275 +148,81 @@ async function updateSyncStatusUI() {
         `;
         document.getElementById('sync-now-btn').addEventListener('click', syncNowHandler);
     } else {
-        container.innerHTML = '';
+        container.innerHTML = ''; // Clear the banner if no pending submissions
     }
 }
 
-
-// --- REVISED: Manual Sync Handler with detailed feedback ---
 async function syncNowHandler() {
     const syncButton = document.getElementById('sync-now-btn');
     if (!syncButton) return;
 
     const originalText = syncButton.innerHTML;
-    syncButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Syncing...';
+    syncButton.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Syncing...';
     syncButton.disabled = true;
 
-    if (!navigator.onLine) {
-        alert('You are still offline. Please connect to the internet to sync.');
+    const db = await openDB(DB_NAME, DB_VERSION);
+    const pendingRegistrations = await db.getAll(STORE_PENDING_REGISTRATIONS);
+
+    if (pendingRegistrations.length === 0) {
+        alert('No pending registrations to sync!');
+        updateSyncStatusUI();
         syncButton.innerHTML = originalText;
         syncButton.disabled = false;
         return;
     }
 
-    const pendingRegistrations = await db.getAll(STORE_PENDING_REGISTRATIONS);
-    if (pendingRegistrations.length === 0) {
-        alert('No pending registrations to sync!');
-        await updateSyncStatusUI();
-        return;
-    }
+    const isOnline = navigator.onLine;
 
-    let syncedCount = 0, duplicateCount = 0, failedCount = 0;
+    if (isOnline) {
+        console.log('Online, attempting immediate sync of all pending registrations.');
+        let syncedCount = 0;
+        let failedCount = 0;
 
-    for (const reg of pendingRegistrations) {
-        const result = await processAndSendRegistration(reg.data, reg.id);
-        if (result.status === 'success') syncedCount++;
-        else if (result.status === 'duplicate') duplicateCount++;
-        else failedCount++;
-    }
-
-    let alertMessage = 'Sync Complete!\n';
-    if (syncedCount > 0) alertMessage += `\n- Successfully submitted ${syncedCount} registration(s).`;
-    if (duplicateCount > 0) alertMessage += `\n- Cleared ${duplicateCount} duplicate registration(s).`;
-    if (failedCount > 0) alertMessage += `\n- Failed to submit ${failedCount} registration(s). They will be retried automatically later.`;
-    
-    alert(alertMessage);
-
-    syncButton.innerHTML = "Sync Now";
-    syncButton.disabled = false;
-    await updateSyncStatusUI();
-}
-async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
-    try {
-        const formData = new FormData();
-        const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
-        
-        for (const key in allSteps) {
-            if (Object.prototype.hasOwnProperty.call(allSteps, key)) {
-                const value = allSteps[key];
-                if (key !== 'photoId' && key !== 'photoBase64') {
-                    if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
-                        formData.append(key, JSON.stringify(value));
-                    } else if (value !== null && value !== undefined) {
-                        formData.append(key, value);
-                    }
+        for (const reg of pendingRegistrations) {
+            try {
+                // This is the critical line that needs to be updated.
+                const success = await processAndSendRegistration(reg.data, reg.id);
+                if (success) {
+                    syncedCount++;
+                } else {
+                    failedCount++;
                 }
+            } catch (error) {
+                console.error(`Error submitting pending registration ID ${reg.id}:`, error);
+                failedCount++;
             }
         }
 
-        if (allSteps.photoId) {
-            const imageData = await db.get(STORE_OFFLINE_IMAGES, allSteps.photoId);
-            if (imageData?.image) {
-                formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
-            }
+        if (syncedCount > 0) {
+            alert(`Sync complete! Successfully submitted ${syncedCount} registration(s).`);
         }
-
-        const response = await fetch('/register/api/submit-registration/', {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-CSRFToken': getCookie('csrftoken') },
-        });
-
-        const cleanupPending = async () => {
-            if (!dbKey) return;
-            const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
-            await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
-            if (allSteps.photoId) {
-                await tx.objectStore(STORE_OFFLINE_IMAGES).delete(allSteps.photoId);
-            }
-            await tx.done;
-        };
-
-        if (response.ok) {
-            await cleanupPending();
-            return { status: 'success' };
-        } 
-        
-        if (response.status === 409) {
-            await cleanupPending();
-            return { status: 'duplicate' };
+        if (failedCount > 0) {
+            alert(`Warning: Failed to submit ${failedCount} registration(s). They will remain in offline storage.`);
         }
+        updateSyncStatusUI();
 
-        return { status: 'failed' };
-    } catch (error) {
-        console.error('Network error or exception sending registration:', error);
-        return { status: 'failed' };
-    }
-}
-
-// --- REVISED: Main submission logic on final step ---
-async function submitFullRegistration() {
-    const fullRegistrationData = await getCurrentRegistrationData();
-    if (!fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
-        alert('An error occurred. Incomplete data. Please start over.');
-        return;
-    }
-
-    if (navigator.onLine) {
-        const result = await processAndSendRegistration(fullRegistrationData);
-        if (result.status === 'success') {
-            await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft');
-            alert('Registration submitted successfully!');
-            window.location.href = '/register/success/';
-            return;
-        }
-        if (result.status === 'duplicate') {
-            await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft');
-            alert('This mobile number is already registered. This registration has been cancelled.');
-            window.location.href = '/register/registration/';
-            return;
-        }
-    }
-
-    await saveForBackgroundSync(fullRegistrationData);
-    await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft');
-
-    if ('serviceWorker' in navigator && 'SyncManager' in window) {
-        const registration = await navigator.serviceWorker.ready;
-        await registration.sync.register('sync-labor-registration');
-        alert('You are offline. Your registration is saved and will be submitted automatically when you are back online.');
     } else {
-        alert('Your registration is saved locally but cannot be synced automatically. Please use the "Sync Now" button when you are online.');
+        // ... (rest of the offline logic remains the same) ...
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                await registration.sync.register('sync-labor-registration');
+                alert('You are offline. Sync request sent and will be processed when a network connection is available.');
+            } catch (error) {
+                console.error('Failed to register background sync:', error);
+                alert('Failed to start sync. Please check your network connection and try again.');
+            }
+        } else {
+            alert('Your browser does not support background sync. Data is saved locally, but will not auto-sync.');
+        }
     }
-    window.location.href = '/register/success/';
+
+    syncButton.innerHTML = originalText;
+    syncButton.disabled = false;
+    updateSyncStatusUI();
 }
 
-// async function handleNextSubmit(event) {
-//     event.preventDefault();
-
-//     const form = document.getElementById('registrationForm');
-//     const mobileInput = form.querySelector('[name="mobile_number"]');
-//     // Final check before proceeding from step 1
-//     if (parseInt(form.querySelector('input[name="step"]').value) === 1 && mobileInput.classList.contains('is-invalid')) {
-//         alert('The mobile number is already registered. Please use a different number.');
-//         mobileInput.focus();
-//         return;
-//     }
-
-//     /* ... Your existing validation and data saving logic for handleNextSubmit ... */
-//     // The final call in Step 3 to `await submitFullRegistration();` is correct.
-// }
-
-
-// --- REVISED: Main submission logic on final step ---
-// async function submitFullRegistration() {
-//     const fullRegistrationData = await getCurrentRegistrationData();
-//     if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
-//         alert('An error occurred. Incomplete data. Please start over.');
-//         return;
-//     }
-
-//     if (navigator.onLine) {
-//         console.log('Online, attempting immediate submission.');
-//         const result = await processAndSendRegistration(fullRegistrationData);
-
-//         if (result.status === 'success') {
-//             await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft'); // Clear draft
-//             alert('Registration submitted successfully!');
-//             window.location.href = '/register/success/';
-//             return;
-//         }
-        
-//         if (result.status === 'duplicate') {
-//             await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft'); // Clear invalid draft
-//             alert('This mobile number is already registered. This registration has been cancelled.');
-//             window.location.href = '/register/registration/'; // Go back to start
-//             return;
-//         }
-        
-//         console.log('Immediate online submission failed, falling back to background sync.');
-//     }
-
-//     // This block runs if offline OR if the online attempt failed with a network/server error
-//     await saveForBackgroundSync(fullRegistrationData);
-//     await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft'); // Clear draft, data is now in pending queue
-
-//     if ('serviceWorker' in navigator && 'SyncManager' in window) {
-//         const registration = await navigator.serviceWorker.ready;
-//         await registration.sync.register('sync-labor-registration');
-//         alert('You are offline. Your registration is saved and will be submitted automatically when you are back online.');
-//     } else {
-//         alert('Your registration is saved locally but your browser does not support automatic background sync. Please sync manually when you are online.');
-//     }
-//     window.location.href = '/register/success/';
-// }
-
-
-// --- REVISED: Central function to send data to the server ---
-// async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
-//     /**
-//     * @returns {Promise<object>} An object with status: 'success', 'duplicate', or 'failed'.
-//     */
-//     try {
-//         const formData = new FormData();
-//         const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
-        
-//         for (const key in allSteps) {
-//             if (Object.prototype.hasOwnProperty.call(allSteps, key)) {
-//                 const value = allSteps[key];
-//                  if (key !== 'photoId' && key !== 'photoBase64') {
-//                      if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
-//                         formData.append(key, JSON.stringify(value));
-//                     } else if (value !== null && value !== undefined) {
-//                         formData.append(key, value);
-//                     }
-//                 }
-//             }
-//         }
-
-//         if (allSteps.photoId) {
-//             const imageData = await db.get(STORE_OFFLINE_IMAGES, allSteps.photoId);
-//             if (imageData && imageData.image) {
-//                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
-//             }
-//         }
-
-//         const response = await fetch('/register/api/submit-registration/', {
-//             method: 'POST',
-//             body: formData,
-//             headers: { 'X-CSRFToken': getCookie('csrftoken') },
-//         });
-
-//         const cleanupPending = async () => {
-//             if (!dbKey) return;
-//             const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
-//             await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
-//             if (allSteps.photoId) {
-//                 await tx.objectStore(STORE_OFFLINE_IMAGES).delete(allSteps.photoId);
-//             }
-//             await tx.done;
-//         };
-
-//         if (response.ok) {
-//             await cleanupPending();
-//             return { status: 'success' };
-//         } 
-        
-//         if (response.status === 409) {
-//             console.warn('Submission failed: Mobile number is a duplicate. Clearing from device.');
-//             await cleanupPending();
-//             return { status: 'duplicate' };
-//         }
-
-//         return { status: 'failed' };
-
-//     } catch (error) {
-//         console.error('Network error or exception sending registration:', error);
-//         return { status: 'failed' };
-//     }
-// }
-
-// // --- Load Data from IndexedDB (Pre-fill Forms) ---
+// --- Load Data from IndexedDB (Pre-fill Forms) ---
 async function loadStep1Data() {
     const currentRegistration = await getCurrentRegistrationData();
     const step1Data = currentRegistration.step1 || {};
@@ -575,291 +360,284 @@ async function loadStep3Data() {
 }
 
 // // --- Navigation Logic (Updated for IndexedDB) ---
-async function handleNextSubmit(event) {
-    event.preventDefault(); // Prevent default form submission
+// async function handleNextSubmit(event) {
+//     event.preventDefault(); // Prevent default form submission
 
-    const currentStep = parseInt(document.querySelector('input[name="step"]').value);
-    const form = document.getElementById('registrationForm');
-    let isValid = true;
-    let currentRegistration = await getCurrentRegistrationData();
-    let stepData = {};
+//     const currentStep = parseInt(document.querySelector('input[name="step"]').value);
+//     const form = document.getElementById('registrationForm');
+//     let isValid = true;
+//     let currentRegistration = await getCurrentRegistrationData();
+//     let stepData = {};
 
-    function getFieldValue(name) {
-        const element = form.querySelector(`[name="${name}"]`);
-        if (!element) return null;
-        if (element.type === 'checkbox' || element.type === 'radio') {
-            const selected = form.querySelector(`[name="${name}"]:checked`);
-            return selected ? selected.value : ''; // For radio buttons return value, for checkbox, check.
-        }
-        if (element.tagName === 'SELECT') {
-            return element.value;
-        }
-        return element.value.trim();
-    }
+//     function getFieldValue(name) {
+//         const element = form.querySelector(`[name="${name}"]`);
+//         if (!element) return null;
+//         if (element.type === 'checkbox' || element.type === 'radio') {
+//             const selected = form.querySelector(`[name="${name}"]:checked`);
+//             return selected ? selected.value : ''; // For radio buttons return value, for checkbox, check.
+//         }
+//         if (element.tagName === 'SELECT') {
+//             return element.value;
+//         }
+//         return element.value.trim();
+//     }
 
-    function getCheckboxValues(name) {
-        const checkboxes = form.querySelectorAll(`input[name="${name}"]:checked`);
-        return Array.from(checkboxes).map(cb => cb.value);
-    }
+//     function getCheckboxValues(name) {
+//         const checkboxes = form.querySelectorAll(`input[name="${name}"]:checked`);
+//         return Array.from(checkboxes).map(cb => cb.value);
+//     }
 
-    // Clear any previous invalid states
-    form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+//     // Clear any previous invalid states
+//     form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
 
-    if (currentStep === 1) {
-         const mobileInput = form.querySelector('[name="mobile_number"]');
-        if (mobileInput && mobileInput.classList.contains('is-invalid')) {
-            alert('This mobile number is already registered. Please use a different number.');
-            mobileInput.focus();
-            return; // Stop execution
-        }
-        const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
-        requiredFields.forEach(fieldName => {
-            const field = form.querySelector(`[name="${fieldName}"]`);
-            if (field) {
-                if (!getFieldValue(fieldName)) {
-                    field.classList.add('is-invalid');
-                    isValid = false;
-                }
-            }
-        });
+//     if (currentStep === 1) {
+//         const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
+//         requiredFields.forEach(fieldName => {
+//             const field = form.querySelector(`[name="${fieldName}"]`);
+//             if (field) {
+//                 if (!getFieldValue(fieldName)) {
+//                     field.classList.add('is-invalid');
+//                     isValid = false;
+//                 }
+//             }
+//         });
 
-        const capturedPhotoHiddenInput = document.getElementById('captured_photo_hidden');
-        const uploadedPhotoFiles = document.querySelector('input[name="photo"]').files;
+//         const capturedPhotoHiddenInput = document.getElementById('captured_photo_hidden');
+//         const uploadedPhotoFiles = document.querySelector('input[name="photo"]').files;
 
-        if (!capturedPhotoHiddenInput.value && uploadedPhotoFiles.length === 0 && !photoBlob) {
-            if (!confirm('No photo was captured or uploaded. A photo helps with verification and improves your chances of getting work. Do you want to continue without a photo?')) {
-                isValid = false;
-            }
-        } else if (capturedPhotoHiddenInput.value) {
-            const photoConfirmedDiv = document.getElementById('photo-confirmed');
-            const photoPreviewDiv = document.getElementById('photo-preview');
+//         if (!capturedPhotoHiddenInput.value && uploadedPhotoFiles.length === 0 && !photoBlob) {
+//             if (!confirm('No photo was captured or uploaded. A photo helps with verification and improves your chances of getting work. Do you want to continue without a photo?')) {
+//                 isValid = false;
+//             }
+//         } else if (capturedPhotoHiddenInput.value) {
+//             const photoConfirmedDiv = document.getElementById('photo-confirmed');
+//             const photoPreviewDiv = document.getElementById('photo-preview');
 
-            if (photoPreviewDiv.style.display !== 'none' && photoConfirmedDiv.style.display === 'none') {
-                alert('Please confirm your photo by clicking "Use This Photo" or retake it if you\'re not satisfied.');
-                isValid = false;
-                photoPreviewDiv.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
+//             if (photoPreviewDiv.style.display !== 'none' && photoConfirmedDiv.style.display === 'none') {
+//                 alert('Please confirm your photo by clicking "Use This Photo" or retake it if you\'re not satisfied.');
+//                 isValid = false;
+//                 photoPreviewDiv.scrollIntoView({ behavior: 'smooth' });
+//             }
+//         }
 
-        const latitude = document.getElementById('latitude_hidden').value; // Use hidden input values
-        const longitude = document.getElementById('longitude_hidden').value;
-        if (!latitude || !longitude) {
-            if (!confirm('Location was not captured. This may affect service quality. Do you want to continue without location?')) {
-                isValid = false;
-            }
-        }
+//         const latitude = document.getElementById('latitude_hidden').value; // Use hidden input values
+//         const longitude = document.getElementById('longitude_hidden').value;
+//         if (!latitude || !longitude) {
+//             if (!confirm('Location was not captured. This may affect service quality. Do you want to continue without location?')) {
+//                 isValid = false;
+//             }
+//         }
 
-        if (!isValid) {
-            if (!document.querySelector('.is-invalid')) {
-                alert('Please fill in all required fields.'); // Generic alert if no specific invalid field
-            }
-            const firstInvalid = document.querySelector('.is-invalid');
-            if (firstInvalid) {
-                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                firstInvalid.focus();
-            }
-            return; // Stop function execution
-        }
+//         if (!isValid) {
+//             if (!document.querySelector('.is-invalid')) {
+//                 alert('Please fill in all required fields.'); // Generic alert if no specific invalid field
+//             }
+//             const firstInvalid = document.querySelector('.is-invalid');
+//             if (firstInvalid) {
+//                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+//                 firstInvalid.focus();
+//             }
+//             return; // Stop function execution
+//         }
 
-        stepData = {
-            full_name: getFieldValue('full_name'),
-            mobile_number: getFieldValue('mobile_number'),
-            category: getFieldValue('category'),
-            taluka: getFieldValue('taluka'),
-            village: getFieldValue('village'),
-            location: (latitude && longitude) ? {
-                latitude: parseFloat(latitude),
-                longitude: parseFloat(longitude),
-                accuracy: parseFloat(document.getElementById('location_accuracy_hidden').value),
-                timestamp: new Date().toISOString() // Store timestamp
-            } : null,
-            photoId: null, // Will be set if blob is saved
-            photoBase64: null // Will be cleared if photoId is set, or used if no blob
-        };
+//         stepData = {
+//             full_name: getFieldValue('full_name'),
+//             mobile_number: getFieldValue('mobile_number'),
+//             category: getFieldValue('category'),
+//             taluka: getFieldValue('taluka'),
+//             village: getFieldValue('village'),
+//             location: (latitude && longitude) ? {
+//                 latitude: parseFloat(latitude),
+//                 longitude: parseFloat(longitude),
+//                 accuracy: parseFloat(document.getElementById('location_accuracy_hidden').value),
+//                 timestamp: new Date().toISOString() // Store timestamp
+//             } : null,
+//             photoId: null, // Will be set if blob is saved
+//             photoBase64: null // Will be cleared if photoId is set, or used if no blob
+//         };
 
-        let imageId = null;
-        if (photoBlob) {
-            imageId = await saveImageBlob(photoBlob, 'captured_image.jpeg', photoBlob.type);
-            stepData.photoId = imageId;
-            stepData.photoBase64 = null; // Clear base64 if blob is saved
-        } else if (uploadedPhotoFiles.length > 0) {
-            const uploadedFile = uploadedPhotoFiles[0];
-            imageId = await saveImageBlob(uploadedFile, uploadedFile.name, uploadedFile.type);
-            stepData.photoId = imageId;
-            stepData.photoBase64 = null; // Clear base64 if blob is saved
-        } else if (capturedPhotoHiddenInput.value) {
-            // If no blob/uploaded file, but base64 is present (e.g., loaded from IDB)
-            stepData.photoBase64 = capturedPhotoHiddenInput.value;
-        }
+//         let imageId = null;
+//         if (photoBlob) {
+//             imageId = await saveImageBlob(photoBlob, 'captured_image.jpeg', photoBlob.type);
+//             stepData.photoId = imageId;
+//             stepData.photoBase64 = null; // Clear base64 if blob is saved
+//         } else if (uploadedPhotoFiles.length > 0) {
+//             const uploadedFile = uploadedPhotoFiles[0];
+//             imageId = await saveImageBlob(uploadedFile, uploadedFile.name, uploadedFile.type);
+//             stepData.photoId = imageId;
+//             stepData.photoBase64 = null; // Clear base64 if blob is saved
+//         } else if (capturedPhotoHiddenInput.value) {
+//             // If no blob/uploaded file, but base64 is present (e.g., loaded from IDB)
+//             stepData.photoBase64 = capturedPhotoHiddenInput.value;
+//         }
 
-        currentRegistration.step1 = stepData;
-        await saveCurrentRegistrationData(currentRegistration);
+//         currentRegistration.step1 = stepData;
+//         await saveCurrentRegistrationData(currentRegistration);
 
-        // Redirect to next step, passing category in URL for Django's GET view
-        const categoryToPass = stepData.category; // Always use data from current submission for redirection
-        window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
+//         // Redirect to next step, passing category in URL for Django's GET view
+//         const categoryToPass = stepData.category; // Always use data from current submission for redirection
+//         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
 
-    } else if (currentStep === 2) {
-        const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
-        const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
+//     } else if (currentStep === 2) {
+//         const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
+//         const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
 
-        let requiredFields = [];
-        switch(currentCategory) {
-            case 'individual_labor':
-                requiredFields = [
-                    'gender', 'age', 'primary_source_income', 'employment_type',
-                    'willing_to_migrate', 'expected_wage', 'availability'
-                    // adult_men/women are numbers, checked below for > 0
-                ];
-                break;
-            case 'mukkadam':
-                requiredFields = [
-                    'providing_labour_count', 'total_workers_peak', 'expected_charges',
-                    'labour_supply_availability', 'arrange_transport', 'supply_areas'
-                ];
-                break;
-            case 'transport':
-                requiredFields = [
-                    'vehicle_type', 'people_capacity', 'expected_fair',
-                    'availability', 'service_areas'
-                ];
-                break;
-            case 'others':
-                requiredFields = [
-                    'business_name', 'help_description'
-                ];
-                break;
-        }
+//         let requiredFields = [];
+//         switch(currentCategory) {
+//             case 'individual_labor':
+//                 requiredFields = [
+//                     'gender', 'age', 'primary_source_income', 'employment_type',
+//                     'willing_to_migrate', 'expected_wage', 'availability'
+//                     // adult_men/women are numbers, checked below for > 0
+//                 ];
+//                 break;
+//             case 'mukkadam':
+//                 requiredFields = [
+//                     'providing_labour_count', 'total_workers_peak', 'expected_charges',
+//                     'labour_supply_availability', 'arrange_transport', 'supply_areas'
+//                 ];
+//                 break;
+//             case 'transport':
+//                 requiredFields = [
+//                     'vehicle_type', 'people_capacity', 'expected_fair',
+//                     'availability', 'service_areas'
+//                 ];
+//                 break;
+//             case 'others':
+//                 requiredFields = [
+//                     'business_name', 'help_description'
+//                 ];
+//                 break;
+//         }
 
-        requiredFields.forEach(fieldName => {
-            const field = form.querySelector(`[name="${fieldName}"]`);
-            if (field) {
-                let fieldValue = getFieldValue(fieldName);
-                if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
-                    // For numbers, also ensure they are > 0 if required
-                    if (!fieldValue || parseInt(fieldValue) <= 0 || isNaN(parseInt(fieldValue))) {
-                        field.classList.add('is-invalid');
-                        isValid = false;
-                    }
-                } else if (!fieldValue && (field.type !== 'checkbox' || !field.checked)) { // Checkboxes are special
-                    field.classList.add('is-invalid');
-                    isValid = false;
-                }
-            }
-        });
+//         requiredFields.forEach(fieldName => {
+//             const field = form.querySelector(`[name="${fieldName}"]`);
+//             if (field) {
+//                 let fieldValue = getFieldValue(fieldName);
+//                 if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
+//                     // For numbers, also ensure they are > 0 if required
+//                     if (!fieldValue || parseInt(fieldValue) <= 0 || isNaN(parseInt(fieldValue))) {
+//                         field.classList.add('is-invalid');
+//                         isValid = false;
+//                     }
+//                 } else if (!fieldValue && (field.type !== 'checkbox' || !field.checked)) { // Checkboxes are special
+//                     field.classList.add('is-invalid');
+//                     isValid = false;
+//                 }
+//             }
+//         });
 
-        if (currentCategory === 'individual_labor') {
-            const skillCheckboxes = getCheckboxValues('skills');
-            if (skillCheckboxes.length === 0) {
-                if (!confirm('No skills selected. Are you sure you want to continue without specifying any skills?')) {
-                    isValid = false;
-                }
-            }
+//         if (currentCategory === 'individual_labor') {
+//             const skillCheckboxes = getCheckboxValues('skills');
+//             if (skillCheckboxes.length === 0) {
+//                 if (!confirm('No skills selected. Are you sure you want to continue without specifying any skills?')) {
+//                     isValid = false;
+//                 }
+//             }
 
-            const commCheckboxes = getCheckboxValues('communication_preferences');
-            if (commCheckboxes.length === 0) {
-                if (!confirm('No communication preferences selected. Please select at least one way to contact you.')) {
-                    isValid = false;
-                }
-            }
-            // Additional check for adult_men/women fields (optional or mandatory based on your rules)
-            const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
-            const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
-            if (adultMen < 0) {
-                document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid');
-                isValid = false;
-            }
-            if (adultWomen < 0) {
-                document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid');
-                isValid = false;
-            }
+//             const commCheckboxes = getCheckboxValues('communication_preferences');
+//             if (commCheckboxes.length === 0) {
+//                 if (!confirm('No communication preferences selected. Please select at least one way to contact you.')) {
+//                     isValid = false;
+//                 }
+//             }
+//             // Additional check for adult_men/women fields (optional or mandatory based on your rules)
+//             const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
+//             const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
+//             if (adultMen < 0) {
+//                 document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid');
+//                 isValid = false;
+//             }
+//             if (adultWomen < 0) {
+//                 document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid');
+//                 isValid = false;
+//             }
 
-        } else if (currentCategory === 'mukkadam') {
-            const skillCheckboxes = getCheckboxValues('skills');
-            if (skillCheckboxes.length === 0) {
-                if (!confirm('No skills specified for your workers. Are you sure you want to continue?')) {
-                    isValid = false;
-                }
-            }
+//         } else if (currentCategory === 'mukkadam') {
+//             const skillCheckboxes = getCheckboxValues('skills');
+//             if (skillCheckboxes.length === 0) {
+//                 if (!confirm('No skills specified for your workers. Are you sure you want to continue?')) {
+//                     isValid = false;
+//                 }
+//             }
 
-            const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
-            const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
-            if (peakCount < providingCount) {
-                alert('Total workers at peak cannot be less than regular providing labour count.');
-                form.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
-                isValid = false;
-            }
-            // Check 'other' transport if selected
-            const arrangeTransport = getFieldValue('arrange_transport');
-            if (arrangeTransport === 'other') {
-                const arrangeTransportOther = getFieldValue('arrange_transport_other');
-                if (!arrangeTransportOther) {
-                    form.querySelector('[name="arrange_transport_other"]').classList.add('is-invalid');
-                    isValid = false;
-                }
-            }
-        }
+//             const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
+//             const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
+//             if (peakCount < providingCount) {
+//                 alert('Total workers at peak cannot be less than regular providing labour count.');
+//                 form.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
+//                 isValid = false;
+//             }
+//             // Check 'other' transport if selected
+//             const arrangeTransport = getFieldValue('arrange_transport');
+//             if (arrangeTransport === 'other') {
+//                 const arrangeTransportOther = getFieldValue('arrange_transport_other');
+//                 if (!arrangeTransportOther) {
+//                     form.querySelector('[name="arrange_transport_other"]').classList.add('is-invalid');
+//                     isValid = false;
+//                 }
+//             }
+//         }
 
-        if (!isValid) {
-            if (!document.querySelector('.is-invalid')) {
-                alert('Please fill in all required fields correctly.');
-            }
-            const firstInvalid = document.querySelector('.is-invalid');
-            if (firstInvalid) {
-                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                firstInvalid.focus();
-            }
-            return;
-        }
+//         if (!isValid) {
+//             if (!document.querySelector('.is-invalid')) {
+//                 alert('Please fill in all required fields correctly.');
+//             }
+//             const firstInvalid = document.querySelector('.is-invalid');
+//             if (firstInvalid) {
+//                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+//                 firstInvalid.focus();
+//             }
+//             return;
+//         }
 
-        // Collect step 2 data based on category
-        if (currentCategory === 'individual_labor') {
-            stepData = {
-                gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')) || null, primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
-                skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate') === 'yes', expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
-                adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
-                communication_preferences: getCheckboxValues('communication_preferences')
-            };
-        } else if (currentCategory === 'mukkadam') {
-            stepData = {
-                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
-                labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
-                supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
-            };
-        } else if (currentCategory === 'transport') {
-            stepData = {
-                vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
-                availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
-            };
-        } else if (currentCategory === 'others') {
-            stepData = {
-                business_name: getFieldValue('business_name'), help_description: getFieldValue('help_description'),
-            };
-        }
-        currentRegistration.step2 = stepData;
-        await saveCurrentRegistrationData(currentRegistration);
+//         // Collect step 2 data based on category
+//         if (currentCategory === 'individual_labor') {
+//             stepData = {
+//                 gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')) || null, primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
+//                 skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate') === 'yes', expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
+//                 adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
+//                 communication_preferences: getCheckboxValues('communication_preferences')
+//             };
+//         } else if (currentCategory === 'mukkadam') {
+//             stepData = {
+//                 providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
+//                 labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
+//                 supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
+//             };
+//         } else if (currentCategory === 'transport') {
+//             stepData = {
+//                 vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
+//                 availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
+//             };
+//         } else if (currentCategory === 'others') {
+//             stepData = {
+//                 business_name: getFieldValue('business_name'), help_description: getFieldValue('help_description'),
+//             };
+//         }
+//         currentRegistration.step2 = stepData;
+//         await saveCurrentRegistrationData(currentRegistration);
 
-        const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
-        window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
+//         const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
+//         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
 
-    } else if (currentStep === 3) {
-        const agreement = document.querySelector('input[name="data_sharing_agreement"]');
-        if (!agreement.checked) {
-            alert('Please accept the data sharing agreement to proceed.');
-            agreement.focus();
-            return; // Stop function execution
-        }
+//     } else if (currentStep === 3) {
+//         const agreement = document.querySelector('input[name="data_sharing_agreement"]');
+//         if (!agreement.checked) {
+//             alert('Please accept the data sharing agreement to proceed.');
+//             agreement.focus();
+//             return; // Stop function execution
+//         }
 
-        stepData = {
-            data_sharing_agreement: agreement.checked
-        };
-        currentRegistration.step3 = stepData;
-        await saveCurrentRegistrationData(currentRegistration);
+//         stepData = {
+//             data_sharing_agreement: agreement.checked
+//         };
+//         currentRegistration.step3 = stepData;
+//         await saveCurrentRegistrationData(currentRegistration);
 
-        await submitFullRegistration();
-    }
-}
-
+//         await submitFullRegistration();
+//     }
+// }
 
 
 // async function submitFullRegistration() {
@@ -900,17 +678,18 @@ async function handleNextSubmit(event) {
 //     window.location.href = '/register/success/';
 // }
 
-// async function clearCurrentRegistrationAndImage() {
-//     if (!db) await initDB();
-//     const currentRegistration = await getCurrentRegistrationData();
-//     const tx = db.transaction([STORE_CURRENT_REGISTRATION, STORE_OFFLINE_IMAGES], 'readwrite');
-//     await tx.objectStore(STORE_CURRENT_REGISTRATION).delete('current_draft');
-//     if (currentRegistration && currentRegistration.step1 && currentRegistration.step1.photoId) {
-//         await tx.objectStore(STORE_OFFLINE_IMAGES).delete(currentRegistration.step1.photoId);
-//     }
-//     await tx.done;
-//     console.log('Current registration and associated image cleared from IndexedDB.');
-// }
+async function clearCurrentRegistrationAndImage() {
+    if (!db) await initDB();
+    const currentRegistration = await getCurrentRegistrationData();
+    const tx = db.transaction([STORE_CURRENT_REGISTRATION, STORE_OFFLINE_IMAGES], 'readwrite');
+    await tx.objectStore(STORE_CURRENT_REGISTRATION).delete('current_draft');
+    if (currentRegistration && currentRegistration.step1 && currentRegistration.step1.photoId) {
+        await tx.objectStore(STORE_OFFLINE_IMAGES).delete(currentRegistration.step1.photoId);
+    }
+    await tx.done;
+    console.log('Current registration and associated image cleared from IndexedDB.');
+}
+
 
 // async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
 //     /**
@@ -1729,3 +1508,673 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 // multi_step_form_client.js - Complete implementation with background sync
+// registration/static/registration/js/serviceworker.js const CACHE_NAME = 'labor-registration-cache-v1'; const DB_NAME = 'LaborRegistrationDB'; const DB_VERSION = 2; const STORE_PENDING_REGISTRATIONS = 'pending_registrations'; const STORE_OFFLINE_IMAGES = 'offline_images'; const urlsToCac
+
+// Add these functions to your existing multi_step_form_client.js
+
+// Mobile number validation and duplicate check
+async function checkMobileNumberDuplicate(mobileNumber) {
+    try {
+        const response = await fetch('/register/api/check-mobile-number/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                mobile_number: mobileNumber
+            })
+        });
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error checking mobile number:', error);
+        return { exists: false, message: 'Unable to check mobile number' };
+    }
+}
+
+// Function to validate mobile number format
+function validateMobileNumber(number) {
+    const cleaned = number.replace(/[^\d]/g, '');
+    return cleaned.length === 10 && /^[6-9]/.test(cleaned);
+}
+
+// Function to show mobile number error
+function showMobileNumberError(message) {
+    const errorDiv = document.getElementById('mobile-number-error');
+    const mobileInput = document.querySelector('[name="mobile_number"]');
+    
+    if (errorDiv && mobileInput) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        mobileInput.classList.add('is-invalid');
+    }
+}
+
+// Function to clear mobile number error
+function clearMobileNumberError() {
+    const errorDiv = document.getElementById('mobile-number-error');
+    const mobileInput = document.querySelector('[name="mobile_number"]');
+    
+    if (errorDiv && mobileInput) {
+        errorDiv.style.display = 'none';
+        mobileInput.classList.remove('is-invalid');
+    }
+}
+
+// Function to handle mobile number blur event (check for duplicates)
+async function handleMobileNumberBlur(event) {
+    const mobileNumber = event.target.value.trim();
+    
+    if (!mobileNumber) return;
+    
+    // Clear previous errors
+    clearMobileNumberError();
+    
+    // Validate format first
+    if (!validateMobileNumber(mobileNumber)) {
+        showMobileNumberError('Please enter a valid 10-digit mobile number');
+        return;
+    }
+    
+    // Check for duplicate if online
+    if (navigator.onLine) {
+        const loadingSpinner = document.createElement('div');
+        loadingSpinner.innerHTML = '<small class="text-info"><i class="fas fa-spinner fa-spin me-1"></i>Checking availability...</small>';
+        loadingSpinner.id = 'mobile-check-loading';
+        
+        const mobileInput = document.querySelector('[name="mobile_number"]');
+        mobileInput.parentNode.appendChild(loadingSpinner);
+        
+        try {
+            const result = await checkMobileNumberDuplicate(mobileNumber);
+            
+            if (result.exists) {
+                showMobileNumberError('This mobile number is already registered. Please use a different number.');
+                
+                // Show popup for immediate feedback
+                if (confirm('This mobile number is already registered. Would you like to use a different number?')) {
+                    event.target.focus();
+                    event.target.select();
+                }
+            }
+        } catch (error) {
+            console.error('Failed to check mobile number:', error);
+        } finally {
+            const spinner = document.getElementById('mobile-check-loading');
+            if (spinner) spinner.remove();
+        }
+    }
+}
+
+// Function to remove duplicate data from offline storage
+async function removeDuplicateFromOffline(mobileNumber) {
+    try {
+        if (!db) await initDB();
+        
+        const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+        const pendingStore = tx.objectStore(STORE_PENDING_REGISTRATIONS);
+        const imageStore = tx.objectStore(STORE_OFFLINE_IMAGES);
+        
+        const allRegistrations = await pendingStore.getAll();
+        
+        for (const registration of allRegistrations) {
+            const regMobileNumber = registration.data?.step1?.mobile_number;
+            if (regMobileNumber && regMobileNumber.replace(/[^\d]/g, '') === mobileNumber.replace(/[^\d]/g, '')) {
+                // Remove the registration
+                await pendingStore.delete(registration.id);
+                
+                // Remove associated image if exists
+                if (registration.data?.step1?.photoId) {
+                    await imageStore.delete(registration.data.step1.photoId);
+                }
+                
+                console.log(`Removed duplicate registration for mobile number: ${mobileNumber}`);
+            }
+        }
+        
+        await tx.done;
+        await updateSyncStatusUI(); // Update the UI to reflect changes
+        
+    } catch (error) {
+        console.error('Error removing duplicate from offline storage:', error);
+    }
+}
+
+// Updated sync function with duplicate checking
+async function syncSingleRegistrationWithDuplicateCheck(reg, pendingStore, imageStore) {
+    try {
+        const mobileNumber = reg.data?.step1?.mobile_number;
+        
+        // Check for duplicate before syncing if online
+        if (mobileNumber && navigator.onLine) {
+            const duplicateCheck = await checkMobileNumberDuplicate(mobileNumber);
+            if (duplicateCheck.exists) {
+                console.warn(`Duplicate mobile number found during sync: ${mobileNumber}`);
+                
+                // Remove from offline storage
+                await pendingStore.delete(reg.id);
+                if (reg.data?.step1?.photoId) {
+                    await imageStore.delete(reg.data.step1.photoId);
+                }
+                
+                // Show notification about duplicate
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('Duplicate Registration Removed', {
+                        body: `Registration with mobile number ${mobileNumber} was removed as it already exists in database.`,
+                        icon: '/static/images/android-chrome-192x192.png'
+                    });
+                }
+                
+                throw new Error(`Duplicate mobile number: ${mobileNumber}. Registration removed from offline storage.`);
+            }
+        }
+        
+        // Proceed with normal sync if no duplicate
+        return await syncSingleRegistration(reg, pendingStore, imageStore);
+        
+    } catch (error) {
+        throw error;
+    }
+}
+
+// Updated processAndSendRegistration with better image handling
+async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
+    try {
+        // Check for duplicate mobile number first
+        const mobileNumber = fullRegistrationData.step1?.mobile_number;
+        if (mobileNumber && navigator.onLine) {
+            const duplicateCheck = await checkMobileNumberDuplicate(mobileNumber);
+            if (duplicateCheck.exists) {
+                console.warn(`Duplicate mobile number found: ${mobileNumber}`);
+                
+                // Remove from offline storage if dbKey provided
+                if (dbKey) {
+                    await removeDuplicateFromOffline(mobileNumber);
+                }
+                
+                throw new Error(`Mobile number ${mobileNumber} is already registered.`);
+            }
+        }
+        
+        const formData = new FormData();
+        console.log('Preparing to send registration data to server:', fullRegistrationData);
+
+        // Append all fields to FormData (excluding photo-related fields)
+        const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
+        for (const key in allSteps) {
+            if (allSteps.hasOwnProperty(key)) {
+                if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null && key !== 'location')) {
+                    formData.append(key, JSON.stringify(allSteps[key]));
+                } else if (key === 'location' && allSteps[key] !== null) {
+                    formData.append(key, JSON.stringify(allSteps[key]));
+                } else if (key !== 'photoId' && key !== 'photoBase64') {
+                    formData.append(key, allSteps[key]);
+                }
+            }
+        }
+
+        // Handle image with priority: photoId from IndexedDB > photoBase64 fallback
+        let imageAppended = false;
+        
+        if (fullRegistrationData.step1?.photoId) {
+            try {
+                const db = await openDB(DB_NAME, DB_VERSION);
+                const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
+                
+                if (imageData && imageData.image) {
+                    // Ensure we have a valid Blob
+                    let imageBlob = imageData.image;
+                    
+                    // Convert to Blob if it's not already
+                    if (!(imageBlob instanceof Blob)) {
+                        if (typeof imageBlob === 'string' && imageBlob.startsWith('data:')) {
+                            // Convert base64 to Blob
+                            const response = await fetch(imageBlob);
+                            imageBlob = await response.blob();
+                        }
+                    }
+                    
+                    if (imageBlob instanceof Blob) {
+                        formData.append('photo', imageBlob, imageData.name || 'captured_image.jpeg');
+                        imageAppended = true;
+                        console.log(`Image from IndexedDB (ID: ${fullRegistrationData.step1.photoId}) appended successfully`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error retrieving image from IndexedDB:', error);
+            }
+        }
+        
+        // Fallback to base64 if no image was appended from IndexedDB
+        if (!imageAppended && fullRegistrationData.step1?.photoBase64) {
+            try {
+                const response = await fetch(fullRegistrationData.step1.photoBase64);
+                const blob = await response.blob();
+                formData.append('photo', blob, 'captured_image.jpeg');
+                imageAppended = true;
+                console.log('Image from base64 fallback appended successfully');
+            } catch (error) {
+                console.error('Failed to convert base64 to Blob:', error);
+            }
+        }
+        
+        if (!imageAppended) {
+            console.warn('No image was appended to form data');
+        }
+
+        // Debug FormData contents
+        console.log('--- FormData Contents ---');
+        for (const pair of formData.entries()) {
+            if (pair[0] === 'photo') {
+                console.log(`${pair[0]}: [File Blob - ${pair[1].size} bytes, type: ${pair[1].type}]`);
+            } else {
+                console.log(`${pair[0]}: ${pair[1]}`);
+            }
+        }
+        console.log('--- End FormData Contents ---');
+
+        // Send to server
+        const response = await fetch('/register/api/submit-registration/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+        });
+
+        if (response.ok) {
+            console.log('Registration submitted successfully.');
+            
+            // Clean up IndexedDB data if submission was successful
+            if (dbKey) {
+                const db = await openDB(DB_NAME, DB_VERSION);
+                const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+                await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
+                
+                if (fullRegistrationData.step1?.photoId) {
+                    await tx.objectStore(STORE_OFFLINE_IMAGES).delete(fullRegistrationData.step1.photoId);
+                    console.log(`Image ID ${fullRegistrationData.step1.photoId} removed from IndexedDB`);
+                }
+                
+                await tx.done;
+                console.log(`Registration ID ${dbKey} cleaned up from IndexedDB`);
+            }
+            
+            return true;
+        } else {
+            const errorResponse = await response.json();
+            console.error('Server rejected submission:', response.status, errorResponse);
+            
+            // Handle duplicate mobile number error from server
+            if (errorResponse.error_type === 'duplicate_mobile') {
+                if (dbKey) {
+                    await removeDuplicateFromOffline(mobileNumber);
+                }
+                throw new Error(errorResponse.message);
+            }
+            
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('Error in processAndSendRegistration:', error);
+        throw error;
+    }
+}
+
+// Updated handleNextSubmit for step 1 with mobile number validation
+async function handleNextSubmit(event) {
+    event.preventDefault();
+
+    const currentStep = parseInt(document.querySelector('input[name="step"]').value);
+    const form = document.getElementById('registrationForm');
+    let isValid = true;
+    let currentRegistration = await getCurrentRegistrationData();
+    let stepData = {};
+
+    // ... existing helper functions remain the same ...
+
+    // Clear any previous invalid states
+    form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+    if (currentStep === 1) {
+        const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
+        requiredFields.forEach(fieldName => {
+            const field = form.querySelector(`[name="${fieldName}"]`);
+            if (field) {
+                if (!getFieldValue(fieldName)) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                }
+            }
+        });
+
+        // Special validation for mobile number
+        const mobileNumber = getFieldValue('mobile_number');
+        if (mobileNumber) {
+            if (!validateMobileNumber(mobileNumber)) {
+                showMobileNumberError('Please enter a valid 10-digit mobile number');
+                isValid = false;
+            } else if (navigator.onLine) {
+                // Check for duplicate online
+                const duplicateCheck = await checkMobileNumberDuplicate(mobileNumber);
+                if (duplicateCheck.exists) {
+                    showMobileNumberError('This mobile number is already registered. Please use a different number.');
+                    isValid = false;
+                    
+                    // Show popup
+                    setTimeout(() => {
+                        alert('This mobile number is already registered. Please change the number to continue.');
+                        document.querySelector('[name="mobile_number"]').focus();
+                    }, 100);
+                }
+            }
+        }
+
+        const capturedPhotoHiddenInput = document.getElementById('captured_photo_hidden');
+        const uploadedPhotoFiles = document.querySelector('input[name="photo"]').files;
+
+        if (!capturedPhotoHiddenInput.value && uploadedPhotoFiles.length === 0 && !photoBlob) {
+            if (!confirm('No photo was captured or uploaded. A photo helps with verification and improves your chances of getting work. Do you want to continue without a photo?')) {
+                isValid = false;
+            }
+        } else if (capturedPhotoHiddenInput.value) {
+            const photoConfirmedDiv = document.getElementById('photo-confirmed');
+            const photoPreviewDiv = document.getElementById('photo-preview');
+
+            if (photoPreviewDiv.style.display !== 'none' && photoConfirmedDiv.style.display === 'none') {
+                alert('Please confirm your photo by clicking "Use This Photo" or retake it if you\'re not satisfied.');
+                isValid = false;
+                photoPreviewDiv.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        const latitude = document.getElementById('latitude_hidden').value;
+        const longitude = document.getElementById('longitude_hidden').value;
+        if (!latitude || !longitude) {
+            if (!confirm('Location was not captured. This may affect service quality. Do you want to continue without location?')) {
+                isValid = false;
+            }
+        }
+
+        if (!isValid) {
+            const firstInvalid = document.querySelector('.is-invalid');
+            if (firstInvalid) {
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalid.focus();
+            }
+            return;
+        }
+
+        stepData = {
+            full_name: getFieldValue('full_name'),
+            mobile_number: getFieldValue('mobile_number'),
+            category: getFieldValue('category'),
+            taluka: getFieldValue('taluka'),
+            village: getFieldValue('village'),
+            location: (latitude && longitude) ? {
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
+                accuracy: parseFloat(document.getElementById('location_accuracy_hidden').value),
+                timestamp: new Date().toISOString()
+            } : null,
+            photoId: null,
+            photoBase64: null
+        };
+
+        let imageId = null;
+        if (photoBlob) {
+            imageId = await saveImageBlob(photoBlob, 'captured_image.jpeg', photoBlob.type);
+            stepData.photoId = imageId;
+            stepData.photoBase64 = null;
+        } else if (uploadedPhotoFiles.length > 0) {
+            const uploadedFile = uploadedPhotoFiles[0];
+            imageId = await saveImageBlob(uploadedFile, uploadedFile.name, uploadedFile.type);
+            stepData.photoId = imageId;
+            stepData.photoBase64 = null;
+        } else if (capturedPhotoHiddenInput.value) {
+            stepData.photoBase64 = capturedPhotoHiddenInput.value;
+        }
+
+        currentRegistration.step1 = stepData;
+        await saveCurrentRegistrationData(currentRegistration);
+
+        const categoryToPass = stepData.category;
+        window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
+
+    } else if (currentStep === 2) {
+        // ... existing step 2 validation code remains the same ...
+        const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
+        const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
+
+        let requiredFields = [];
+        switch(currentCategory) {
+            case 'individual_labor':
+                requiredFields = [
+                    'gender', 'age', 'primary_source_income', 'employment_type',
+                    'willing_to_migrate', 'expected_wage', 'availability'
+                ];
+                break;
+            case 'mukkadam':
+                requiredFields = [
+                    'providing_labour_count', 'total_workers_peak', 'expected_charges',
+                    'labour_supply_availability', 'arrange_transport', 'supply_areas'
+                ];
+                break;
+            case 'transport':
+                requiredFields = [
+                    'vehicle_type', 'people_capacity', 'expected_fair',
+                    'availability', 'service_areas'
+                ];
+                break;
+            case 'others':
+                requiredFields = [
+                    'business_name', 'help_description'
+                ];
+                break;
+        }
+
+        requiredFields.forEach(fieldName => {
+            const field = form.querySelector(`[name="${fieldName}"]`);
+            if (field) {
+                let fieldValue = getFieldValue(fieldName);
+                if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
+                    if (!fieldValue || parseInt(fieldValue) <= 0 || isNaN(parseInt(fieldValue))) {
+                        field.classList.add('is-invalid');
+                        isValid = false;
+                    }
+                } else if (!fieldValue && (field.type !== 'checkbox' || !field.checked)) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                }
+            }
+        });
+
+        if (currentCategory === 'individual_labor') {
+            const skillCheckboxes = getCheckboxValues('skills');
+            if (skillCheckboxes.length === 0) {
+                if (!confirm('No skills selected. Are you sure you want to continue without specifying any skills?')) {
+                    isValid = false;
+                }
+            }
+
+            const commCheckboxes = getCheckboxValues('communication_preferences');
+            if (commCheckboxes.length === 0) {
+                if (!confirm('No communication preferences selected. Please select at least one way to contact you.')) {
+                    isValid = false;
+                }
+            }
+
+            const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
+            const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
+            if (adultMen < 0) {
+                document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid');
+                isValid = false;
+            }
+            if (adultWomen < 0) {
+                document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid');
+                isValid = false;
+            }
+
+        } else if (currentCategory === 'mukkadam') {
+            const skillCheckboxes = getCheckboxValues('skills');
+            if (skillCheckboxes.length === 0) {
+                if (!confirm('No skills specified for your workers. Are you sure you want to continue?')) {
+                    isValid = false;
+                }
+            }
+
+            const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
+            const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
+            if (peakCount < providingCount) {
+                alert('Total workers at peak cannot be less than regular providing labour count.');
+                form.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
+                isValid = false;
+            }
+
+            const arrangeTransport = getFieldValue('arrange_transport');
+            if (arrangeTransport === 'other') {
+                const arrangeTransportOther = getFieldValue('arrange_transport_other');
+                if (!arrangeTransportOther) {
+                    form.querySelector('[name="arrange_transport_other"]').classList.add('is-invalid');
+                    isValid = false;
+                }
+            }
+        }
+
+        if (!isValid) {
+            const firstInvalid = document.querySelector('.is-invalid');
+            if (firstInvalid) {
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalid.focus();
+            }
+            return;
+        }
+
+        // Collect step 2 data based on category
+        if (currentCategory === 'individual_labor') {
+            stepData = {
+                gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')) || null, primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
+                skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate') === 'yes', expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
+                adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
+                communication_preferences: getCheckboxValues('communication_preferences')
+            };
+        } else if (currentCategory === 'mukkadam') {
+            stepData = {
+                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
+                labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
+                supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
+            };
+        } else if (currentCategory === 'transport') {
+            stepData = {
+                vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
+                availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
+            };
+        } else if (currentCategory === 'others') {
+            stepData = {
+                business_name: getFieldValue('business_name'), help_description: getFieldValue('help_description'),
+            };
+        }
+        currentRegistration.step2 = stepData;
+        await saveCurrentRegistrationData(currentRegistration);
+
+        const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
+        window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
+
+    } else if (currentStep === 3) {
+        const agreement = document.querySelector('input[name="data_sharing_agreement"]');
+        if (!agreement.checked) {
+            alert('Please accept the data sharing agreement to proceed.');
+            agreement.focus();
+            return;
+        }
+
+        stepData = {
+            data_sharing_agreement: agreement.checked
+        };
+        currentRegistration.step3 = stepData;
+        await saveCurrentRegistrationData(currentRegistration);
+
+        await submitFullRegistration();
+    }
+}
+
+// Updated submit full registration with better error handling
+async function submitFullRegistration() {
+    const fullRegistrationData = await getCurrentRegistrationData();
+    if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
+        console.error('Incomplete registration data found for submission. Cannot submit.');
+        alert('An error occurred. Please ensure all steps are completed before submitting.');
+        return;
+    }
+
+    const isOnline = navigator.onLine;
+
+    if (isOnline) {
+        console.log('Online, attempting immediate submission.');
+        try {
+            const success = await processAndSendRegistration(fullRegistrationData);
+            if (success) {
+                await clearCurrentRegistrationAndImage();
+                alert('Registration submitted successfully!');
+                window.location.href = '/register/success/';
+                return;
+            }
+        } catch (error) {
+            if (error.message.includes('already registered')) {
+                alert('This mobile number is already registered in our system. Your offline data has been cleared.');
+                await clearCurrentRegistrationAndImage();
+                window.location.href = '/register/';
+                return;
+            }
+            console.log('Immediate online submission failed, falling back to background sync.');
+        }
+    }
+
+    // Store for offline sync
+    await saveForBackgroundSync(fullRegistrationData);
+    await clearCurrentRegistrationAndImage();
+
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.sync.register('sync-labor-registration');
+        alert('You are offline. Your registration will be submitted when you are back online.');
+    } else {
+        alert('Your data is saved locally. It might be lost if you clear browser data.');
+    }
+    
+    window.location.href = '/register/success/';
+}
+
+// Add event listener for mobile number field
+document.addEventListener('DOMContentLoaded', function() {
+    // ... existing DOMContentLoaded code ...
+    
+    // Add mobile number blur event listener
+    const mobileInput = document.querySelector('[name="mobile_number"]');
+    if (mobileInput) {
+        mobileInput.addEventListener('blur', handleMobileNumberBlur);
+        mobileInput.addEventListener('input', clearMobileNumberError);
+    }
+});
+
+// Helper functions (add these if not already present)
+function getFieldValue(name) {
+    const element = document.querySelector(`[name="${name}"]`);
+    if (!element) return null;
+    if (element.type === 'checkbox' || element.type === 'radio') {
+        const selected = document.querySelector(`[name="${name}"]:checked`);
+        return selected ? selected.value : '';
+    }
+    if (element.tagName === 'SELECT') {
+        return element.value;
+    }
+    return element.value.trim();
+}
+
+function getCheckboxValues(name) {
+    const checkboxes = document.querySelectorAll(`input[name="${name}"]:checked`);
+    return Array.from(checkboxes).map(cb => cb.value);
+}
