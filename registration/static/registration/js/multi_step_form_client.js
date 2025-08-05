@@ -807,7 +807,17 @@ async function handleNextSubmit(event) {
             }
             return;
         }
-
+        // --- NEW LOGIC: Check for duplicate phone numbers before proceeding ---
+        const mobileNumber = getFieldValue('mobile_number');
+        if (navigator.onLine && mobileNumber) {
+            const isDuplicate = await checkPhoneNumberUniqueness(mobileNumber);
+            if (isDuplicate) {
+                alert(`The mobile number ${mobileNumber} is already registered. Please use a different number.`);
+                document.querySelector('[name="mobile_number"]').classList.add('is-invalid');
+                document.querySelector('[name="mobile_number"]').focus();
+                return; // Stop the function here
+            }
+        }
         stepData = {
             full_name: getFieldValue('full_name'), mobile_number: getFieldValue('mobile_number'), category: getFieldValue('category'),
             taluka: getFieldValue('taluka'), village: getFieldValue('village'),

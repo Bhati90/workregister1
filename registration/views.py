@@ -652,7 +652,24 @@ class MultiStepRegistrationView(View):
             return redirect('registration:registration') # Use namespaced URL
 
         return render(request, self.template_name, context)
+@csrf_exempt
+def check_phone_number_api(request):
+    """
+    Provides a lightweight API endpoint for client-side JavaScript to check
+    if a mobile number is already registered across all models.
+    """
+    mobile_number = request.GET.get('mobile_number')
+    if not mobile_number:
+        return JsonResponse({'is_duplicate': False, 'message': 'No phone number provided.'}, status=400)
 
+    is_duplicate = (
+        IndividualLabor.objects.filter(mobile_number=mobile_number).exists() or
+        Mukkadam.objects.filter(mobile_number=mobile_number).exists() or
+        Transport.objects.filter(mobile_number=mobile_number).exists() or
+        Others.objects.filter(mobile_number=mobile_number).exists()
+    )
+
+    return JsonResponse({'is_duplicate': is_duplicate})
 @csrf_exempt
 # @method_decorator(require_POST, name='dispatch')
 @require_POST
@@ -865,15 +882,3 @@ def location_status_api(request):
             return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
 
-@csrf_exempt
-def check_phone_number_api(request):
-    mobile_number = request.GET.get('mobile_number')
-    if not mobile_number:
-        return JsonResponse({'is_duplicate': False, 'message': 'No phone number provided.'}, status=400)
-
-    is_duplicate = (IndividualLabor.objects.filter(mobile_number=mobile_number).exists() or
-                    Mukkadam.objects.filter(mobile_number=mobile_number).exists() or
-                    Transport.objects.filter(mobile_number=mobile_number).exists() or
-                    Others.objects.filter(mobile_number=mobile_number).exists())
-
-    return JsonResponse({'is_duplicate': is_duplicate})
