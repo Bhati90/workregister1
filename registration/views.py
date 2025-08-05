@@ -1,6 +1,10 @@
 
 
 # registration/views.py
+# registration/views.py
+import base64
+import uuid
+from django.core.files.base import ContentFile
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -154,7 +158,8 @@ def submit_registration_api(request):
                 return Decimal(value) if value else None
             except (ValueError, TypeError, InvalidOperation):
                 return None
-
+        photo_file = request.FILES.get('photo')
+        photo_base64 = request.POST.get('photo_base64')
         # Basic Info (Step 1)
         full_name = request.POST.get('full_name')
         mobile_number = request.POST.get('mobile_number')
@@ -302,7 +307,23 @@ def submit_registration_api(request):
             # It already contains the name, size, content_type
             instance.photo.save(photo_file.name, photo_file, save=True)
             logger.info(f"Photo saved for {full_name}.")
+        elif photo_base64:
+            # This handles the offline sync where we get a base64 string
+            try:
+                # The string will be in the format 'data:image/jpeg;base64,L2...=='
+                # We need to strip the header and decode the rest
+                format, imgstr = photo_base64.split(';base64,')
+                ext = format.split('/')[-1]
+                # Generate a unique filename
+                filename = f"{uuid.uuid4().hex}.{ext}"
+                # Decode the base64 string and create a Django ContentFile
+                data = ContentFile(base64.b64decode(imgstr), name=filename)
+                instance.photo.save(filename, data, save=True)
+                logger.info(f"Photo saved from Base64 string for {instance.full_name}.")
+            except Exception as e:
+                logger.error(f"Could not save photo from Base64 string for {instance.full_name}. Error: {e}", exc_info=True)
 
+        # --- END OF MODIFIED PHOTO SAVING LOGIC ---
         logger.info(f"Registration for {full_name} saved successfully to database (PK: {instance.pk}).")
         return JsonResponse({'status': 'success', 'message': 'Registration processed and saved.'}, status=200)
 

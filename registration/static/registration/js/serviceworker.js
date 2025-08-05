@@ -29,6 +29,20 @@ const urlsToCache = [
 // Import idb at the top level (cached version)
 let idbModule = null;
 
+/**
+ * Converts a Blob to a Base64 string.
+ * @param {Blob} blob The blob to convert.
+ * @returns {Promise<string>} A promise that resolves with the Base64 string.
+ */
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
 async function getIDB() {
     if (!idbModule) {
         try {
@@ -238,7 +252,34 @@ async function syncSingleRegistration(reg, pendingStore, imageStore) {
             console.warn('[Service Worker] Failed to convert base64 to Blob for sync:', e);
         }
     }
-    
+
+       let imageAppended = false;
+    // Try to get image from IndexedDB using photoId
+    if (step1Data.photoId) {
+        try {
+            const imageData = await imageStore.get(step1Data.photoId);
+            if (imageData && imageData.image) {
+                const imageBlob = imageData.image;
+                // NEW: Convert the blob to a Base64 string
+                const base64String = await blobToBase64(imageBlob);
+                // NEW: Append the base64 string as a text field
+                formData.append('photo_base64', base64String);
+                imageAppended = true;
+                console.log(`[Service Worker] Image (ID: ${step1Data.photoId}) successfully converted to Base64 and appended.`);
+            }
+        } catch (error) {
+            console.error(`[Service Worker] Error processing image ID ${step1Data.photoId}:`, error);
+        }
+    }
+
+    // Fallback to existing base64 string if photoId method fails
+    if (!imageAppended && step1Data.photoBase64) {
+        formData.append('photo_base64', step1Data.photoBase64);
+       console.log('[Service Worker] Appending existing photoBase64 from draft.');
+    }
+
+    // --- END OF MODIFIED IMAGE HANDLING ---
+
     // Append step 2 data
     for (const key in step2Data) {
         if (step2Data.hasOwnProperty(key)) {
