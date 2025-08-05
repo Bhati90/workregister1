@@ -924,6 +924,109 @@ async function clearCurrentRegistrationAndImage() {
 //         return false;
 //     }
 // }
+// async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
+//     /**
+//      * Prepares and sends a single registration to the server.
+//      * If a dbKey is provided, it will clean up the corresponding data from IndexedDB on success.
+//      *
+//      * @param {object} fullRegistrationData - The complete registration object to be submitted.
+//      * @param {string|number|null} dbKey - The key of the record in IndexedDB, if applicable.
+//      * @returns {Promise<boolean>} - True if submission was successful, false otherwise.
+//      */
+//     try {
+//         const formData = new FormData();
+//         console.log('Preparing to send registration data to server:', fullRegistrationData);
+
+//         // Append Step 1 data
+//         if (fullRegistrationData.step1) {
+//             for (const key in fullRegistrationData.step1) {
+//                 if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
+//                     formData.append(key, fullRegistrationData.step1[key]);
+//                 }
+//             }
+//         }
+
+//         // Append location data as JSON string
+//         if (fullRegistrationData.step1 && fullRegistrationData.step1.location) {
+//             formData.append('location', JSON.stringify(fullRegistrationData.step1.location));
+//         }
+
+//         // Handle photo from the offline images store using photoId
+//         if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+//             const db = await openDB(DB_NAME, DB_VERSION);
+//             const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
+//             if (imageData && imageData.image) {
+//                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+//             } else {
+//                 console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
+//                 // Note: Consider what to do here. For now, it will submit without a photo.
+//             }
+//         }
+        
+//         // Fallback: Handle photo from base64 if no photoId is present
+//         else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
+//             try {
+//                 const response = await fetch(fullRegistrationData.step1.photoBase64);
+//                 const blob = await response.blob();
+//                 formData.append('photo', blob, 'captured_image.jpeg');
+//                 console.log('[Client] Appending base64 image to form data.');
+//             } catch (e) {
+//                 console.warn('[Client] Failed to convert base64 to Blob for sync:', e);
+//             }
+//         }
+
+//         // Append Step 2 data
+//         if (fullRegistrationData.step2) {
+//             for (const key in fullRegistrationData.step2) {
+//                 if (fullRegistrationData.step2.hasOwnProperty(key)) {
+//                     // Stringify arrays and objects (like skills, comm_preferences)
+//                     if (Array.isArray(fullRegistrationData.step2[key]) || (typeof fullRegistrationData.step2[key] === 'object' && fullRegistrationData.step2[key] !== null)) {
+//                         formData.append(key, JSON.stringify(fullRegistrationData.step2[key]));
+//                     } else {
+//                         formData.append(key, fullRegistrationData.step2[key]);
+//                     }
+//                 }
+//             }
+//         }
+
+//         // Append Step 3 data
+//         if (fullRegistrationData.step3) {
+//             formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
+//         }
+
+//         const response = await fetch('/register/api/submit-registration/', {
+//             method: 'POST',
+//             body: formData,
+//             headers: {
+//                 'X-CSRFToken': getCookie('csrftoken'),
+//             },
+//         });
+
+//         if (response.ok) {
+//             console.log('Registration submitted successfully.');
+//             // Clean up data from IndexedDB if a key was provided
+//             if (dbKey) {
+//                 const db = await openDB(DB_NAME, DB_VERSION);
+//                 const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+//                 await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
+//                 if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+//                     await tx.objectStore(STORE_OFFLINE_IMAGES).delete(fullRegistrationData.step1.photoId);
+//                 }
+//                 await tx.done;
+//                 console.log(`Pending registration ID ${dbKey} and image cleared from IndexedDB.`);
+//             }
+//             return true;
+//         } else {
+//             const errorResponse = await response.json();
+//             console.error('Failed to submit registration:', response.status, errorResponse);
+//             return false;
+//         }
+
+//     } catch (error) {
+//         console.error('Error sending registration to server:', error);
+//         return false;
+//     }
+// }
 async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
     /**
      * Prepares and sends a single registration to the server.
@@ -937,33 +1040,36 @@ async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
         const formData = new FormData();
         console.log('Preparing to send registration data to server:', fullRegistrationData);
 
-        // Append Step 1 data
-        if (fullRegistrationData.step1) {
-            for (const key in fullRegistrationData.step1) {
-                if (fullRegistrationData.step1.hasOwnProperty(key) && key !== 'photoId' && key !== 'photoBase64' && key !== 'location') {
-                    formData.append(key, fullRegistrationData.step1[key]);
+        // --- Step 1: Append all fields to FormData ---
+        // This loop handles both step 1 and step 2 data by iterating through all nested properties.
+        const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
+        for (const key in allSteps) {
+            if (allSteps.hasOwnProperty(key)) {
+                // Handle complex data types like arrays and objects
+                if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null && key !== 'location')) {
+                    formData.append(key, JSON.stringify(allSteps[key]));
+                } else if (key === 'location' && allSteps[key] !== null) {
+                    formData.append(key, JSON.stringify(allSteps[key]));
+                } else if (key !== 'photoId' && key !== 'photoBase64') {
+                    // Append all other simple fields
+                    formData.append(key, allSteps[key]);
                 }
             }
         }
 
-        // Append location data as JSON string
-        if (fullRegistrationData.step1 && fullRegistrationData.step1.location) {
-            formData.append('location', JSON.stringify(fullRegistrationData.step1.location));
-        }
-
-        // Handle photo from the offline images store using photoId
+        // --- Step 2: Handle the Image Separately ---
+        // Prioritize getting the image from the offline store if a photoId exists
         if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
             const db = await openDB(DB_NAME, DB_VERSION);
             const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
             if (imageData && imageData.image) {
                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+                console.log(`[Client] Appending image ID ${fullRegistrationData.step1.photoId} to form data.`);
             } else {
                 console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
-                // Note: Consider what to do here. For now, it will submit without a photo.
             }
         }
-        
-        // Fallback: Handle photo from base64 if no photoId is present
+        // Fallback: If no photoId, check for a base64 string
         else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
             try {
                 const response = await fetch(fullRegistrationData.step1.photoBase64);
@@ -975,25 +1081,18 @@ async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
             }
         }
 
-        // Append Step 2 data
-        if (fullRegistrationData.step2) {
-            for (const key in fullRegistrationData.step2) {
-                if (fullRegistrationData.step2.hasOwnProperty(key)) {
-                    // Stringify arrays and objects (like skills, comm_preferences)
-                    if (Array.isArray(fullRegistrationData.step2[key]) || (typeof fullRegistrationData.step2[key] === 'object' && fullRegistrationData.step2[key] !== null)) {
-                        formData.append(key, JSON.stringify(fullRegistrationData.step2[key]));
-                    } else {
-                        formData.append(key, fullRegistrationData.step2[key]);
-                    }
-                }
+        // --- Step 3: Log FormData for Debugging ---
+        console.log('--- FormData Contents Before Sending ---');
+        for (const pair of formData.entries()) {
+            if (pair[0] === 'photo') {
+                console.log(pair[0] + ': [File Blob]');
+            } else {
+                console.log(pair[0] + ': ' + pair[1]);
             }
         }
+        console.log('--- End FormData Contents ---');
 
-        // Append Step 3 data
-        if (fullRegistrationData.step3) {
-            formData.append('data_sharing_agreement', fullRegistrationData.step3.data_sharing_agreement);
-        }
-
+        // --- Step 4: Perform the Fetch Request ---
         const response = await fetch('/register/api/submit-registration/', {
             method: 'POST',
             body: formData,
@@ -1021,12 +1120,12 @@ async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
             console.error('Failed to submit registration:', response.status, errorResponse);
             return false;
         }
-
     } catch (error) {
         console.error('Error sending registration to server:', error);
         return false;
     }
 }
+
 
 function getCookie(name) {
     let cookieValue = null;
