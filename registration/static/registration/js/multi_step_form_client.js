@@ -455,6 +455,284 @@ async function loadStep3Data() {
 }
 
 // --- Navigation Logic (Updated for IndexedDB) ---
+// async function handleNextSubmit(event) {
+//     event.preventDefault(); // Prevent default form submission
+
+//     const currentStep = parseInt(document.querySelector('input[name="step"]').value);
+//     const form = document.getElementById('registrationForm');
+//     let isValid = true;
+//     let currentRegistration = await getCurrentRegistrationData();
+//     let stepData = {};
+
+//     function getFieldValue(name) {
+//         const element = form.querySelector(`[name="${name}"]`);
+//         if (!element) return null;
+//         if (element.type === 'checkbox' || element.type === 'radio') {
+//             const selected = form.querySelector(`[name="${name}"]:checked`);
+//             return selected ? selected.value : ''; // For radio buttons return value, for checkbox, check.
+//         }
+//         if (element.tagName === 'SELECT') {
+//             return element.value;
+//         }
+//         return element.value.trim();
+//     }
+
+//     function getCheckboxValues(name) {
+//         const checkboxes = form.querySelectorAll(`input[name="${name}"]:checked`);
+//         return Array.from(checkboxes).map(cb => cb.value);
+//     }
+
+//     // Clear any previous invalid states
+//     form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+//     if (currentStep === 1) {
+//         const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
+//         requiredFields.forEach(fieldName => {
+//             const field = form.querySelector(`[name="${fieldName}"]`);
+//             if (field) {
+//                 if (!getFieldValue(fieldName)) {
+//                     field.classList.add('is-invalid');
+//                     isValid = false;
+//                 }
+//             }
+//         });
+
+//         const capturedPhotoHiddenInput = document.getElementById('captured_photo_hidden');
+//         const uploadedPhotoFiles = document.querySelector('input[name="photo"]').files;
+
+//         if (!capturedPhotoHiddenInput.value && uploadedPhotoFiles.length === 0 && !photoBlob) {
+//             if (!confirm('No photo was captured or uploaded. A photo helps with verification and improves your chances of getting work. Do you want to continue without a photo?')) {
+//                 isValid = false;
+//             }
+//         } else if (capturedPhotoHiddenInput.value) {
+//             const photoConfirmedDiv = document.getElementById('photo-confirmed');
+//             const photoPreviewDiv = document.getElementById('photo-preview');
+
+//             if (photoPreviewDiv.style.display !== 'none' && photoConfirmedDiv.style.display === 'none') {
+//                 alert('Please confirm your photo by clicking "Use This Photo" or retake it if you\'re not satisfied.');
+//                 isValid = false;
+//                 photoPreviewDiv.scrollIntoView({ behavior: 'smooth' });
+//             }
+//         }
+
+//         const latitude = document.getElementById('latitude_hidden').value; // Use hidden input values
+//         const longitude = document.getElementById('longitude_hidden').value;
+//         if (!latitude || !longitude) {
+//             if (!confirm('Location was not captured. This may affect service quality. Do you want to continue without location?')) {
+//                 isValid = false;
+//             }
+//         }
+
+//         if (!isValid) {
+//             if (!document.querySelector('.is-invalid')) {
+//                 alert('Please fill in all required fields.'); // Generic alert if no specific invalid field
+//             }
+//             const firstInvalid = document.querySelector('.is-invalid');
+//             if (firstInvalid) {
+//                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+//                 firstInvalid.focus();
+//             }
+//             return; // Stop function execution
+//         }
+
+//         stepData = {
+//             full_name: getFieldValue('full_name'),
+//             mobile_number: getFieldValue('mobile_number'),
+//             category: getFieldValue('category'),
+//             taluka: getFieldValue('taluka'),
+//             village: getFieldValue('village'),
+//             location: (latitude && longitude) ? {
+//                 latitude: parseFloat(latitude),
+//                 longitude: parseFloat(longitude),
+//                 accuracy: parseFloat(document.getElementById('location_accuracy_hidden').value),
+//                 timestamp: new Date().toISOString() // Store timestamp
+//             } : null,
+//             photoId: null, // Will be set if blob is saved
+//             photoBase64: null // Will be cleared if photoId is set, or used if no blob
+//         };
+
+//         let imageId = null;
+//         if (photoBlob) {
+//             imageId = await saveImageBlob(photoBlob, 'captured_image.jpeg', photoBlob.type);
+//             stepData.photoId = imageId;
+//             stepData.photoBase64 = null; // Clear base64 if blob is saved
+//         } else if (uploadedPhotoFiles.length > 0) {
+//             const uploadedFile = uploadedPhotoFiles[0];
+//             imageId = await saveImageBlob(uploadedFile, uploadedFile.name, uploadedFile.type);
+//             stepData.photoId = imageId;
+//             stepData.photoBase64 = null; // Clear base64 if blob is saved
+//         } else if (capturedPhotoHiddenInput.value) {
+//             // If no blob/uploaded file, but base64 is present (e.g., loaded from IDB)
+//             stepData.photoBase64 = capturedPhotoHiddenInput.value;
+//         }
+
+//         currentRegistration.step1 = stepData;
+//         await saveCurrentRegistrationData(currentRegistration);
+
+//         // Redirect to next step, passing category in URL for Django's GET view
+//         const categoryToPass = stepData.category; // Always use data from current submission for redirection
+//         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
+
+//     } else if (currentStep === 2) {
+//         const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
+//         const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
+
+//         let requiredFields = [];
+//         switch(currentCategory) {
+//             case 'individual_labor':
+//                 requiredFields = [
+//                     'gender', 'age', 'primary_source_income', 'employment_type',
+//                     'willing_to_migrate', 'expected_wage', 'availability'
+//                     // adult_men/women are numbers, checked below for > 0
+//                 ];
+//                 break;
+//             case 'mukkadam':
+//                 requiredFields = [
+//                     'providing_labour_count', 'total_workers_peak', 'expected_charges',
+//                     'labour_supply_availability', 'arrange_transport', 'supply_areas'
+//                 ];
+//                 break;
+//             case 'transport':
+//                 requiredFields = [
+//                     'vehicle_type', 'people_capacity', 'expected_fair',
+//                     'availability', 'service_areas'
+//                 ];
+//                 break;
+//             case 'others':
+//                 requiredFields = [
+//                     'business_name', 'help_description'
+//                 ];
+//                 break;
+//         }
+
+//         requiredFields.forEach(fieldName => {
+//             const field = form.querySelector(`[name="${fieldName}"]`);
+//             if (field) {
+//                 let fieldValue = getFieldValue(fieldName);
+//                 if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
+//                     // For numbers, also ensure they are > 0 if required
+//                     if (!fieldValue || parseInt(fieldValue) <= 0 || isNaN(parseInt(fieldValue))) {
+//                         field.classList.add('is-invalid');
+//                         isValid = false;
+//                     }
+//                 } else if (!fieldValue && (field.type !== 'checkbox' || !field.checked)) { // Checkboxes are special
+//                     field.classList.add('is-invalid');
+//                     isValid = false;
+//                 }
+//             }
+//         });
+
+//         if (currentCategory === 'individual_labor') {
+//             const skillCheckboxes = getCheckboxValues('skills');
+//             if (skillCheckboxes.length === 0) {
+//                 if (!confirm('No skills selected. Are you sure you want to continue without specifying any skills?')) {
+//                     isValid = false;
+//                 }
+//             }
+
+//             const commCheckboxes = getCheckboxValues('communication_preferences');
+//             if (commCheckboxes.length === 0) {
+//                 if (!confirm('No communication preferences selected. Please select at least one way to contact you.')) {
+//                     isValid = false;
+//                 }
+//             }
+//             // Additional check for adult_men/women fields (optional or mandatory based on your rules)
+//             const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
+//             const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
+//             if (adultMen < 0) {
+//                 document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid');
+//                 isValid = false;
+//             }
+//             if (adultWomen < 0) {
+//                 document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid');
+//                 isValid = false;
+//             }
+
+//         } else if (currentCategory === 'mukkadam') {
+//             const skillCheckboxes = getCheckboxValues('skills');
+//             if (skillCheckboxes.length === 0) {
+//                 if (!confirm('No skills specified for your workers. Are you sure you want to continue?')) {
+//                     isValid = false;
+//                 }
+//             }
+
+//             const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
+//             const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
+//             if (peakCount < providingCount) {
+//                 alert('Total workers at peak cannot be less than regular providing labour count.');
+//                 form.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
+//                 isValid = false;
+//             }
+//             // Check 'other' transport if selected
+//             const arrangeTransport = getFieldValue('arrange_transport');
+//             if (arrangeTransport === 'other') {
+//                 const arrangeTransportOther = getFieldValue('arrange_transport_other');
+//                 if (!arrangeTransportOther) {
+//                     form.querySelector('[name="arrange_transport_other"]').classList.add('is-invalid');
+//                     isValid = false;
+//                 }
+//             }
+//         }
+
+//         if (!isValid) {
+//             if (!document.querySelector('.is-invalid')) {
+//                 alert('Please fill in all required fields correctly.');
+//             }
+//             const firstInvalid = document.querySelector('.is-invalid');
+//             if (firstInvalid) {
+//                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+//                 firstInvalid.focus();
+//             }
+//             return;
+//         }
+
+//         // Collect step 2 data based on category
+//         if (currentCategory === 'individual_labor') {
+//             stepData = {
+//                 gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')) || null, primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
+//                 skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate') === 'yes', expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
+//                 adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
+//                 communication_preferences: getCheckboxValues('communication_preferences')
+//             };
+//         } else if (currentCategory === 'mukkadam') {
+//             stepData = {
+//                 providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
+//                 labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
+//                 supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
+//             };
+//         } else if (currentCategory === 'transport') {
+//             stepData = {
+//                 vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
+//                 availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
+//             };
+//         } else if (currentCategory === 'others') {
+//             stepData = {
+//                 business_name: getFieldValue('business_name'), help_description: getFieldValue('help_description'),
+//             };
+//         }
+//         currentRegistration.step2 = stepData;
+//         await saveCurrentRegistrationData(currentRegistration);
+
+//         const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
+//         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
+
+//     } else if (currentStep === 3) {
+//         const agreement = document.querySelector('input[name="data_sharing_agreement"]');
+//         if (!agreement.checked) {
+//             alert('Please accept the data sharing agreement to proceed.');
+//             agreement.focus();
+//             return; // Stop function execution
+//         }
+
+//         stepData = {
+//             data_sharing_agreement: agreement.checked
+//         };
+//         currentRegistration.step3 = stepData;
+//         await saveCurrentRegistrationData(currentRegistration);
+
+//         await submitFullRegistration();
+//     }
+// }
 async function handleNextSubmit(event) {
     event.preventDefault(); // Prevent default form submission
 
@@ -469,7 +747,7 @@ async function handleNextSubmit(event) {
         if (!element) return null;
         if (element.type === 'checkbox' || element.type === 'radio') {
             const selected = form.querySelector(`[name="${name}"]:checked`);
-            return selected ? selected.value : ''; // For radio buttons return value, for checkbox, check.
+            return selected ? selected.value : '';
         }
         if (element.tagName === 'SELECT') {
             return element.value;
@@ -482,21 +760,19 @@ async function handleNextSubmit(event) {
         return Array.from(checkboxes).map(cb => cb.value);
     }
 
-    // Clear any previous invalid states
     form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
 
     if (currentStep === 1) {
         const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
         requiredFields.forEach(fieldName => {
             const field = form.querySelector(`[name="${fieldName}"]`);
-            if (field) {
-                if (!getFieldValue(fieldName)) {
-                    field.classList.add('is-invalid');
-                    isValid = false;
-                }
+            if (field && !getFieldValue(fieldName)) {
+                field.classList.add('is-invalid');
+                isValid = false;
             }
         });
-
+        
+        // ... (rest of your Step 1 validation code, unchanged) ...
         const capturedPhotoHiddenInput = document.getElementById('captured_photo_hidden');
         const uploadedPhotoFiles = document.querySelector('input[name="photo"]').files;
 
@@ -515,7 +791,7 @@ async function handleNextSubmit(event) {
             }
         }
 
-        const latitude = document.getElementById('latitude_hidden').value; // Use hidden input values
+        const latitude = document.getElementById('latitude_hidden').value;
         const longitude = document.getElementById('longitude_hidden').value;
         if (!latitude || !longitude) {
             if (!confirm('Location was not captured. This may affect service quality. Do you want to continue without location?')) {
@@ -524,160 +800,6 @@ async function handleNextSubmit(event) {
         }
 
         if (!isValid) {
-            if (!document.querySelector('.is-invalid')) {
-                alert('Please fill in all required fields.'); // Generic alert if no specific invalid field
-            }
-            const firstInvalid = document.querySelector('.is-invalid');
-            if (firstInvalid) {
-                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                firstInvalid.focus();
-            }
-            return; // Stop function execution
-        }
-
-        stepData = {
-            full_name: getFieldValue('full_name'),
-            mobile_number: getFieldValue('mobile_number'),
-            category: getFieldValue('category'),
-            taluka: getFieldValue('taluka'),
-            village: getFieldValue('village'),
-            location: (latitude && longitude) ? {
-                latitude: parseFloat(latitude),
-                longitude: parseFloat(longitude),
-                accuracy: parseFloat(document.getElementById('location_accuracy_hidden').value),
-                timestamp: new Date().toISOString() // Store timestamp
-            } : null,
-            photoId: null, // Will be set if blob is saved
-            photoBase64: null // Will be cleared if photoId is set, or used if no blob
-        };
-
-        let imageId = null;
-        if (photoBlob) {
-            imageId = await saveImageBlob(photoBlob, 'captured_image.jpeg', photoBlob.type);
-            stepData.photoId = imageId;
-            stepData.photoBase64 = null; // Clear base64 if blob is saved
-        } else if (uploadedPhotoFiles.length > 0) {
-            const uploadedFile = uploadedPhotoFiles[0];
-            imageId = await saveImageBlob(uploadedFile, uploadedFile.name, uploadedFile.type);
-            stepData.photoId = imageId;
-            stepData.photoBase64 = null; // Clear base64 if blob is saved
-        } else if (capturedPhotoHiddenInput.value) {
-            // If no blob/uploaded file, but base64 is present (e.g., loaded from IDB)
-            stepData.photoBase64 = capturedPhotoHiddenInput.value;
-        }
-
-        currentRegistration.step1 = stepData;
-        await saveCurrentRegistrationData(currentRegistration);
-
-        // Redirect to next step, passing category in URL for Django's GET view
-        const categoryToPass = stepData.category; // Always use data from current submission for redirection
-        window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
-
-    } else if (currentStep === 2) {
-        const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
-        const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
-
-        let requiredFields = [];
-        switch(currentCategory) {
-            case 'individual_labor':
-                requiredFields = [
-                    'gender', 'age', 'primary_source_income', 'employment_type',
-                    'willing_to_migrate', 'expected_wage', 'availability'
-                    // adult_men/women are numbers, checked below for > 0
-                ];
-                break;
-            case 'mukkadam':
-                requiredFields = [
-                    'providing_labour_count', 'total_workers_peak', 'expected_charges',
-                    'labour_supply_availability', 'arrange_transport', 'supply_areas'
-                ];
-                break;
-            case 'transport':
-                requiredFields = [
-                    'vehicle_type', 'people_capacity', 'expected_fair',
-                    'availability', 'service_areas'
-                ];
-                break;
-            case 'others':
-                requiredFields = [
-                    'business_name', 'help_description'
-                ];
-                break;
-        }
-
-        requiredFields.forEach(fieldName => {
-            const field = form.querySelector(`[name="${fieldName}"]`);
-            if (field) {
-                let fieldValue = getFieldValue(fieldName);
-                if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
-                    // For numbers, also ensure they are > 0 if required
-                    if (!fieldValue || parseInt(fieldValue) <= 0 || isNaN(parseInt(fieldValue))) {
-                        field.classList.add('is-invalid');
-                        isValid = false;
-                    }
-                } else if (!fieldValue && (field.type !== 'checkbox' || !field.checked)) { // Checkboxes are special
-                    field.classList.add('is-invalid');
-                    isValid = false;
-                }
-            }
-        });
-
-        if (currentCategory === 'individual_labor') {
-            const skillCheckboxes = getCheckboxValues('skills');
-            if (skillCheckboxes.length === 0) {
-                if (!confirm('No skills selected. Are you sure you want to continue without specifying any skills?')) {
-                    isValid = false;
-                }
-            }
-
-            const commCheckboxes = getCheckboxValues('communication_preferences');
-            if (commCheckboxes.length === 0) {
-                if (!confirm('No communication preferences selected. Please select at least one way to contact you.')) {
-                    isValid = false;
-                }
-            }
-            // Additional check for adult_men/women fields (optional or mandatory based on your rules)
-            const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
-            const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
-            if (adultMen < 0) {
-                document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid');
-                isValid = false;
-            }
-            if (adultWomen < 0) {
-                document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid');
-                isValid = false;
-            }
-
-        } else if (currentCategory === 'mukkadam') {
-            const skillCheckboxes = getCheckboxValues('skills');
-            if (skillCheckboxes.length === 0) {
-                if (!confirm('No skills specified for your workers. Are you sure you want to continue?')) {
-                    isValid = false;
-                }
-            }
-
-            const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
-            const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
-            if (peakCount < providingCount) {
-                alert('Total workers at peak cannot be less than regular providing labour count.');
-                form.querySelector('[name="total_workers_peak"]').classList.add('is-invalid');
-                isValid = false;
-            }
-            // Check 'other' transport if selected
-            const arrangeTransport = getFieldValue('arrange_transport');
-            if (arrangeTransport === 'other') {
-                const arrangeTransportOther = getFieldValue('arrange_transport_other');
-                if (!arrangeTransportOther) {
-                    form.querySelector('[name="arrange_transport_other"]').classList.add('is-invalid');
-                    isValid = false;
-                }
-            }
-        }
-
-        if (!isValid) {
-            if (!document.querySelector('.is-invalid')) {
-                alert('Please fill in all required fields correctly.');
-            }
             const firstInvalid = document.querySelector('.is-invalid');
             if (firstInvalid) {
                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -686,33 +808,93 @@ async function handleNextSubmit(event) {
             return;
         }
 
-        // Collect step 2 data based on category
+        stepData = {
+            full_name: getFieldValue('full_name'), mobile_number: getFieldValue('mobile_number'), category: getFieldValue('category'),
+            taluka: getFieldValue('taluka'), village: getFieldValue('village'),
+            location: (latitude && longitude) ? {
+                latitude: parseFloat(latitude), longitude: parseFloat(longitude),
+                accuracy: parseFloat(document.getElementById('location_accuracy_hidden').value),
+                timestamp: new Date().toISOString()
+            } : null,
+            photoId: null, photoBase64: null
+        };
+
+        let imageId = null;
+        if (photoBlob) {
+            imageId = await saveImageBlob(photoBlob, 'captured_image.jpeg', photoBlob.type);
+            stepData.photoId = imageId;
+            stepData.photoBase64 = null;
+        } else if (uploadedPhotoFiles.length > 0) {
+            const uploadedFile = uploadedPhotoFiles[0];
+            imageId = await saveImageBlob(uploadedFile, uploadedFile.name, uploadedFile.type);
+            stepData.photoId = imageId;
+            stepData.photoBase64 = null;
+        } else if (capturedPhotoHiddenInput.value) {
+            stepData.photoBase64 = capturedPhotoHiddenInput.value;
+        }
+
+        currentRegistration.step1 = stepData;
+        await saveCurrentRegistrationData(currentRegistration);
+        const categoryToPass = stepData.category;
+        window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
+
+    } else if (currentStep === 2) {
+        const categoryFromStep1 = currentRegistration.step1 ? currentRegistration.step1.category : '';
+        const currentCategory = document.getElementById('currentCategorySession').value || categoryFromStep1;
+        // ... (rest of your Step 2 validation logic, unchanged) ...
+        let requiredFields = [];
+        switch(currentCategory) {
+            case 'individual_labor': requiredFields = ['gender', 'age', 'primary_source_income', 'employment_type', 'willing_to_migrate', 'expected_wage', 'availability']; break;
+            case 'mukkadam': requiredFields = ['providing_labour_count', 'total_workers_peak', 'expected_charges', 'labour_supply_availability', 'arrange_transport', 'supply_areas']; break;
+            case 'transport': requiredFields = ['vehicle_type', 'people_capacity', 'expected_fair', 'availability', 'service_areas']; break;
+            case 'others': requiredFields = ['business_name', 'help_description']; break;
+        }
+
+        requiredFields.forEach(fieldName => {
+            const field = form.querySelector(`[name="${fieldName}"]`);
+            if (field) {
+                let fieldValue = getFieldValue(fieldName);
+                if (field.type === 'number' && ['age', 'providing_labour_count', 'total_workers_peak', 'people_capacity'].includes(fieldName)) {
+                    if (!fieldValue || parseInt(fieldValue) <= 0 || isNaN(parseInt(fieldValue))) {
+                        field.classList.add('is-invalid'); isValid = false;
+                    }
+                } else if (!fieldValue && (field.type !== 'checkbox' || !field.checked)) {
+                    field.classList.add('is-invalid'); isValid = false;
+                }
+            }
+        });
         if (currentCategory === 'individual_labor') {
-            stepData = {
-                gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')) || null, primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'),
-                skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate') === 'yes', expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'),
-                adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0,
-                communication_preferences: getCheckboxValues('communication_preferences')
-            };
+            const skillCheckboxes = getCheckboxValues('skills'); if (skillCheckboxes.length === 0 && !confirm('No skills selected. Are you sure you want to continue without specifying any skills?')) { isValid = false; }
+            const commCheckboxes = getCheckboxValues('communication_preferences'); if (commCheckboxes.length === 0 && !confirm('No communication preferences selected. Please select at least one way to contact you.')) { isValid = false; }
+            const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
+            const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
+            if (adultMen < 0) { document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid'); isValid = false; }
+            if (adultWomen < 0) { document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid'); isValid = false; }
         } else if (currentCategory === 'mukkadam') {
-            stepData = {
-                providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
-                labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
-                supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
-            };
+            const skillCheckboxes = getCheckboxValues('skills'); if (skillCheckboxes.length === 0 && !confirm('No skills specified for your workers. Are you sure you want to continue?')) { isValid = false; }
+            const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
+            const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
+            if (peakCount < providingCount) { alert('Total workers at peak cannot be less than regular providing labour count.'); form.querySelector('[name="total_workers_peak"]').classList.add('is-invalid'); isValid = false; }
+            const arrangeTransport = getFieldValue('arrange_transport');
+            if (arrangeTransport === 'other' && !getFieldValue('arrange_transport_other')) { form.querySelector('[name="arrange_transport_other"]').classList.add('is-invalid'); isValid = false; }
+        }
+        if (!isValid) {
+            const firstInvalid = document.querySelector('.is-invalid');
+            if (firstInvalid) { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); firstInvalid.focus(); }
+            return;
+        }
+
+        if (currentCategory === 'individual_labor') {
+            stepData = { gender: getFieldValue('gender'), age: parseInt(getFieldValue('age')) || null, primary_source_income: getFieldValue('primary_source_income'), employment_type: getFieldValue('employment_type'), skills: getCheckboxValues('skills'), willing_to_migrate: getFieldValue('willing_to_migrate') === 'yes', expected_wage: getFieldValue('expected_wage'), availability: getFieldValue('availability'), adult_men_seeking_employment: parseInt(getFieldValue('adult_men_seeking_employment')) || 0, adult_women_seeking_employment: parseInt(getFieldValue('adult_women_seeking_employment')) || 0, communication_preferences: getCheckboxValues('communication_preferences') };
+        } else if (currentCategory === 'mukkadam') {
+            stepData = { providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'), labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'), supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills') };
         } else if (currentCategory === 'transport') {
-            stepData = {
-                vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
-                availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas'),
-            };
+            stepData = { vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'), availability: getFieldValue('availability'), service_areas: getFieldValue('service_areas') };
         } else if (currentCategory === 'others') {
-            stepData = {
-                business_name: getFieldValue('business_name'), help_description: getFieldValue('help_description'),
-            };
+            stepData = { business_name: getFieldValue('business_name'), help_description: getFieldValue('help_description') };
         }
         currentRegistration.step2 = stepData;
         await saveCurrentRegistrationData(currentRegistration);
-
         const categoryToPass = currentRegistration.step1 ? currentRegistration.step1.category : '';
         window.location.href = `?step=${currentStep + 1}&current_category_from_db=${encodeURIComponent(categoryToPass)}`;
 
@@ -721,16 +903,47 @@ async function handleNextSubmit(event) {
         if (!agreement.checked) {
             alert('Please accept the data sharing agreement to proceed.');
             agreement.focus();
-            return; // Stop function execution
+            return;
         }
 
-        stepData = {
-            data_sharing_agreement: agreement.checked
-        };
+        // --- NEW LOGIC: Check for duplicate phone numbers before submission ---
+        const mobileNumber = currentRegistration.step1.mobile_number;
+        if (await checkPhoneNumberUniqueness(mobileNumber)) {
+            alert('This mobile number is already registered. You cannot create a new registration with this number.');
+            // Stop and return to step 1 so the user can edit the number
+            window.location.href = `?step=1`;
+            return;
+        }
+
+        stepData = { data_sharing_agreement: agreement.checked };
         currentRegistration.step3 = stepData;
         await saveCurrentRegistrationData(currentRegistration);
 
         await submitFullRegistration();
+    }
+}
+
+async function checkPhoneNumberUniqueness(mobileNumber) {
+    if (!mobileNumber) return false;
+    try {
+        const response = await fetch(`/register/api/check-phone-number/?mobile_number=${encodeURIComponent(mobileNumber)}`, {
+            method: 'GET',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            return data.is_duplicate; // Will be true or false
+        } else {
+            console.error('Error checking phone number uniqueness:', response.status);
+            // In case of error, assume it's not a duplicate to allow submission
+            // and rely on the final backend validation check.
+            return false;
+        }
+    } catch (error) {
+        console.error('Network error during phone number check:', error);
+        // In case of network error, assume not a duplicate to allow offline submission
+        return false;
     }
 }
 
@@ -1027,49 +1240,142 @@ async function clearCurrentRegistrationAndImage() {
 //         return false;
 //     }
 // }
+// async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
+//     /**
+//      * Prepares and sends a single registration to the server.
+//      * If a dbKey is provided, it will clean up the corresponding data from IndexedDB on success.
+//      *
+//      * @param {object} fullRegistrationData - The complete registration object to be submitted.
+//      * @param {string|number|null} dbKey - The key of the record in IndexedDB, if applicable.
+//      * @returns {Promise<boolean>} - True if submission was successful, false otherwise.
+//      */
+//     try {
+//         const formData = new FormData();
+//         console.log('Preparing to send registration data to server:', fullRegistrationData);
+
+//         // --- Step 1: Append all fields to FormData ---
+//         // This loop handles both step 1 and step 2 data by iterating through all nested properties.
+//         const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
+//         for (const key in allSteps) {
+//             if (allSteps.hasOwnProperty(key)) {
+//                 // Handle complex data types like arrays and objects
+//                 if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null && key !== 'location')) {
+//                     formData.append(key, JSON.stringify(allSteps[key]));
+//                 } else if (key === 'location' && allSteps[key] !== null) {
+//                     formData.append(key, JSON.stringify(allSteps[key]));
+//                 } else if (key !== 'photoId' && key !== 'photoBase64') {
+//                     // Append all other simple fields
+//                     formData.append(key, allSteps[key]);
+//                 }
+//             }
+//         }
+
+//         // --- Step 2: Handle the Image Separately ---
+//         // Prioritize getting the image from the offline store if a photoId exists
+//         if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+//             const db = await openDB(DB_NAME, DB_VERSION);
+//             const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
+//             if (imageData && imageData.image) {
+//                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+//                 console.log(`[Client] Appending image ID ${fullRegistrationData.step1.photoId} to form data.`);
+//             } else {
+//                 console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
+//             }
+//         }
+//         // Fallback: If no photoId, check for a base64 string
+//         else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
+//             try {
+//                 const response = await fetch(fullRegistrationData.step1.photoBase64);
+//                 const blob = await response.blob();
+//                 formData.append('photo', blob, 'captured_image.jpeg');
+//                 console.log('[Client] Appending base64 image to form data.');
+//             } catch (e) {
+//                 console.warn('[Client] Failed to convert base64 to Blob for sync:', e);
+//             }
+//         }
+
+//         // --- Step 3: Log FormData for Debugging ---
+//         console.log('--- FormData Contents Before Sending ---');
+//         for (const pair of formData.entries()) {
+//             if (pair[0] === 'photo') {
+//                 console.log(pair[0] + ': [File Blob]');
+//             } else {
+//                 console.log(pair[0] + ': ' + pair[1]);
+//             }
+//         }
+//         console.log('--- End FormData Contents ---');
+
+//         // --- Step 4: Perform the Fetch Request ---
+//         const response = await fetch('/register/api/submit-registration/', {
+//             method: 'POST',
+//             body: formData,
+//             headers: {
+//                 'X-CSRFToken': getCookie('csrftoken'),
+//             },
+//         });
+
+//         if (response.ok) {
+//             console.log('Registration submitted successfully.');
+//             // Clean up data from IndexedDB if a key was provided
+//             if (dbKey) {
+//                 const db = await openDB(DB_NAME, DB_VERSION);
+//                 const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+//                 await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
+//                 if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+//                     await tx.objectStore(STORE_OFFLINE_IMAGES).delete(fullRegistrationData.step1.photoId);
+//                 }
+//                 await tx.done;
+//                 console.log(`Pending registration ID ${dbKey} and image cleared from IndexedDB.`);
+//             }
+//             return true;
+//         } else {
+//             const errorResponse = await response.json();
+//             console.error('Failed to submit registration:', response.status, errorResponse);
+//             return false;
+//         }
+//     } catch (error) {
+//         console.error('Error sending registration to server:', error);
+//         return false;
+//     }
+// }
+// --- Updated processAndSendRegistration (for image sync) ---
 async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
-    /**
-     * Prepares and sends a single registration to the server.
-     * If a dbKey is provided, it will clean up the corresponding data from IndexedDB on success.
-     *
-     * @param {object} fullRegistrationData - The complete registration object to be submitted.
-     * @param {string|number|null} dbKey - The key of the record in IndexedDB, if applicable.
-     * @returns {Promise<boolean>} - True if submission was successful, false otherwise.
-     */
     try {
         const formData = new FormData();
         console.log('Preparing to send registration data to server:', fullRegistrationData);
+        
+        const db = await openDB(DB_NAME, DB_VERSION);
 
-        // --- Step 1: Append all fields to FormData ---
-        // This loop handles both step 1 and step 2 data by iterating through all nested properties.
+        // Append all text-based data from all steps
         const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
         for (const key in allSteps) {
             if (allSteps.hasOwnProperty(key)) {
-                // Handle complex data types like arrays and objects
-                if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null && key !== 'location')) {
+                // Exclude photo-related IDs and raw file objects
+                if (key === 'photoId' || key === 'photoBase64' || key === 'image') {
+                    continue;
+                }
+                if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null)) {
                     formData.append(key, JSON.stringify(allSteps[key]));
-                } else if (key === 'location' && allSteps[key] !== null) {
-                    formData.append(key, JSON.stringify(allSteps[key]));
-                } else if (key !== 'photoId' && key !== 'photoBase64') {
-                    // Append all other simple fields
+                } else {
                     formData.append(key, allSteps[key]);
                 }
             }
         }
 
-        // --- Step 2: Handle the Image Separately ---
-        // Prioritize getting the image from the offline store if a photoId exists
+        // Handle the Image Separately
+        // The most reliable method is to always retrieve the image from IndexedDB
+        // This ensures the image is available even after a page refresh or in the service worker
         if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
-            const db = await openDB(DB_NAME, DB_VERSION);
             const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
             if (imageData && imageData.image) {
+                // The crucial third argument is the filename, which Django needs.
                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
                 console.log(`[Client] Appending image ID ${fullRegistrationData.step1.photoId} to form data.`);
             } else {
                 console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
             }
         }
-        // Fallback: If no photoId, check for a base64 string
+        // Fallback to base64 if no photoId is available (e.g., from older data)
         else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
             try {
                 const response = await fetch(fullRegistrationData.step1.photoBase64);
@@ -1081,31 +1387,20 @@ async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
             }
         }
 
-        // --- Step 3: Log FormData for Debugging ---
         console.log('--- FormData Contents Before Sending ---');
         for (const pair of formData.entries()) {
-            if (pair[0] === 'photo') {
-                console.log(pair[0] + ': [File Blob]');
-            } else {
-                console.log(pair[0] + ': ' + pair[1]);
-            }
+            if (pair[0] === 'photo') { console.log(pair[0] + ': [File Blob]'); }
+            else { console.log(pair[0] + ': ' + pair[1]); }
         }
         console.log('--- End FormData Contents ---');
 
-        // --- Step 4: Perform the Fetch Request ---
         const response = await fetch('/register/api/submit-registration/', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
+            method: 'POST', body: formData, headers: { 'X-CSRFToken': getCookie('csrftoken') },
         });
 
         if (response.ok) {
             console.log('Registration submitted successfully.');
-            // Clean up data from IndexedDB if a key was provided
             if (dbKey) {
-                const db = await openDB(DB_NAME, DB_VERSION);
                 const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
                 await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
                 if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
@@ -1125,80 +1420,6 @@ async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
         return false;
     }
 }
-
-// async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
-//     try {
-//         const formData = new FormData();
-//         const db = await openDB(DB_NAME, DB_VERSION);
-
-//         // Append all text-based data from all steps
-//         const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
-//         for (const key in allSteps) {
-//             if (allSteps.hasOwnProperty(key)) {
-//                 // Exclude photo-related IDs and raw file objects
-//                 if (key === 'photoId' || key === 'photoBase64' || key === 'image') {
-//                     continue;
-//                 }
-                
-//                 // Handle complex data types like arrays and objects
-//                 if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null)) {
-//                     formData.append(key, JSON.stringify(allSteps[key]));
-//                 } else {
-//                     formData.append(key, allSteps[key]);
-//                 }
-//             }
-//         }
-
-//         // Handle the Image Separately
-//         if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
-//             const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
-//             if (imageData && imageData.image) {
-//                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
-//                 console.log(`[Client] Appending image ID ${fullRegistrationData.step1.photoId} to form data.`);
-//             } else {
-//                 console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
-//             }
-//         } else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
-//             try {
-//                 const response = await fetch(fullRegistrationData.step1.photoBase64);
-//                 const blob = await response.blob();
-//                 formData.append('photo', blob, 'captured_image.jpeg');
-//                 console.log('[Client] Appending base64 image to form data.');
-//             } catch (e) {
-//                 console.warn('[Client] Failed to convert base64 to Blob for sync:', e);
-//             }
-//         }
-
-//         const response = await fetch('/register/api/submit-registration/', {
-//             method: 'POST',
-//             body: formData,
-//             headers: {
-//                 'X-CSRFToken': getCookie('csrftoken'),
-//             },
-//         });
-
-//         if (response.ok) {
-//             // Success logic remains the same
-//             if (dbKey) {
-//                 const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
-//                 await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
-//                 if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
-//                     await tx.objectStore(STORE_OFFLINE_IMAGES).delete(fullRegistrationData.step1.photoId);
-//                 }
-//                 await tx.done;
-//             }
-//             return true;
-//         } else {
-//             const errorResponse = await response.json();
-//             console.error('Failed to submit registration:', response.status, errorResponse);
-//             return false;
-//         }
-//     } catch (error) {
-//         console.error('Error sending registration to server:', error);
-//         return false;
-//     }
-// }
-
 
 function getCookie(name) {
     let cookieValue = null;

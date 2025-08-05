@@ -663,25 +663,20 @@ def submit_registration_api(request):
     This replaces the session-based multi-step POST logic.
     """
     logger.info("submit_registration_api received a request.")
-    logger.info("submit_registration_api received a request.")
-    logger.info(f"Received POST data: {request.POST}")
-    logger.info(f"Received FILES data: {request.FILES}")
-
-    # --- ADD THIS CODE FOR DUPLICATE CHECK ---
-    mobile_number = request.POST.get('mobile_number')
-    if mobile_number:
-        # Check if the number exists in any of the registration models
-        if (IndividualLabor.objects.filter(mobile_number=mobile_number).exists() or
-            Mukkadam.objects.filter(mobile_number=mobile_number).exists() or
-            Transport.objects.filter(mobile_number=mobile_number).exists() or
-            Others.objects.filter(mobile_number=mobile_number).exists()):
-            
-            logger.warning(f"Mobile number {mobile_number} is already registered. Rejecting submission.")
-            return JsonResponse({
-                'status': 'error',
-                'message': f'This mobile number ({mobile_number}) is already registered. Please use a different number.'
-            }, status=400)
     try:
+        mobile_number = request.POST.get('mobile_number')
+        if mobile_number:
+            is_duplicate = (IndividualLabor.objects.filter(mobile_number=mobile_number).exists() or
+                            Mukkadam.objects.filter(mobile_number=mobile_number).exists() or
+                            Transport.objects.filter(mobile_number=mobile_number).exists() or
+                            Others.objects.filter(mobile_number=mobile_number).exists())
+            if is_duplicate:
+                 # If a duplicate is found, return an error and stop the process
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'This mobile number ({mobile_number}) is already registered.'
+                }, status=400)
+            
         def safe_int(value):
             try:
                 # Convert to int, return None if empty string or cannot convert
@@ -853,6 +848,7 @@ def home_view(request):
 
 @csrf_exempt
 def location_status_api(request):
+
     # This API endpoint is not directly used by the multi_step_form_client for final submission
     # but was present in your code. Keep it if you have other uses.
     if request.method == 'POST':
@@ -868,3 +864,16 @@ def location_status_api(request):
         except json.JSONDecodeError:
             return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
+@csrf_exempt
+def check_phone_number_api(request):
+    mobile_number = request.GET.get('mobile_number')
+    if not mobile_number:
+        return JsonResponse({'is_duplicate': False, 'message': 'No phone number provided.'}, status=400)
+
+    is_duplicate = (IndividualLabor.objects.filter(mobile_number=mobile_number).exists() or
+                    Mukkadam.objects.filter(mobile_number=mobile_number).exists() or
+                    Transport.objects.filter(mobile_number=mobile_number).exists() or
+                    Others.objects.filter(mobile_number=mobile_number).exists())
+
+    return JsonResponse({'is_duplicate': is_duplicate})
