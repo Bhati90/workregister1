@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import dj_database_url
+import cloudinary
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,7 +25,37 @@ ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 AUTH_USER_MODEL = 'auth.User' 
 
 # Application definition
+# Configure Cloudinary (you already have this, but make sure it's properly set)
+cloudinary.config(
+    cloud_name="df8f5bxfp",  # Your cloud name from the URL
+    api_key="196762722111821",  # Your API key from the URL  
+    api_secret="nKpyWbKl0UAdaqgkjI9W0HpQkR4",  # Your API secret from the URL
+    secure=True
+)
 
+# Optional: Add logging configuration for better debugging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'cloudinary_uploads.log',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'registration.views': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

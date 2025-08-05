@@ -190,10 +190,9 @@ import uuid
 import os
 
 def photo_upload_path(instance, filename):
-    """Generate upload path for captured photos"""
-    ext = filename.split('.')[-1]
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    return f'captured_photos/{filename}'
+      """Generate upload path for photos - this won't be used with Cloudinary URLs but good to keep"""
+      return f'registrations/{instance.category}/{instance.mobile_number}/{filename}'
+
 
 class BaseRegistration(models.Model):
     # First page - Basic Information
@@ -206,8 +205,7 @@ class BaseRegistration(models.Model):
     village = models.CharField(max_length=100)
 
     # Updated photo field for camera capture
-    photo = models.ImageField(upload_to=photo_upload_path, null=True, blank=True)
-
+    photo = models.URLField(max_length=500, null=True, blank=True, help_text="Cloudinary image URL")
     # Location field using PostGIS
     location = gis_models.PointField(
         null=True,
@@ -243,9 +241,14 @@ class BaseRegistration(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"{self.full_name} - {self.mobile_number} ({self.category})"
+    
     class Meta:
-        abstract = True
-
+        verbose_name = "Labor Registration"
+        verbose_name_plural = "Labor Registrations"
+        ordering = ['-created_at']
+        
     def get_location_display(self):
         """Get human-readable location coordinates"""
         if self.location:
