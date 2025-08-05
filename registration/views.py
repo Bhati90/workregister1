@@ -663,6 +663,24 @@ def submit_registration_api(request):
     This replaces the session-based multi-step POST logic.
     """
     logger.info("submit_registration_api received a request.")
+    logger.info("submit_registration_api received a request.")
+    logger.info(f"Received POST data: {request.POST}")
+    logger.info(f"Received FILES data: {request.FILES}")
+
+    # --- ADD THIS CODE FOR DUPLICATE CHECK ---
+    mobile_number = request.POST.get('mobile_number')
+    if mobile_number:
+        # Check if the number exists in any of the registration models
+        if (IndividualLabor.objects.filter(mobile_number=mobile_number).exists() or
+            Mukkadam.objects.filter(mobile_number=mobile_number).exists() or
+            Transport.objects.filter(mobile_number=mobile_number).exists() or
+            Others.objects.filter(mobile_number=mobile_number).exists()):
+            
+            logger.warning(f"Mobile number {mobile_number} is already registered. Rejecting submission.")
+            return JsonResponse({
+                'status': 'error',
+                'message': f'This mobile number ({mobile_number}) is already registered. Please use a different number.'
+            }, status=400)
     try:
         def safe_int(value):
             try:

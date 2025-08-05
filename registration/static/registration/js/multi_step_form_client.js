@@ -1126,6 +1126,79 @@ async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
     }
 }
 
+// async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
+//     try {
+//         const formData = new FormData();
+//         const db = await openDB(DB_NAME, DB_VERSION);
+
+//         // Append all text-based data from all steps
+//         const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
+//         for (const key in allSteps) {
+//             if (allSteps.hasOwnProperty(key)) {
+//                 // Exclude photo-related IDs and raw file objects
+//                 if (key === 'photoId' || key === 'photoBase64' || key === 'image') {
+//                     continue;
+//                 }
+                
+//                 // Handle complex data types like arrays and objects
+//                 if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null)) {
+//                     formData.append(key, JSON.stringify(allSteps[key]));
+//                 } else {
+//                     formData.append(key, allSteps[key]);
+//                 }
+//             }
+//         }
+
+//         // Handle the Image Separately
+//         if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+//             const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
+//             if (imageData && imageData.image) {
+//                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+//                 console.log(`[Client] Appending image ID ${fullRegistrationData.step1.photoId} to form data.`);
+//             } else {
+//                 console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
+//             }
+//         } else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
+//             try {
+//                 const response = await fetch(fullRegistrationData.step1.photoBase64);
+//                 const blob = await response.blob();
+//                 formData.append('photo', blob, 'captured_image.jpeg');
+//                 console.log('[Client] Appending base64 image to form data.');
+//             } catch (e) {
+//                 console.warn('[Client] Failed to convert base64 to Blob for sync:', e);
+//             }
+//         }
+
+//         const response = await fetch('/register/api/submit-registration/', {
+//             method: 'POST',
+//             body: formData,
+//             headers: {
+//                 'X-CSRFToken': getCookie('csrftoken'),
+//             },
+//         });
+
+//         if (response.ok) {
+//             // Success logic remains the same
+//             if (dbKey) {
+//                 const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+//                 await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
+//                 if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+//                     await tx.objectStore(STORE_OFFLINE_IMAGES).delete(fullRegistrationData.step1.photoId);
+//                 }
+//                 await tx.done;
+//             }
+//             return true;
+//         } else {
+//             const errorResponse = await response.json();
+//             console.error('Failed to submit registration:', response.status, errorResponse);
+//             return false;
+//         }
+//     } catch (error) {
+//         console.error('Error sending registration to server:', error);
+//         return false;
+//     }
+// }
+
 
 function getCookie(name) {
     let cookieValue = null;
