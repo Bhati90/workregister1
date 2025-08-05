@@ -1099,6 +1099,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         ...module.exports, // Keep existing exports
         processAndSendRegistration,
+        syncSingleRegistrationWithDuplicateCheck,
         updateSyncStatusUI,
         syncNowHandler,
         checkPendingRegistrations,
