@@ -4,6 +4,9 @@
 # registration/views.py
 import base64
 import uuid
+# registration/views.py
+from django.core.files.storage import default_storage
+# ... your other imports
 from django.core.files.base import ContentFile
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -301,7 +304,15 @@ def submit_registration_api(request):
                 instance.location_timestamp = None
 
         instance.save() # Save the main instance first
-
+        
+        # --- START: NEW DEBUGGING BLOCK ---
+        # --- START: NEW DEBUGGING BLOCK ---
+        print("\n--- RUNTIME STORAGE CHECK ---")
+        print(f"The default_storage object being used is: {default_storage}")
+        print(f"The class of the storage object is: {default_storage.__class__}")
+        print("---------------------------\n")
+    # --- END: NEW DEBUGGING BLOCK ---
+    # --- END: NEW DEBUGGING BLOCK ---
         if photo_file:
             # photo_file is a Django InMemoryUploadedFile or TemporaryUploadedFile
             # It already contains the name, size, content_type
@@ -312,7 +323,7 @@ def submit_registration_api(request):
             try:
                 data = ContentFile(base64.b64decode(imgstr), name=filename)
     
-    # You send the prepared file to the *EXACT SAME* Cloudinary "printer".
+                 # You send the prepared file to the *EXACT SAME* Cloudinary "printer".
                 instance.photo.save(filename, data, save=True)
                 # The string will be in the format 'data:image/jpeg;base64,L2...=='
                 # We need to strip the header and decode the rest
