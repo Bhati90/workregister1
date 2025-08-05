@@ -1,26 +1,25 @@
-// registration/static/registration/js/multi_step_form_client.js
+// File: registration/static/registration/js/multi_step_form_client.js
+// --- FINAL VERSION ---
 
 // Import idb library for easier IndexedDB access
 import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
 
-// Global variables for camera, photo, and IndexedDB instance
+// --- Global variables and DB Constants ---
 let cameraStream = null;
-let photoBlob = null; // Store the captured photo as a Blob directly
-let currentFacingMode = 'environment'; // Start with back camera (better for general photos)
+let photoBlob = null;
+let currentFacingMode = 'environment';
 let availableCameras = [];
-
-// IndexedDB related constants and instance
 let db;
-const DB_NAME = 'LaborRegistrationDB'; // Name of your IndexedDB database
-const DB_VERSION = 2; // IMPORTANT: Increment this version number whenever you change the database schema
-const STORE_CURRENT_REGISTRATION = 'current_registration_form'; // Store for the single ongoing, multi-step form data (draft)
-const STORE_PENDING_REGISTRATIONS = 'pending_registrations'; // Store for completed forms awaiting synchronization
-const STORE_OFFLINE_IMAGES = 'offline_images'; // Store for captured image Blobs
+const DB_NAME = 'LaborRegistrationDB';
+const DB_VERSION = 2;
+const STORE_CURRENT_REGISTRATION = 'current_registration_form';
+const STORE_PENDING_REGISTRATIONS = 'pending_registrations';
+const STORE_OFFLINE_IMAGES = 'offline_images';
+
 
 // --- PWA Service Worker Registration ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        // Register the service worker as a module to allow for import statements
         navigator.serviceWorker.register('/static/registration/js/serviceworker.js', { type: 'module' })
             .then(registration => {
                 console.log('Service Worker registered successfully:', registration.scope);
@@ -31,8 +30,10 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+
 // --- IndexedDB Initialization ---
 async function initDB() {
+    if (db) return;
     db = await openDB(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion, transaction) {
             console.log(`IndexedDB upgrade: oldVersion=${oldVersion}, newVersion=${newVersion}`);
@@ -41,75 +42,69 @@ async function initDB() {
                 db.createObjectStore(STORE_PENDING_REGISTRATIONS, { keyPath: 'id', autoIncrement: true });
                 db.createObjectStore(STORE_OFFLINE_IMAGES, { keyPath: 'id', autoIncrement: true });
             }
-            if (oldVersion < 2) {
-                // Example of schema upgrade: add an index if needed in the future
-                // const pendingStore = transaction.objectStore(STORE_PENDING_REGISTRATIONS);
-                // pendingStore.createIndex('timestamp', 'timestamp');
-            }
         },
     });
     console.log('IndexedDB initialized.');
 }
 
-// --- Data Storage/Retrieval Functions (IndexedDB) ---
+
+// --- Data Storage/Retrieval Functions (Unchanged) ---
 async function saveCurrentRegistrationData(data) {
     if (!db) await initDB();
     const tx = db.transaction(STORE_CURRENT_REGISTRATION, 'readwrite');
-    const store = tx.objectStore(STORE_CURRENT_REGISTRATION);
-    await store.put({ id: 'current_draft', data: data });
+    await tx.objectStore(STORE_CURRENT_REGISTRATION).put({ id: 'current_draft', data: data });
     await tx.done;
-    console.log('Current registration data saved to IndexedDB.');
 }
 
 async function getCurrentRegistrationData() {
     if (!db) await initDB();
-    const tx = db.transaction(STORE_CURRENT_REGISTRATION, 'readonly');
-    const store = tx.objectStore(STORE_CURRENT_REGISTRATION);
-    const record = await store.get('current_draft');
+    const record = await db.get(STORE_CURRENT_REGISTRATION, 'current_draft');
     return record ? record.data : {};
 }
 
 async function getPendingRegistrationsCount() {
     if (!db) await initDB();
-    const tx = db.transaction(STORE_PENDING_REGISTRATIONS, 'readonly');
-    const store = tx.objectStore(STORE_PENDING_REGISTRATIONS);
-    return await store.count();
+    return await db.count(STORE_PENDING_REGISTRATIONS);
 }
 
 async function saveImageBlob(blob, fileName, mimeType) {
     if (!db) await initDB();
-    const tx = db.transaction(STORE_OFFLINE_IMAGES, 'readwrite');
-    const store = tx.objectStore(STORE_OFFLINE_IMAGES);
-    const imageId = await store.add({ image: blob, name: fileName, type: mimeType });
-    await tx.done;
+    const imageId = await db.add(STORE_OFFLINE_IMAGES, { image: blob, name: fileName, type: mimeType });
     console.log('Image Blob saved to IndexedDB with ID:', imageId);
     return imageId;
 }
 
 async function saveForBackgroundSync(fullRegistrationData) {
     if (!db) await initDB();
-    const tx = db.transaction(STORE_PENDING_REGISTRATIONS, 'readwrite');
-    const store = tx.objectStore(STORE_PENDING_REGISTRATIONS);
-    await store.add({
+    await db.add(STORE_PENDING_REGISTRATIONS, {
         data: fullRegistrationData,
-        timestamp: Date.now(),
-        attemptedSync: 0
+        timestamp: Date.now()
     });
-    await tx.done;
     console.log('Full registration saved for background sync.');
-    await updateSyncStatusUI(); // Update UI after saving
+    await updateSyncStatusUI();
 }
+
 
 // --- UI Initialization and Event Listeners ---
 document.addEventListener('DOMContentLoaded', async function() {
     await initDB();
-    await updateSyncStatusUI(); // Initial check for pending forms
+    await updateSyncStatusUI();
 
-    const currentStep = parseInt(document.querySelector('input[name="step"]').value);
+    const form = document.getElementById('registrationForm');
+    if (!form) return;
+    
+    const currentStepInput = form.querySelector('input[name="step"]');
+    if (!currentStepInput) return;
+    const currentStep = parseInt(currentStepInput.value);
 
     if (currentStep === 1) {
         initializeCameraAndLocation();
         await loadStep1Data();
+        // --- ADDED: Attach listener for duplicate number check ---
+        const mobileInput = document.querySelector('[name="mobile_number"]');
+        if (mobileInput) {
+            mobileInput.addEventListener('blur', checkMobileNumberExists);
+        }
     } else if (currentStep === 2) {
         await loadStep2Data();
         initializeFormElements();
@@ -119,16 +114,42 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     const prevBtn = document.getElementById('prevStepBtn');
     const nextBtn = document.getElementById('nextStepBtn');
-
-    if (prevBtn) {
-        prevBtn.addEventListener('click', goBack);
-    }
-    if (nextBtn) {
-        // IMPORTANT: Attach event listener to the button, not the form submit event directly
-        // The handleNextSubmit will prevent default and control navigation
-        nextBtn.addEventListener('click', handleNextSubmit);
-    }
+    if (prevBtn) prevBtn.addEventListener('click', goBack);
+    if (nextBtn) nextBtn.addEventListener('click', handleNextSubmit);
 });
+
+
+// --- NEW: Function for optimistic duplicate check ---
+async function checkMobileNumberExists() {
+    const mobileInput = document.querySelector('[name="mobile_number"]');
+    const errorDiv = document.getElementById('mobile-number-error');
+    if (!mobileInput || !errorDiv) return;
+
+    const mobileNumber = mobileInput.value.trim();
+
+    // Reset state before checking
+    mobileInput.classList.remove('is-invalid');
+    errorDiv.style.display = 'none';
+
+    if (mobileNumber.length < 10 || !navigator.onLine) {
+        return; // Don't check if offline or number is too short
+    }
+
+    try {
+        const response = await fetch(`/register/api/check-mobile/?mobile_number=${encodeURIComponent(mobileNumber)}`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        if (data.exists) {
+            errorDiv.textContent = 'This mobile number is already registered.';
+            errorDiv.style.display = 'block';
+            mobileInput.classList.add('is-invalid');
+        }
+    } catch (error) {
+        console.warn('Could not check mobile number:', error);
+    }
+}
+
 
 // --- Sync Status UI Management ---
 async function updateSyncStatusUI() {
@@ -140,7 +161,7 @@ async function updateSyncStatusUI() {
         container.innerHTML = `
             <div id="sync-banner" class="alert alert-warning d-flex align-items-center justify-content-between p-3 mt-3 shadow">
                 <span>
-                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <i class="fas fa-sync-alt me-2"></i>
                     <strong>Pending Submissions:</strong> You have ${pendingCount} registration(s) waiting to be submitted.
                 </span>
                 <button id="sync-now-btn" class="btn btn-primary btn-sm">Sync Now</button>
@@ -148,83 +169,275 @@ async function updateSyncStatusUI() {
         `;
         document.getElementById('sync-now-btn').addEventListener('click', syncNowHandler);
     } else {
-        container.innerHTML = ''; // Clear the banner if no pending submissions
+        container.innerHTML = '';
     }
 }
 
 
-// Corrected syncNowHandler function
+// --- REVISED: Manual Sync Handler with detailed feedback ---
 async function syncNowHandler() {
     const syncButton = document.getElementById('sync-now-btn');
     if (!syncButton) return;
 
     const originalText = syncButton.innerHTML;
-    syncButton.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Syncing...';
+    syncButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Syncing...';
     syncButton.disabled = true;
 
-    const db = await openDB(DB_NAME, DB_VERSION);
-    const pendingRegistrations = await db.getAll(STORE_PENDING_REGISTRATIONS);
-
-    if (pendingRegistrations.length === 0) {
-        alert('No pending registrations to sync!');
-        updateSyncStatusUI();
+    if (!navigator.onLine) {
+        alert('You are still offline. Please connect to the internet to sync.');
         syncButton.innerHTML = originalText;
         syncButton.disabled = false;
         return;
     }
 
-    const isOnline = navigator.onLine;
+    const pendingRegistrations = await db.getAll(STORE_PENDING_REGISTRATIONS);
+    if (pendingRegistrations.length === 0) {
+        alert('No pending registrations to sync!');
+        await updateSyncStatusUI();
+        return;
+    }
 
-    if (isOnline) {
-        console.log('Online, attempting immediate sync of all pending registrations.');
-        let syncedCount = 0;
-        let failedCount = 0;
+    let syncedCount = 0, duplicateCount = 0, failedCount = 0;
 
-        for (const reg of pendingRegistrations) {
-            try {
-                // This is the critical line that needs to be updated.
-                const success = await processAndSendRegistration(reg.data, reg.id);
-                if (success) {
-                    syncedCount++;
-                } else {
-                    failedCount++;
+    for (const reg of pendingRegistrations) {
+        const result = await processAndSendRegistration(reg.data, reg.id);
+        if (result.status === 'success') syncedCount++;
+        else if (result.status === 'duplicate') duplicateCount++;
+        else failedCount++;
+    }
+
+    let alertMessage = 'Sync Complete!\n';
+    if (syncedCount > 0) alertMessage += `\n- Successfully submitted ${syncedCount} registration(s).`;
+    if (duplicateCount > 0) alertMessage += `\n- Cleared ${duplicateCount} duplicate registration(s).`;
+    if (failedCount > 0) alertMessage += `\n- Failed to submit ${failedCount} registration(s). They will be retried automatically later.`;
+    
+    alert(alertMessage);
+
+    syncButton.innerHTML = "Sync Now";
+    syncButton.disabled = false;
+    await updateSyncStatusUI();
+}
+async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
+    try {
+        const formData = new FormData();
+        const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
+        
+        for (const key in allSteps) {
+            if (Object.prototype.hasOwnProperty.call(allSteps, key)) {
+                const value = allSteps[key];
+                if (key !== 'photoId' && key !== 'photoBase64') {
+                    if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+                        formData.append(key, JSON.stringify(value));
+                    } else if (value !== null && value !== undefined) {
+                        formData.append(key, value);
+                    }
                 }
-            } catch (error) {
-                console.error(`Error submitting pending registration ID ${reg.id}:`, error);
-                failedCount++;
             }
         }
 
-        if (syncedCount > 0) {
-            alert(`Sync complete! Successfully submitted ${syncedCount} registration(s).`);
-        }
-        if (failedCount > 0) {
-            alert(`Warning: Failed to submit ${failedCount} registration(s). They will remain in offline storage.`);
-        }
-        updateSyncStatusUI();
-
-    } else {
-        // ... (rest of the offline logic remains the same) ...
-        if ('serviceWorker' in navigator && 'SyncManager' in window) {
-            try {
-                const registration = await navigator.serviceWorker.ready;
-                await registration.sync.register('sync-labor-registration');
-                alert('You are offline. Sync request sent and will be processed when a network connection is available.');
-            } catch (error) {
-                console.error('Failed to register background sync:', error);
-                alert('Failed to start sync. Please check your network connection and try again.');
+        if (allSteps.photoId) {
+            const imageData = await db.get(STORE_OFFLINE_IMAGES, allSteps.photoId);
+            if (imageData?.image) {
+                formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
             }
-        } else {
-            alert('Your browser does not support background sync. Data is saved locally, but will not auto-sync.');
+        }
+
+        const response = await fetch('/register/api/submit-registration/', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        });
+
+        const cleanupPending = async () => {
+            if (!dbKey) return;
+            const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+            await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
+            if (allSteps.photoId) {
+                await tx.objectStore(STORE_OFFLINE_IMAGES).delete(allSteps.photoId);
+            }
+            await tx.done;
+        };
+
+        if (response.ok) {
+            await cleanupPending();
+            return { status: 'success' };
+        } 
+        
+        if (response.status === 409) {
+            await cleanupPending();
+            return { status: 'duplicate' };
+        }
+
+        return { status: 'failed' };
+    } catch (error) {
+        console.error('Network error or exception sending registration:', error);
+        return { status: 'failed' };
+    }
+}
+
+// --- REVISED: Main submission logic on final step ---
+async function submitFullRegistration() {
+    const fullRegistrationData = await getCurrentRegistrationData();
+    if (!fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
+        alert('An error occurred. Incomplete data. Please start over.');
+        return;
+    }
+
+    if (navigator.onLine) {
+        const result = await processAndSendRegistration(fullRegistrationData);
+        if (result.status === 'success') {
+            await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft');
+            alert('Registration submitted successfully!');
+            window.location.href = '/register/success/';
+            return;
+        }
+        if (result.status === 'duplicate') {
+            await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft');
+            alert('This mobile number is already registered. This registration has been cancelled.');
+            window.location.href = '/register/registration/';
+            return;
         }
     }
 
-    syncButton.innerHTML = originalText;
-    syncButton.disabled = false;
-    updateSyncStatusUI();
+    await saveForBackgroundSync(fullRegistrationData);
+    await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft');
+
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.sync.register('sync-labor-registration');
+        alert('You are offline. Your registration is saved and will be submitted automatically when you are back online.');
+    } else {
+        alert('Your registration is saved locally but cannot be synced automatically. Please use the "Sync Now" button when you are online.');
+    }
+    window.location.href = '/register/success/';
 }
 
-// --- Load Data from IndexedDB (Pre-fill Forms) ---
+// async function handleNextSubmit(event) {
+//     event.preventDefault();
+
+//     const form = document.getElementById('registrationForm');
+//     const mobileInput = form.querySelector('[name="mobile_number"]');
+//     // Final check before proceeding from step 1
+//     if (parseInt(form.querySelector('input[name="step"]').value) === 1 && mobileInput.classList.contains('is-invalid')) {
+//         alert('The mobile number is already registered. Please use a different number.');
+//         mobileInput.focus();
+//         return;
+//     }
+
+//     /* ... Your existing validation and data saving logic for handleNextSubmit ... */
+//     // The final call in Step 3 to `await submitFullRegistration();` is correct.
+// }
+
+
+// --- REVISED: Main submission logic on final step ---
+// async function submitFullRegistration() {
+//     const fullRegistrationData = await getCurrentRegistrationData();
+//     if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
+//         alert('An error occurred. Incomplete data. Please start over.');
+//         return;
+//     }
+
+//     if (navigator.onLine) {
+//         console.log('Online, attempting immediate submission.');
+//         const result = await processAndSendRegistration(fullRegistrationData);
+
+//         if (result.status === 'success') {
+//             await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft'); // Clear draft
+//             alert('Registration submitted successfully!');
+//             window.location.href = '/register/success/';
+//             return;
+//         }
+        
+//         if (result.status === 'duplicate') {
+//             await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft'); // Clear invalid draft
+//             alert('This mobile number is already registered. This registration has been cancelled.');
+//             window.location.href = '/register/registration/'; // Go back to start
+//             return;
+//         }
+        
+//         console.log('Immediate online submission failed, falling back to background sync.');
+//     }
+
+//     // This block runs if offline OR if the online attempt failed with a network/server error
+//     await saveForBackgroundSync(fullRegistrationData);
+//     await db.delete(STORE_CURRENT_REGISTRATION, 'current_draft'); // Clear draft, data is now in pending queue
+
+//     if ('serviceWorker' in navigator && 'SyncManager' in window) {
+//         const registration = await navigator.serviceWorker.ready;
+//         await registration.sync.register('sync-labor-registration');
+//         alert('You are offline. Your registration is saved and will be submitted automatically when you are back online.');
+//     } else {
+//         alert('Your registration is saved locally but your browser does not support automatic background sync. Please sync manually when you are online.');
+//     }
+//     window.location.href = '/register/success/';
+// }
+
+
+// --- REVISED: Central function to send data to the server ---
+// async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
+//     /**
+//     * @returns {Promise<object>} An object with status: 'success', 'duplicate', or 'failed'.
+//     */
+//     try {
+//         const formData = new FormData();
+//         const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
+        
+//         for (const key in allSteps) {
+//             if (Object.prototype.hasOwnProperty.call(allSteps, key)) {
+//                 const value = allSteps[key];
+//                  if (key !== 'photoId' && key !== 'photoBase64') {
+//                      if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+//                         formData.append(key, JSON.stringify(value));
+//                     } else if (value !== null && value !== undefined) {
+//                         formData.append(key, value);
+//                     }
+//                 }
+//             }
+//         }
+
+//         if (allSteps.photoId) {
+//             const imageData = await db.get(STORE_OFFLINE_IMAGES, allSteps.photoId);
+//             if (imageData && imageData.image) {
+//                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+//             }
+//         }
+
+//         const response = await fetch('/register/api/submit-registration/', {
+//             method: 'POST',
+//             body: formData,
+//             headers: { 'X-CSRFToken': getCookie('csrftoken') },
+//         });
+
+//         const cleanupPending = async () => {
+//             if (!dbKey) return;
+//             const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+//             await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
+//             if (allSteps.photoId) {
+//                 await tx.objectStore(STORE_OFFLINE_IMAGES).delete(allSteps.photoId);
+//             }
+//             await tx.done;
+//         };
+
+//         if (response.ok) {
+//             await cleanupPending();
+//             return { status: 'success' };
+//         } 
+        
+//         if (response.status === 409) {
+//             console.warn('Submission failed: Mobile number is a duplicate. Clearing from device.');
+//             await cleanupPending();
+//             return { status: 'duplicate' };
+//         }
+
+//         return { status: 'failed' };
+
+//     } catch (error) {
+//         console.error('Network error or exception sending registration:', error);
+//         return { status: 'failed' };
+//     }
+// }
+
+// // --- Load Data from IndexedDB (Pre-fill Forms) ---
 async function loadStep1Data() {
     const currentRegistration = await getCurrentRegistrationData();
     const step1Data = currentRegistration.step1 || {};
@@ -361,7 +574,7 @@ async function loadStep3Data() {
     }
 }
 
-// --- Navigation Logic (Updated for IndexedDB) ---
+// // --- Navigation Logic (Updated for IndexedDB) ---
 async function handleNextSubmit(event) {
     event.preventDefault(); // Prevent default form submission
 
@@ -393,6 +606,12 @@ async function handleNextSubmit(event) {
     form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
 
     if (currentStep === 1) {
+         const mobileInput = form.querySelector('[name="mobile_number"]');
+        if (mobileInput && mobileInput.classList.contains('is-invalid')) {
+            alert('This mobile number is already registered. Please use a different number.');
+            mobileInput.focus();
+            return; // Stop execution
+        }
         const requiredFields = ['full_name', 'mobile_number', 'taluka', 'village', 'category'];
         requiredFields.forEach(fieldName => {
             const field = form.querySelector(`[name="${fieldName}"]`);
@@ -643,154 +862,154 @@ async function handleNextSubmit(event) {
 
 
 
-async function submitFullRegistration() {
-    const fullRegistrationData = await getCurrentRegistrationData();
-    if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
-        console.error('Incomplete registration data found for submission. Cannot submit.');
-        alert('An error occurred. Please ensure all steps are completed before submitting.');
-        return;
-    }
+// async function submitFullRegistration() {
+//     const fullRegistrationData = await getCurrentRegistrationData();
+//     if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
+//         console.error('Incomplete registration data found for submission. Cannot submit.');
+//         alert('An error occurred. Please ensure all steps are completed before submitting.');
+//         return;
+//     }
 
-    const isOnline = navigator.onLine;
+//     const isOnline = navigator.onLine;
 
-    if (isOnline) {
-        console.log('Online, attempting immediate submission.');
-        const success = await processAndSendRegistration(fullRegistrationData);
-        if (success) {
-            await clearCurrentRegistrationAndImage();
-            alert('Registration submitted successfully!');
-            window.location.href = '/register/success/';
-            return;
-        }
-        // If immediate submission fails, fall back to offline storage
-        console.log('Immediate online submission failed, falling back to background sync.');
-    }
+//     if (isOnline) {
+//         console.log('Online, attempting immediate submission.');
+//         const success = await processAndSendRegistration(fullRegistrationData);
+//         if (success) {
+//             await clearCurrentRegistrationAndImage();
+//             alert('Registration submitted successfully!');
+//             window.location.href = '/register/success/';
+//             return;
+//         }
+//         // If immediate submission fails, fall back to offline storage
+//         console.log('Immediate online submission failed, falling back to background sync.');
+//     }
 
-    // This block runs if offline OR if the online attempt failed
-    await saveForBackgroundSync(fullRegistrationData);
-    await clearCurrentRegistrationAndImage();
+//     // This block runs if offline OR if the online attempt failed
+//     await saveForBackgroundSync(fullRegistrationData);
+//     await clearCurrentRegistrationAndImage();
 
-    if ('serviceWorker' in navigator && 'SyncManager' in window) {
-        const registration = await navigator.serviceWorker.ready;
-        await registration.sync.register('sync-labor-registration');
-        alert('You are offline. Your registration will be submitted when you are back online.');
-    } else {
-        alert('Your data is saved locally. It might be lost if you clear browser data.');
-    }
+//     if ('serviceWorker' in navigator && 'SyncManager' in window) {
+//         const registration = await navigator.serviceWorker.ready;
+//         await registration.sync.register('sync-labor-registration');
+//         alert('You are offline. Your registration will be submitted when you are back online.');
+//     } else {
+//         alert('Your data is saved locally. It might be lost if you clear browser data.');
+//     }
     
-    window.location.href = '/register/success/';
-}
+//     window.location.href = '/register/success/';
+// }
 
-async function clearCurrentRegistrationAndImage() {
-    if (!db) await initDB();
-    const currentRegistration = await getCurrentRegistrationData();
-    const tx = db.transaction([STORE_CURRENT_REGISTRATION, STORE_OFFLINE_IMAGES], 'readwrite');
-    await tx.objectStore(STORE_CURRENT_REGISTRATION).delete('current_draft');
-    if (currentRegistration && currentRegistration.step1 && currentRegistration.step1.photoId) {
-        await tx.objectStore(STORE_OFFLINE_IMAGES).delete(currentRegistration.step1.photoId);
-    }
-    await tx.done;
-    console.log('Current registration and associated image cleared from IndexedDB.');
-}
+// async function clearCurrentRegistrationAndImage() {
+//     if (!db) await initDB();
+//     const currentRegistration = await getCurrentRegistrationData();
+//     const tx = db.transaction([STORE_CURRENT_REGISTRATION, STORE_OFFLINE_IMAGES], 'readwrite');
+//     await tx.objectStore(STORE_CURRENT_REGISTRATION).delete('current_draft');
+//     if (currentRegistration && currentRegistration.step1 && currentRegistration.step1.photoId) {
+//         await tx.objectStore(STORE_OFFLINE_IMAGES).delete(currentRegistration.step1.photoId);
+//     }
+//     await tx.done;
+//     console.log('Current registration and associated image cleared from IndexedDB.');
+// }
 
-async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
-    /**
-     * Prepares and sends a single registration to the server.
-     * If a dbKey is provided, it will clean up the corresponding data from IndexedDB on success.
-     *
-     * @param {object} fullRegistrationData - The complete registration object to be submitted.
-     * @param {string|number|null} dbKey - The key of the record in IndexedDB, if applicable.
-     * @returns {Promise<boolean>} - True if submission was successful, false otherwise.
-     */
-    try {
-        const formData = new FormData();
-        console.log('Preparing to send registration data to server:', fullRegistrationData);
+// async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
+//     /**
+//      * Prepares and sends a single registration to the server.
+//      * If a dbKey is provided, it will clean up the corresponding data from IndexedDB on success.
+//      *
+//      * @param {object} fullRegistrationData - The complete registration object to be submitted.
+//      * @param {string|number|null} dbKey - The key of the record in IndexedDB, if applicable.
+//      * @returns {Promise<boolean>} - True if submission was successful, false otherwise.
+//      */
+//     try {
+//         const formData = new FormData();
+//         console.log('Preparing to send registration data to server:', fullRegistrationData);
 
-        // --- Step 1: Append all fields to FormData ---
-        // This loop handles both step 1 and step 2 data by iterating through all nested properties.
-        const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
-        for (const key in allSteps) {
-            if (allSteps.hasOwnProperty(key)) {
-                // Handle complex data types like arrays and objects
-                if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null && key !== 'location')) {
-                    formData.append(key, JSON.stringify(allSteps[key]));
-                } else if (key === 'location' && allSteps[key] !== null) {
-                    formData.append(key, JSON.stringify(allSteps[key]));
-                } else if (key !== 'photoId' && key !== 'photoBase64') {
-                    // Append all other simple fields
-                    formData.append(key, allSteps[key]);
-                }
-            }
-        }
+//         // --- Step 1: Append all fields to FormData ---
+//         // This loop handles both step 1 and step 2 data by iterating through all nested properties.
+//         const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
+//         for (const key in allSteps) {
+//             if (allSteps.hasOwnProperty(key)) {
+//                 // Handle complex data types like arrays and objects
+//                 if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null && key !== 'location')) {
+//                     formData.append(key, JSON.stringify(allSteps[key]));
+//                 } else if (key === 'location' && allSteps[key] !== null) {
+//                     formData.append(key, JSON.stringify(allSteps[key]));
+//                 } else if (key !== 'photoId' && key !== 'photoBase64') {
+//                     // Append all other simple fields
+//                     formData.append(key, allSteps[key]);
+//                 }
+//             }
+//         }
 
-        // --- Step 2: Handle the Image Separately ---
-        // Prioritize getting the image from the offline store if a photoId exists
-        if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
-            const db = await openDB(DB_NAME, DB_VERSION);
-            const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
-            if (imageData && imageData.image) {
-                formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
-                console.log(`[Client] Appending image ID ${fullRegistrationData.step1.photoId} to form data.`);
-            } else {
-                console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
-            }
-        }
-        // Fallback: If no photoId, check for a base64 string
-        else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
-            try {
-                const response = await fetch(fullRegistrationData.step1.photoBase64);
-                const blob = await response.blob();
-                formData.append('photo', blob, 'captured_image.jpeg');
-                console.log('[Client] Appending base64 image to form data.');
-            } catch (e) {
-                console.warn('[Client] Failed to convert base64 to Blob for sync:', e);
-            }
-        }
+//         // --- Step 2: Handle the Image Separately ---
+//         // Prioritize getting the image from the offline store if a photoId exists
+//         if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+//             const db = await openDB(DB_NAME, DB_VERSION);
+//             const imageData = await db.get(STORE_OFFLINE_IMAGES, fullRegistrationData.step1.photoId);
+//             if (imageData && imageData.image) {
+//                 formData.append('photo', imageData.image, imageData.name || 'captured_image.jpeg');
+//                 console.log(`[Client] Appending image ID ${fullRegistrationData.step1.photoId} to form data.`);
+//             } else {
+//                 console.warn(`[Client] Image with ID ${fullRegistrationData.step1.photoId} not found in offline_images store.`);
+//             }
+//         }
+//         // Fallback: If no photoId, check for a base64 string
+//         else if (fullRegistrationData.step1 && fullRegistrationData.step1.photoBase64) {
+//             try {
+//                 const response = await fetch(fullRegistrationData.step1.photoBase64);
+//                 const blob = await response.blob();
+//                 formData.append('photo', blob, 'captured_image.jpeg');
+//                 console.log('[Client] Appending base64 image to form data.');
+//             } catch (e) {
+//                 console.warn('[Client] Failed to convert base64 to Blob for sync:', e);
+//             }
+//         }
 
-        // --- Step 3: Log FormData for Debugging ---
-        console.log('--- FormData Contents Before Sending ---');
-        for (const pair of formData.entries()) {
-            if (pair[0] === 'photo') {
-                console.log(pair[0] + ': [File Blob]');
-            } else {
-                console.log(pair[0] + ': ' + pair[1]);
-            }
-        }
-        console.log('--- End FormData Contents ---');
+//         // --- Step 3: Log FormData for Debugging ---
+//         console.log('--- FormData Contents Before Sending ---');
+//         for (const pair of formData.entries()) {
+//             if (pair[0] === 'photo') {
+//                 console.log(pair[0] + ': [File Blob]');
+//             } else {
+//                 console.log(pair[0] + ': ' + pair[1]);
+//             }
+//         }
+//         console.log('--- End FormData Contents ---');
 
-        // --- Step 4: Perform the Fetch Request ---
-        const response = await fetch('/register/api/submit-registration/', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-        });
+//         // --- Step 4: Perform the Fetch Request ---
+//         const response = await fetch('/register/api/submit-registration/', {
+//             method: 'POST',
+//             body: formData,
+//             headers: {
+//                 'X-CSRFToken': getCookie('csrftoken'),
+//             },
+//         });
 
-        if (response.ok) {
-            console.log('Registration submitted successfully.');
-            // Clean up data from IndexedDB if a key was provided
-            if (dbKey) {
-                const db = await openDB(DB_NAME, DB_VERSION);
-                const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
-                await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
-                if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
-                    await tx.objectStore(STORE_OFFLINE_IMAGES).delete(fullRegistrationData.step1.photoId);
-                }
-                await tx.done;
-                console.log(`Pending registration ID ${dbKey} and image cleared from IndexedDB.`);
-            }
-            return true;
-        } else {
-            const errorResponse = await response.json();
-            console.error('Failed to submit registration:', response.status, errorResponse);
-            return false;
-        }
-    } catch (error) {
-        console.error('Error sending registration to server:', error);
-        return false;
-    }
-}
+//         if (response.ok) {
+//             console.log('Registration submitted successfully.');
+//             // Clean up data from IndexedDB if a key was provided
+//             if (dbKey) {
+//                 const db = await openDB(DB_NAME, DB_VERSION);
+//                 const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
+//                 await tx.objectStore(STORE_PENDING_REGISTRATIONS).delete(dbKey);
+//                 if (fullRegistrationData.step1 && fullRegistrationData.step1.photoId) {
+//                     await tx.objectStore(STORE_OFFLINE_IMAGES).delete(fullRegistrationData.step1.photoId);
+//                 }
+//                 await tx.done;
+//                 console.log(`Pending registration ID ${dbKey} and image cleared from IndexedDB.`);
+//             }
+//             return true;
+//         } else {
+//             const errorResponse = await response.json();
+//             console.error('Failed to submit registration:', response.status, errorResponse);
+//             return false;
+//         }
+//     } catch (error) {
+//         console.error('Error sending registration to server:', error);
+//         return false;
+//     }
+// }
 
 
 function getCookie(name) {

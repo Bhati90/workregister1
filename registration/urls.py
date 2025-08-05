@@ -12,6 +12,8 @@ urlpatterns = [
     path('success/', views.success_view, name='success_page'),
 
     # The crucial API endpoint for PWA submission
+    path('api/check-mobile/', views.check_mobile_number, name='check_mobile'),
+
     path('api/submit-registration/', views.submit_registration_api, name='submit_registration_api'), # This remains as /api/submit-registration/ relative to 'register/'
     #  path('api/check-phone-number/', views.check_phone_number_api, name='check_phone_number_api'),
     # path('api/submit-registration/', views.submit_registr

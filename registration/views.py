@@ -1,5 +1,12 @@
 
 # registration/views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from rest_framework.parsers import MultiPartParser, FormParser
+
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -17,6 +24,10 @@ from dateutil.parser import isoparse # Make sure you have python-dateutil instal
 from .forms import (
     BaseInformationForm, IndividualLaborForm, MukkadamForm,
     TransportForm, OthersForm, DataSharingAgreementForm
+)
+from .serializers import (
+    IndividualLaborSerializer, MukkadamSerializer,
+    TransportSerializer, OthersSerializer
 )
 from .models import IndividualLabor, Mukkadam, Transport, Others
 
@@ -265,6 +276,7 @@ def home_view(request):
 
 @csrf_exempt
 def location_status_api(request):
+
     # This API endpoint is not directly used by the multi_step_form_client for final submission
     # but was present in your code. Keep it if you have other uses.
     if request.method == 'POST':
@@ -280,3 +292,86 @@ def location_status_api(request):
         except json.JSONDecodeError:
             return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
+
+# --- NEW: Helper function to check all models for a duplicate number ---
+def mobile_number_exists(mobile_number):
+    """Checks if a mobile number exists in ANY of the registration models."""
+    if not mobile_number:
+        return False
+    
+    cleaned_number = str(mobile_number).strip().replace('+91', '')
+    if not cleaned_number.isdigit():
+        return False
+    
+    # Check each model to see if a record with this number already exists.
+    # The __endswith check is robust for numbers with or without country codes.
+    if IndividualLabor.objects.filter(mobile_number__endswith=cleaned_number).exists():
+        return True
+    if Mukkadam.objects.filter(mobile_number__endswith=cleaned_number).exists():
+        return True
+    if Transport.objects.filter(mobile_number__endswith=cleaned_number).exists():
+        return True
+    if Others.objects.filter(mobile_number__endswith=cleaned_number).exists():
+        return True
+        
+    return False
+
+# --- NEW: API view for the optimistic check ---
+@require_GET
+def check_mobile_number(request):
+    """
+    API endpoint to check if a mobile number already exists.
+    Expects a query parameter: ?mobile_number=...
+    """
+    mobile_number = request.GET.get('mobile_number', None)
+    if not mobile_number:
+        return JsonResponse({'error': 'Mobile number not provided'}, status=400)
+
+    exists = mobile_number_exists(mobile_number)
+    return JsonResponse({'exists': exists})
+
+
+# --- FULLY REVISED: API view to handle submissions ---
+class SubmitRegistrationAPI(APIView):
+    """
+    Handles the submission of the multi-step registration form.
+    It routes data to the correct model based on the 'category' field.
+    """
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_serializer_class(self, category):
+        """Returns the correct serializer class based on the category string."""
+        serializer_map = {
+            'individual_labor': IndividualLaborSerializer,
+            'mukkadam': MukkadamSerializer,
+            'transport': TransportSerializer,
+            'others': OthersSerializer
+        }
+        return serializer_map.get(category)
+
+    def post(self, request, *args, **kwargs):
+        category = request.data.get('category')
+        if not category:
+            return Response({'error': 'Category not provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        SerializerClass = self.get_serializer_class(category)
+        if not SerializerClass:
+            return Response({'error': f'Invalid category: {category}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = SerializerClass(data=request.data)
+        
+        if serializer.is_valid():
+            mobile_number = serializer.validated_data.get('mobile_number')
+
+            # --- Definitive duplicate check before saving ---
+            if mobile_number_exists(mobile_number):
+                 return Response(
+                    {'error': 'This mobile number is already registered.'}, 
+                    status=status.HTTP_409_CONFLICT
+                )
+            
+            serializer.save()
+            return Response({'message': 'Registration successful'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
