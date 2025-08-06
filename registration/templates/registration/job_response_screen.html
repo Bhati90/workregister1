@@ -1,0 +1,49 @@
+{% extends 'registration/base.html' %}
+{% block title %}Job Responses{% endblock %}
+{% block extra_styles %}
+    /* Your CSS from the previous response */
+{% endblock %}
+
+{% block content %}
+    <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="{% url 'registration:job_requests' %}">Job Requests</a></li><li class="breadcrumb-item active">Manage Responses</li></ol></nav>
+    <h2 class="page-title">Manage Team Responses for "{{ job.title }}"</h2>
+    
+    <div class="card mb-4"><div class="card-body"><h4><i class="fas fa-info-circle me-2 text-primary"></i>Job Details</h4><p><strong>{{ job.title }}</strong> at {{ job.location }}. Requires {{ job.workers_needed }} workers for {{ job.duration_days }} days.</p></div></div>
+
+    <div class="card mb-4">
+    <form>
+        <div class="card-header"><h4><i class="fas fa-users me-2 text-primary"></i>Leader Responses</h4></div>
+        <div class="list-group list-group-flush">
+            {% for leader in job.sent_to %}
+            <label for="leader_choice_{{ leader.leader_id }}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">
+                        {% if leader.response == 'Accepted' %}
+                        <input type="radio" class="form-check-input me-3" name="final_leader" id="leader_choice_{{ leader.leader_id }}" value="{{ leader.leader_id }}">
+                        {% endif %}
+                        {{ leader.name }}
+                    </h5>
+                    {% if leader.response == 'Accepted' %}<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> Accepted</span>
+                    {% elif leader.response == 'Rejected' %}<span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i> Rejected</span>
+                    {% else %}<span class="badge bg-secondary"><i class="fas fa-question-circle me-1"></i> Pending</span>
+                    {% endif %}
+                </div>
+                {% if leader.response == 'Accepted' %}
+                <p class="mb-1"><strong>Quoted Price:</strong> ₹{{ leader.quoted_price }}/day</p>
+                <small><strong>Available Workers:</strong> {{ leader.available_workers|join:", " }}</small>
+                {% elif leader.response == 'Rejected' %}
+                <small class="text-danger"><strong>Reason:</strong> {{ leader.reason }}</small>
+                {% else %}<small>Awaiting response from this leader.</small>
+                {% endif %}
+            </label>
+            {% endfor %}
+        </div>
+        <div class="card-footer text-center">
+            <h5 class="mt-2">Next Actions</h5>
+            <p class="text-muted small">Select an accepted leader and finalize, or re-allocate the job to different leaders.</p>
+            <button type="submit" class="btn btn-success mx-2 my-1"><i class="fas fa-play-circle me-2"></i>Finalize & Start Job</button>
+            <button type="button" class="btn btn-warning mx-2 my-1"><i class="fas fa-redo me-2"></i>Re-Allocate Job</button>
+        </div>
+    </form>
+    </div>
+{% endblock %}

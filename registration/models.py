@@ -160,6 +160,9 @@ class Transport(BaseRegistration):
     expected_fair = models.DecimalField(max_digits=10, decimal_places=2)
     availability = models.TextField()
     service_areas = models.TextField()
+    home_address = models.CharField(max_length=255, blank=True, null=True)
+    whatsapp_number = models.CharField(max_length=15, blank=True, null=True)
+    
 
 class Others(BaseRegistration):
     business_name = models.CharField(max_length=200)

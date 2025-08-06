@@ -13,9 +13,12 @@ urlpatterns = [
 
     # The crucial API endpoint for PWA submission
     # path('api/check-mobile/', views.check_mobile_number, name='check_mobile'),
-     path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
+    path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
     path('api/location-status/', views.location_status_api, name='location_status_api'),
     
+    path('job-requests/', views.job_requests_view, name='job_requests'),
+    path('job/<int:job_id>/responses/', views.job_response_view, name='job_responses'),
+
     path('api/submit-registration/', views.submit_registration_api, name='submit_registration_api'), # This remains as /api/submit-registration/ relative to 'register/'
     #  path('api/check-phone-number/', views.check_phone_number_api, name='check_phone_number_api'),
     # path('api/submit-registration/', views.submit_registr

@@ -6,7 +6,9 @@ import json
 import logging
 from decimal import Decimal, InvalidOperation
 from dateutil.parser import isoparse
-
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from datetime import date, timedelta
 from django.shortcuts import render, redirect
 from django.views import View
 from django.http import JsonResponse
@@ -16,6 +18,7 @@ from django.core.files.base import ContentFile
 from django.contrib.gis.geos import Point
 from django.core.files.storage import default_storage
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 
 from .forms import (
     BaseInformationForm, IndividualLaborForm, MukkadamForm,
@@ -264,3 +267,86 @@ def mobile_number_exists(mobile_number):
     if Others.objects.filter(mobile_number__endswith=cleaned_number).exists():
         return True
     return False
+
+
+# registration/views.py
+
+# ... (imports)
+
+# ADD contact_number to each leader
+DUMMY_TEAM_LEADERS = [
+    {'id': 1, 'name': 'Ramesh Patil', 'contact_number': '9876543210'},
+    {'id': 2, 'name': 'Suresh Kadam', 'contact_number': '9876543211'},
+    {'id': 3, 'name': 'Ganesh More', 'contact_number': '9876543212'},
+    {'id': 4, 'name': 'Kishor Pawar', 'contact_number': '9876543213'},
+]
+
+
+# This is the full dataset we'll use for demonstration.
+# In a real app, this would come from your database.
+
+ALL_JOBS_DATA = [
+    # A new job, less than 2 days old, waiting for allocation.
+    {'id': 1, 'created_at': date.today(), 'required_by_date': date.today() + timedelta(days=5), 'title': 'NEW: Pruning - Skilled', 'status': 'Pending', 'status_class': 'pending', 'competition': 'Good Chance', 'competition_class': 'good-chance', 'dates': 'Fixed Dates', 'location': 'Ojhar, Niphad', 'duration_days': 3, 'workers_needed': 8, 'rate': 520, 'contact_number': '9876543210'},
+      {'id': 11, 'created_at': date.today(), 'required_by_date': date.today() + timedelta(days=5), 'title': 'NEW: Pruning - Skilled', 'status': 'Pending', 'status_class': 'pending', 'competition': 'Good Chance', 'competition_class': 'good-chance', 'dates': 'Fixed Dates', 'location': 'Ojhar, Niphad', 'duration_days': 3, 'workers_needed': 8, 'rate': 520, 'contact_number': '9876543210'},
+
+    # An older job, also waiting for allocation.
+    {'id': 6, 'created_at': date.today() - timedelta(days=3), 'required_by_date': date.today() + timedelta(days=3), 'title': 'OLD: Pending Allocation Job', 'status': 'Pending', 'status_class': 'pending', 'competition': 'Moderate', 'competition_class': 'moderate', 'dates': 'Fixed Dates', 'location': 'Yeola, Yeola', 'duration_days': 7, 'workers_needed': 4, 'rate': 470, 'contact_number': '9876543215'},
+    
+    # A job where requests were sent and we are waiting for responses.
+    {'id': 2, 'created_at': date.today() - timedelta(days=3), 'required_by_date': date.today() + timedelta(days=2), 'title': 'Urgent Weeding', 'status': 'Waiting for Response', 'status_class': 'allocated', 'competition': 'High Competition', 'competition_class': 'high-competition', 'dates': 'Urgent', 'location': 'Dindori, Dindori', 'duration_days': 4, 'workers_needed': 10, 'rate': 450, 'contact_number': '9876543211', 
+     'sent_to': [
+         {'leader_id': 1, 'name': 'Ramesh Patil', 'response': 'Accepted', 'quoted_price': 460, 'available_workers': ['Sunil', 'Anil', 'Mahesh', 'Vikas', 'Prakash']},
+         {'leader_id': 2, 'name': 'Suresh Kadam', 'response': 'Rejected', 'reason': 'Team already booked'},
+         {'leader_id': 3, 'name': 'Ganesh More', 'response': 'Pending'},
+     ]},
+
+    # A job that has been finalized with a leader and is now in progress.
+    {'id': 3, 'created_at': date.today() - timedelta(days=5), 'required_by_date': date.today() + timedelta(days=12), 'title': 'HCN Application Team', 'status': 'Ongoing', 'status_class': 'ongoing', 'competition': 'High Competition', 'competition_class': 'high-competition', 'dates': 'Fixed Dates', 'location': 'Lasalgaon, Niphad', 'duration_days': 2, 'workers_needed': 5, 'rate': 480, 'contact_number': '9876543212', 
+     'finalized_leader': {'name': 'Ganesh More', 'final_price': 490, 'workers': ['Amit', 'Raju', 'Pintu', 'Sonu', 'Monu']}},
+    
+    # A job that has been completed.
+    {'id': 5, 'created_at': date.today() - timedelta(days=10), 'required_by_date': date.today() - timedelta(days=2), 'title': 'Weeding and Cleanup', 'status': 'Completed', 'status_class': 'completed', 'competition': 'Low', 'competition_class': 'good-chance', 'dates': 'Fixed Dates', 'location': 'Sinnar, Sinnar', 'duration_days': 5, 'workers_needed': 6, 'rate': 430, 'contact_number': '9876543214'},
+]
+
+# This view now handles the 2-day rule for 'Latest' vs 'Pending'
+@login_required
+def job_requests_view(request):
+    today = date.today()
+    two_days_ago = today - timedelta(days=2)
+
+    latest_jobs, pending_jobs, ongoing_jobs, completed_jobs = [], [], [], []
+
+    for job in ALL_JOBS_DATA:
+        if job['status'] == 'Completed':
+            completed_jobs.append(job)
+        elif job['status'] == 'Pending' and job['created_at'] >= two_days_ago:
+            latest_jobs.append(job)
+        elif job['status'] == 'Pending' and job['created_at'] < two_days_ago:
+            pending_jobs.append(job)
+        elif job['status'] in ['Ongoing', 'Team Allocated', 'Waiting for Response']:
+            ongoing_jobs.append(job)
+
+    latest_jobs.sort(key=lambda j: j['created_at'], reverse=True)
+    
+    context = {
+        'all_jobs': ALL_JOBS_DATA,
+        'latest_jobs': latest_jobs,
+        'pending_jobs': pending_jobs,
+        'ongoing_jobs': ongoing_jobs,
+        'completed_jobs': completed_jobs,
+        'team_leaders': DUMMY_TEAM_LEADERS, # Pass leaders to the template
+        'today_date': today.isoformat(),
+    }
+    return render(request, 'registration/job_requests.html', context)
+
+# This view finds the specific job to show on the response screen
+@login_required
+def job_response_view(request, job_id):
+    job_data = next((job for job in ALL_JOBS_DATA if job['id'] == job_id), None)
+    
+    if not job_data:
+        return redirect('registration:job_requests')
+
+    context = {'job': job_data}
+    return render(request, 'registration/job_response_screen.html', context)
