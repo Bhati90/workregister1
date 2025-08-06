@@ -1,7 +1,7 @@
 // registration/static/registration/js/multi_step_form_client.js
 
 // Import idb library for easier IndexedDB access
-// import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
+import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
 // 
 // Global variables for camera, photo, and IndexedDB instance
 let cameraStream = null;

@@ -27,6 +27,7 @@ const urlsToCache = [
 ];
 
 // Import idb at the top level (cached version)
+let idbModule = null;
 
 /**
  * Converts a Blob to a Base64 string.
@@ -43,17 +44,17 @@ function blobToBase64(blob) {
 }
 importScripts('https://unpkg.com/idb@7.1.1/build/index.js'); // Use a CDN or your local path
 
-// async function getIDB() {
-//     if (!idbModule) {
-//         try {
-//             idbModule = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
-//         } catch (error) {
-//             console.error('[Service Worker] Failed to import idb:', error);
-//             throw error;
-//         }
-//     }
-//     return idbModule;
-// }
+async function getIDB() {
+    if (!idbModule) {
+        try {
+            idbModule = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
+        } catch (error) {
+            console.error('[Service Worker] Failed to import idb:', error);
+            throw error;
+        }
+    }
+    return idbModule;
+}
 
 // Installation: Cache all essential assets
 self.addEventListener('install', (event) => {
