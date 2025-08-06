@@ -210,6 +210,15 @@ CLOUDINARY_STORAGE = {
 # Set Cloudinary as the default file storage
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
+
+
+
+
+
+
+
+
+#local setup
 # from pathlib import Path
 # import os
 

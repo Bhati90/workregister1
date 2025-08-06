@@ -1,8 +1,8 @@
 // registration/static/registration/js/multi_step_form_client.js
 
 // Import idb library for easier IndexedDB access
-import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
-
+// import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/+esm';
+// 
 // Global variables for camera, photo, and IndexedDB instance
 let cameraStream = null;
 let photoBlob = null; // Store the captured photo as a Blob directly
@@ -1418,8 +1418,7 @@ async function handleNextSubmit(event) {
     let currentRegistration = await getCurrentRegistrationData();
     let stepData = {};
 
-    // ... existing helper functions remain the same ...
-
+  
     // Clear any previous invalid states
     form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
 
@@ -1734,9 +1733,6 @@ async function submitFullRegistration() {
 
 // Add event listener for mobile number field
 document.addEventListener('DOMContentLoaded', function() {
-    // ... existing DOMContentLoaded code ...
-    
-    // Add mobile number blur event listener
     const mobileInput = document.querySelector('[name="mobile_number"]');
     if (mobileInput) {
         mobileInput.addEventListener('blur', handleMobileNumberBlur);
@@ -1744,7 +1740,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Helper functions (add these if not already present)
+
 function getFieldValue(name) {
     const element = document.querySelector(`[name="${name}"]`);
     if (!element) return null;
