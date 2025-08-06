@@ -1072,38 +1072,22 @@ if ('serviceWorker' in navigator) {
             const offlineMessages = document.querySelectorAll('.offline-message, .pending-status');
             offlineMessages.forEach(msg => msg.remove());
             
-            // Enhanced success message with Cloudinary info
-            const syncData = event.data.data || {};
-            let message = 'Your offline registrations have been submitted successfully!';
-            
-            if (syncData.cloudinaryUploads > 0) {
-                message += ` ${syncData.cloudinaryUploads} photo(s) uploaded to cloud storage.`;
-            }
-            
-            if (syncData.duplicates > 0) {
-                message += ` ${syncData.duplicates} duplicate(s) were removed.`;
-            }
-            
-            showSyncMessage(message, 'success');
+            // Show success message
+            showSyncMessage('Your offline registrations have been submitted successfully!', 'success');
             
             // Refresh pending count
-            setTimeout(updateSyncStatusUI, 1000);
+            setTimeout(checkPendingRegistrations, 1000);
         }
     });
 }
 
 // Export functions for use in other scripts
-
-// Export enhanced functions
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        ...module.exports, // Keep existing exports
-        processAndSendRegistration,
-        syncSingleRegistrationWithDuplicateCheck,
-        updateSyncStatusUI,
-        syncNowHandler,
-        checkPendingRegistrations,
-        showOfflineMessage
+        manualSync,
+        registerBackgroundSync,
+        storeRegistrationOffline,
+        checkPendingRegistrations
     };
 }
 
@@ -1385,11 +1369,8 @@ async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
         });
 
         if (response.ok) {
-            const responseData = await response.json();
             console.log('Registration submitted successfully.');
-            if (responseData.photo_url) {
-                console.log(`Image successfully uploaded to Cloudinary: ${responseData.photo_url}`);
-            }
+            
             // Clean up IndexedDB data if submission was successful
             if (dbKey) {
                 const db = await openDB(DB_NAME, DB_VERSION);
