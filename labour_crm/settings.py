@@ -247,7 +247,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # 'authentication',       # PWA support
     'registration',
-    'pwa',  
+    # 'pwa',  
 ]
 
 MIDDLEWARE = [

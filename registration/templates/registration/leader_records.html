@@ -1,0 +1,45 @@
+{% extends 'registration/base.html' %}
+{% block title %}Leader Records{% endblock %}
+
+{% block extra_styles %}
+    .leader-summary-card {
+        background-color: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 1rem;
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+    .leader-summary-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .leader-avatar { width: 60px; height: 60px; border-radius: 50%; }
+    .kpi-summary-value { font-weight: 700; }
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title mb-0">Leaders Overview</h2>
+    </div>
+
+    <div class="row">
+        {% for leader in leader_records %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="leader-summary-card">
+                <div class="card-body text-center">
+                    <img src="{{ leader.avatar }}" alt="{{ leader.name }}" class="leader-avatar mb-3">
+                    <h4 class="card-title">{{ leader.name }}</h4>
+                </div>
+                <div class="list-group list-group-flush text-center small">
+                    <div class="list-group-item"><span class="kpi-summary-value">{{ leader.jobs_completed }}</span> Jobs Completed</div>
+                    <div class="list-group-item"><span class="kpi-summary-value">{{ leader.bids_won }}</span> Bids Won</div>
+                    <div class="list-group-item"><span class="kpi-summary-value text-success">₹{{ leader.total_earnings }}</span> Total Earnings</div>
+                </div>
+                <div class="card-body text-center">
+                    <a href="{% url 'registration:leader_detail' leader.id %}" class="btn btn-primary">View Full Report</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% endblock %} 

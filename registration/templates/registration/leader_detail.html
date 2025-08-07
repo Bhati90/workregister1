@@ -1,0 +1,118 @@
+{% extends 'registration/base.html' %}
+{% block title %}{{ leader.name }} - Performance Report{% endblock %}
+
+{% block extra_styles %}
+    .stat-card { background-color: #fff; border-radius: .75rem; padding: 1.5rem; text-align: center; border: 1px solid #e9ecef;}
+    .stat-value { font-size: 2rem; font-weight: 700; color: #667eea; }
+    .stat-label { font-size: 1rem; color: #6c757d; }
+    .chart-container { background-color: #fff; border-radius: .75rem; padding: 1.5rem; border: 1px solid #e9ecef; }
+    .history-table { font-size: 0.9em; }
+{% endblock %}
+
+{% block content %}
+    <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="{% url 'registration:leader_records' %}">Leaders</a></li><li class="breadcrumb-item active">{{ leader.name }}</li></ol></nav>
+    
+    <div class="d-flex align-items-center mb-4">
+        <img src="{{ leader.avatar }}" alt="{{ leader.name }}" style="width: 80px; height: 80px; border-radius: 50%;" class="me-4">
+        <div>
+            <h2 class="page-title mb-0">Performance Report: {{ leader.name }}</h2>
+            <p class="text-muted">Detailed analytics and job history.</p>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-4 col-6"><div class="stat-card"><div class="stat-value">{{ stats.jobs_completed }}</div><div class="stat-label">Jobs Completed</div></div></div>
+        <div class="col-md-4 col-6"><div class="stat-card"><div class="stat-value">{{ stats.total_workers }}</div><div class="stat-label">Total Workers Managed</div></div></div>
+        <div class="col-md-4 col-12"><div class="stat-card"><div class="stat-value text-success">₹{{ stats.total_earnings }}</div><div class="stat-label">Total Earnings</div></div></div>
+        <div class="col-md-4 col-6"><div class="stat-card"><div class="stat-value">{{ stats.win_rate }}%</div><div class="stat-label">Bid Win Rate</div></div></div>
+        <div class="col-md-4 col-6"><div class="stat-card"><div class="stat-value">{{ stats.acceptance_rate }}%</div><div class="stat-label">Acceptance Rate</div></div></div>
+        <div class="col-md-4 col-12"><div class="stat-card"><div class="stat-value text-danger">₹{{ stats.avg_bid_price }}</div><div class="stat-label">Average Bid Price</div></div></div>
+    </div>
+
+   <div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="chart-container">
+            <h5 class="mb-3">Monthly Earnings</h5>
+            <canvas id="earningsChart" 
+                    data-labels="{{ earnings_chart_labels|safe }}" 
+                    data-values="{{ earnings_chart_data|safe }}">
+            </canvas>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="chart-container">
+            <h5 class="mb-3">Bidding Behavior</h5>
+            <canvas id="biddingChart" 
+                    data-labels="{{ bidding_chart_labels|safe }}" 
+                    data-values="{{ bidding_chart_data|safe }}">
+            </canvas>
+        </div>
+    </div>
+</div>
+
+    <div class="chart-container">
+        <h5 class="mb-3">Completed Job History</h5>
+        {% if stats.completed_jobs_history %}
+        <table class="table table-striped history-table">
+            <thead><tr><th>Job Title</th><th>Completed On</th><th>Workers</th><th>Final Price/Day</th></tr></thead>
+            <tbody>
+                {% for job in stats.completed_jobs_history %}
+                <tr><td>{{ job.title }}</td><td>{{ job.completed_on|date:"d M, Y" }}</td><td>{{ job.workers }}</td><td>₹{{ job.final_price }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted text-center">No completed jobs on record for this leader.</p>
+        {% endif %}
+    </div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 1. Earnings Chart (Bar Chart) - This part is correct
+    const earningsCtx = document.getElementById('earningsChart');
+    if (earningsCtx) {
+        new Chart(earningsCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ earnings_chart_labels|safe }},
+                datasets: [{
+                    label: 'Total Earnings (₹)',
+                    data: {{ earnings_chart_data|safe }},
+                    backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                    borderColor: 'rgba(102, 126, 234, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true } } }
+        });
+    }
+
+    // 2. Bidding Behavior Chart (Doughnut Chart) - Corrected
+    // const biddingCtx = document.getElementById('biddingChart');
+    // if (biddingCtx) {
+    //     new Chart(biddingCtx, {
+    //         type: 'doughnut',
+    //         data: {
+    //             labels: {{ bidding_chart_labels|safe }},
+    //             datasets: [{
+    //                 label: 'Bid Count',
+    //                 data: {{ bidding_chart_data|safe }}, // <-- COMMA ADDED HERE
+    //                 backgroundColor: [
+    //                     'rgba(40, 167, 69, 0.7)',  // Won - Green
+    //                     'rgba(255, 193, 7, 0.7)',   // Lost - Yellow
+    //                     'rgba(220, 53, 69, 0.7)'    // Rejected - Red
+    //                 ],
+    //                 borderColor: '#fff',
+    //                 borderWidth: 2
+    //             }]
+    //         },
+    //         options: { responsive: true, maintainAspectRatio: false }
+    //     });
+    // }
+});
+</script>
+{% endblock %}

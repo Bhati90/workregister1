@@ -1,0 +1,59 @@
+{% extends 'registration/base.html' %}
+
+{% block title %}View Bids{% endblock %}
+
+{% block extra_styles %}
+    .bid-card { background-color: #fff; border: 1px solid #e9ecef; border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .bid-list .list-group-item-success { border-left: 4px solid #198754; }
+{% endblock %}
+
+{% block content %}
+    <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="{% url 'registration:bidding_dashboard' %}">Bidding</a></li><li class="breadcrumb-item active">View Bids</li></ol></nav>
+    <h2 class="page-title">Bids for "{{ job.title }}"</h2>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="bid-card">
+                <h4><i class="fas fa-gavel me-2 text-primary"></i>Incoming Bids</h4>
+                <p class="text-muted">Bids are automatically sorted by the lowest price first.</p>
+                <ul class="list-group bid-list">
+                    {% for bid in bids %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center {% if forloop.first %}list-group-item-success{% endif %}">
+                        <div>
+                            <h5 class="mb-1 fw-bold">{{ bid.leader_name }}</h5>
+                            <small class="text-muted">Bid placed: {{ bid.timestamp }}</small>
+                        </div>
+                        <div>
+                            <span class="h4 fw-bolder text-success me-4">₹{{ bid.bid_price }}/day</span>
+                            {% if forloop.first %}
+                            <button class="btn btn-success"><i class="fas fa-check me-2"></i>Accept Bid</button>
+                            {% else %}
+                            <button class="btn btn-outline-success">Accept Bid</button>
+                            {% endif %}
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center">No bids have been placed for this job yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="bid-card">
+                <h4><i class="fas fa-bullhorn me-2 text-primary"></i>Job Actions</h4>
+                <p>If the bids are too high or there are no bids, you can increase the asking price to attract more leaders.</p>
+                <div class="mb-3">
+                    <label class="form-label">Current Asking Price</label>
+                    <input type="text" class="form-control" value="₹{{ job.initial_price }}/day" disabled readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">New Asking Price</label>
+                    <input type="number" class="form-control" placeholder="Enter new price per day">
+                </div>
+                <div class="d-grid">
+                    <button class="btn btn-warning"><i class="fas fa-arrow-up me-2"></i>Update Price & Notify Leaders</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

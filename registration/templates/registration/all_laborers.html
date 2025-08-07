@@ -1,0 +1,203 @@
+{% extends 'registration/base.html' %}
+{% load static %}
+
+{% block title %}All Laborer Records{% endblock %}
+
+{% block extra_styles %}
+    /* --- CSS for the new UI --- */
+    .filter-bar {
+        background-color: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .laborer-card-new {
+        background-color: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        transition: all 0.2s ease-in-out;
+    }
+    .laborer-card-new:hover {
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    .card-header-new {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 1px solid #f0f0f0;
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+    }
+    .leader-name {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2d3748;
+    }
+    .leader-name i { color: #667eea; }
+    .date-info {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-align: right;
+    }
+    .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .info-item {
+        font-size: 0.95rem;
+        color: #4a5568;
+    }
+    .info-item i {
+        color: #667eea;
+        width: 20px;
+        text-align: center;
+        margin-right: 8px;
+    }
+    .card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        border-top: 1px solid #f0f0f0;
+        padding-top: 1rem;
+        margin-top: 1rem;
+    }
+    .action-badge {
+        font-size: 0.8rem;
+        font-weight: 500;
+        padding: 0.4em 0.8em;
+        border-radius: 50px;
+    }
+    .category-badge {
+        background-color: #dc3545; /* Red as requested */
+        color: white;
+    }
+    .pagination-wrapper { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title mb-0">All Laborer Registrations</h2>
+        <a href="#" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add New Registration</a>
+    </div>
+
+    <div class="filter-bar">
+        <form method="get">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="category" class="form-label">Category</label>
+                    <select name="category" id="category" class="form-select">
+                        <option value="">All Categories</option>
+                        {% for value, name in category_choices %}
+                        <option value="{{ value }}" {% if current_filters.category == value %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="location" class="form-label">Location (Village/Taluka)</label>
+                    <input type="text" name="location" id="location" class="form-control" placeholder="e.g., Nashik" value="{{ current_filters.location }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="price" class="form-label">Price/Day (₹)</label>
+                    <select name="price" id="price" class="form-select">
+                        <option value="">Any Price</option>
+                        <option value="0-300" {% if current_filters.price == '0-300' %}selected{% endif %}>0 - 300</option>
+                        <option value="301-500" {% if current_filters.price == '301-500' %}selected{% endif %}>301 - 500</option>
+                        <option value="501-800" {% if current_filters.price == '501-800' %}selected{% endif %}>501 - 800</option>
+                        <option value="801-10000" {% if current_filters.price == '801-10000' %}selected{% endif %}>800+</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-2"></i>Filter</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% for reg in page_obj %}
+    <div class="laborer-card-new">
+        <div class="card-header-new">
+            <div>
+                <h5 class="leader-name mb-1"><i class="fas fa-user me-2"></i>{{ reg.full_name }}</h5>
+                <span class="badge category-badge">{{ reg.get_category_display }}</span>
+            </div>
+            <div class="date-info">
+                <i class="fas fa-calendar-alt"></i> {{ reg.created_at|date:"M d, Y" }} <br>
+                <small>{{ reg.created_at|timesince }} ago</small>
+            </div>
+        </div>
+
+        <div class="card-grid">
+            <div class="info-item"><i class="fas fa-phone"></i> <strong>Phone:</strong>&nbsp;{{ reg.mobile_number }}</div>
+            <div class="info-item"><i class="fab fa-whatsapp"></i> <strong>WhatsApp:</strong>&nbsp;{{ reg.whatsapp_number|default:"N/A" }}</div>
+            <div class="info-item"><i class="fas fa-map-marker-alt"></i> <strong>Location:</strong>&nbsp;{{ reg.village }}, {{ reg.taluka }}</div>
+            <div class="info-item"><i class="fas fa-home"></i> <strong>Address:</strong>&nbsp;{{ reg.home_address|default:"N/A" }}</div>
+            
+            {% if reg.category == 'transport' %}
+            <div class="info-item"><i class="fas fa-truck"></i> <strong>Vehicle:</strong>&nbsp;{{ reg.vehicle_type }} ({{ reg.people_capacity }} people)</div>
+            <div class="info-item"><i class="fas fa-rupee-sign"></i> <strong>Fare:</strong>&nbsp;₹{{ reg.expected_fair }}</div>
+            {% elif reg.category == 'mukkadam' %}
+            <div class="info-item"><i class="fas fa-users"></i> <strong>Workers:</strong>&nbsp;{{ reg.providing_labour_count }}</div>
+            <div class="info-item"><i class="fas fa-rupee-sign"></i> <strong>Charges:</strong>&nbsp;₹{{ reg.expected_charges }}</div>
+            {% elif reg.category == 'individual_labor' %}
+            <div class="info-item"><i class="fas fa-user-friends"></i> <strong>Gender:</strong>&nbsp;{{ reg.get_gender_display }}</div>
+            <div class="info-item"><i class="fas fa-rupee-sign"></i> <strong>Wage:</strong>&nbsp;₹{{ reg.expected_wage }}</div>
+            {% endif %}
+        </div>
+
+        <div class="card-actions">
+            {% if reg.location %}<span class="badge bg-success-subtle text-success-emphasis action-badge">GPS Available</span>{% endif %}
+            {% if reg.photo %}<span class="badge bg-info-subtle text-info-emphasis action-badge">Photo Available</span>{% endif %}
+            <a href="#" class="btn btn-sm btn-outline-primary rounded-pill ms-auto"><i class="fas fa-edit me-1"></i> Edit</a>
+            <a href="#" class="btn btn-sm btn-outline-success rounded-pill"><i class="fas fa-map-marker-alt me-1"></i> View Map</a>
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-info text-center p-4">
+        <h4>No Laborers Found</h4>
+        <p class="mb-0">Your search and filter criteria did not match any records. Try adjusting your filters.</p>
+    </div>
+    {% endfor %}
+
+    {% if page_obj.has_other_pages %}
+<div class="pagination-wrapper mt-4">
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center mb-0">
+            
+            {# Previous Button #}
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}">Previous</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">Previous</span></li>
+            {% endif %}
+
+            {# Page Number Indicator #}
+            <li class="page-item active" aria-current="page">
+                <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {# Next Button #}
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}">Next</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+            {% endif %}
+
+        </ul>
+    </nav>
+</div>
+{% endif %}
+
+{% endblock %}

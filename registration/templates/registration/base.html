@@ -61,7 +61,7 @@
         }
         
         /* Add placeholder and job card styles here for use in other pages */
-        {% block extra_styles %}{% endblock %}
+        /* {% block extra_styles %}{% endblock %} */
 
         /* Responsive */
         @media (max-width: 768px) {
@@ -81,7 +81,11 @@
                     <p class="dashboard-subtitle">Overview of all registrations and analytics</p>
                 </div>
                 <div class="col-md-4 text-end">
-                    <a href="{% url 'registration:home' %}" class="btn btn-light btn-action me-2"><i class="fas fa-home me-2"></i>Main Home</a>
+                    <a href="{% url 'registration:dashboard' %}" class="btn btn-light btn-action me-2"><i class="fas fa-home me-2"></i>Main Home</a>
+                    <a class="btn btn-light btn-action me-2  {% if request.resolver_match.url_name == 'all_laborers' %}active{% endif %}" href="{% url 'registration:all_laborers' %}">Laborers</a>
+
+                    <a class="btn btn-light btn-action me-2 {% if request.resolver_match.url_name == 'leader_records' %}active{% endif %}" href="{% url 'registration:leader_records' %}">Leaders</a> 
+                    <a class="btn btn-light btn-action me-2 {% if request.resolver_match.url_name == 'bidding_dashboard' %}active{% endif %}" href="{% url 'registration:bidding_dashboard' %}">Bidding</a>
                     <a href="/admin/" class="btn btn-outline-light btn-action"><i class="fas fa-cog me-2"></i>Admin</a>
                 </div>
             </div>

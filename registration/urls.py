@@ -15,9 +15,26 @@ urlpatterns = [
     # path('api/check-mobile/', views.check_mobile_number, name='check_mobile'),
     path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
     path('api/location-status/', views.location_status_api, name='location_status_api'),
-    
-    path('job-requests/', views.job_requests_view, name='job_requests'),
-    path('job/<int:job_id>/responses/', views.job_response_view, name='job_responses'),
+
+# ADD THIS NEW URL
+path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+ # ADD THIS NEW URL for the unified laborer list
+    path('all-laborers/', views.all_laborers_view, name='all_laborers'),
+    # path('laborers/', views.laborer_records_view, name='laborer_records'),
+    path('leaders/', views.leader_records_view, name='leader_records'),
+      path('leader/<int:leader_id>/', views.leader_detail_view, name='leader_detail'),
+
+     path('bidding/', views.bidding_dashboard_view, name='bidding_dashboard'),
+    path('bidding/<int:job_id>/', views.view_bids_view, name='view_bids'),
+
+    # CORRECT
+path('job-requests/', views.job_requests_view, name='job_requests'),
+ path('job/<int:job_id>/responses/', views.job_response_view, name='job_responses'),
+
+       path('leader/dashboard/', views.leader_dashboard_view, name='leader_dashboard'),
+    path('leader/find-laborers/', views.find_laborers_view, name='find_laborers'),
+    path('find-laborersss/', views.find_laborerss_view, name='find_laborersss'),
 
     path('api/submit-registration/', views.submit_registration_api, name='submit_registration_api'), # This remains as /api/submit-registration/ relative to 'register/'
     #  path('api/check-phone-number/', views.check_phone_number_api, name='check_phone_number_api'),
