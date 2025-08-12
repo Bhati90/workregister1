@@ -1,0 +1,26 @@
+[
+    {
+        "job_id": "JOB-1001",
+        "farmer": "d5e6b0ac-2a31-4f3a-ae56-b49ab5dc6501",
+        "created_at": "2025-07-31T10:15:42.758098Z",
+        "labour_count": 6,
+        "activities": ["harvesting"],
+        "date_needed": "2025-08-15",
+        "is_completed": false,
+        "notes": "",
+        "location": "Nashik, Maharashtra",
+        "price": 4500
+    },
+    {
+        "job_id": "JOB-1002",
+        "farmer": "8b4e1f92-8a42-45c5-92f2-8e0b32b09c17",
+        "created_at": "2025-08-01T08:22:18.294699Z",
+        "labour_count": 9,
+        "activities": ["planting"],
+        "date_needed": "2025-08-20",
+        "is_completed": false,
+        "notes": "",
+        "location": "Pune, Maharashtra",
+        "price": 6700
+    }
+]

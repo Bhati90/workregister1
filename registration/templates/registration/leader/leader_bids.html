@@ -1,0 +1,56 @@
+{% extends 'registration/leader/leader_base.html' %}
+{% block title %}Mukadam Bids{% endblock %}
+
+{% block content %}
+<h2 class="page-title">Mukadam Bid Notifications</h2>
+
+{% for notification in bid_notifications %}
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                Bid for Job: <strong>{{ notification.job.title }}</strong>
+            </span>
+            <small class="text-muted">
+                Received {{ notification.created_at|timesince }} ago
+            </small>
+        </div>
+        <div class="card-body">
+            <p>{{ notification.message }}</p>
+            <hr>
+            
+            <h5>Bid Details:</h5>
+            {% with bid=notification.content_object %}
+                {% if bid %}
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <strong>Mukadam:</strong> {{ bid.mukadam.full_name }}
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Contact Number:</strong> 
+                        <a href="tel:{{ bid.mukadam.mobile_number }}">{{ bid.mukadam.mobile_number }}</a>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Bid Price:</strong> ₹{{ bid.bid_price }}
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Workers Provided:</strong> {{ bid.workers_provided }}
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Services Included:</strong>
+                        {% if bid.includes_transport %}<span class="badge bg-info">Transport</span>{% endif %}
+                        {% if bid.includes_accommodation %}<span class="badge bg-info">Accommodation</span>{% endif %}
+                        {% if bid.no_advance_required %}<span class="badge bg-warning text-dark">No Advance</span>{% endif %}
+                    </li>
+                </ul>
+                {% else %}
+                <p class="text-muted">Bid details could not be loaded.</p>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+{% empty %}
+    <div class="alert alert-info">
+        You have not received any bid notifications.
+    </div>
+{% endfor %}
+{% endblock %}

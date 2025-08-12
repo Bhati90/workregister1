@@ -1,0 +1,93 @@
+{# templates/registration/find_laborers.html #}
+{% extends 'registration/leader/leader_base.html' %}
+
+{% block content %}
+<form action="{% url 'registration:assign_team_to_job' job.id %}" method="POST">
+    {% csrf_token %}
+ 
+{# ... somewhere near the top of the page ... #}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Find Team for: {{ job.title }}</h2>
+    
+    <a href="{% url 'registration:advanced_labor_search' job.id %}" class="btn btn-success">
+        <i class="fas fa-star me-2"></i> Use Advanced Search
+    </a>
+
+<p class="text-muted">You need to select {{ job.workers_needed }} workers.</p>
+        </div>
+        <div>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#confirmTeamModal">
+                <i class="fas fa-check me-2"></i>Finalize & Send Response
+            </button>
+            <button type="submit" name="reject_job" class="btn btn-outline-danger">
+                <i class="fas fa-times me-2"></i>Cannot Form Team
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <h5>Individual Laborers</h5>
+            {% for worker in available_individuals %}
+            <div class="form-check card card-body mb-2">
+                <input class="form-check-input" type="checkbox" name="workers" value="individuallabor-{{ worker.pk }}" id="ind-{{ worker.pk }}">
+                <label class="form-check-label" for="ind-{{ worker.pk }}">
+                    <strong>{{ worker.full_name }}</strong> <br>
+                    <small class="text-muted">{{ worker.village }} | Skill: {{ worker.skill_other|default:'General' }}</small>
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-md-4">
+            <h5>Mukkadams (Contractors)</h5>
+            {% for worker in available_mukkadams %}
+            <div class="form-check card card-body mb-2">
+                <input class="form-check-input" type="checkbox" name="workers" value="mukkadam-{{ worker.pk }}" id="muk-{{ worker.pk }}">
+                <label class="form-check-label" for="muk-{{ worker.pk }}">
+                    <strong>{{ worker.full_name }}</strong> <br>
+                    <small class="text-muted">Supplies ~{{ worker.providing_labour_count }} workers</small>
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-md-4">
+            <h5>Transport Providers</h5>
+            {% for worker in available_transports %}
+            <div class="form-check card card-body mb-2">
+                <input class="form-check-input" type="checkbox" name="workers" value="transport-{{ worker.pk }}" id="trans-{{ worker.pk }}">
+                <label class="form-check-label" for="trans-{{ worker.pk }}">
+                    <strong>{{ worker.full_name }}</strong> <br>
+                    <small class="text-muted">{{ worker.vehicle_type }} ({{ worker.people_capacity }} capacity)</small>
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="modal fade" id="confirmTeamModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Team & Respond</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>You are about to finalize the team for <strong>{{ job.title }}</strong>. Please add any notes and confirm your price.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Your Quoted Price (per day)</label>
+                        <input type="number" name="quoted_price" class="form-control" value="{{ job.rate_per_day }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes for Admin</label>
+                        <textarea name="response_message" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Send Response to Admin</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

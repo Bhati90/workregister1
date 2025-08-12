@@ -1,0 +1,22 @@
+{% extends 'registration/mukadam/mukadam_base.html' %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>My Profile</h2>
+    </div>
+    <div class="card-body">
+        <h5 class="card-title">{{ profile.full_name }}</h5>
+        <p class="card-text"><strong>Mobile:</strong> {{ profile.mobile_number }}</p>
+        <p class="card-text"><strong>Location:</strong> {{ profile.village }}, {{ profile.taluka }}</p>
+        <hr>
+        <p class="card-text"><strong>Typical Workers Provided:</strong> {{ profile.providing_labour_count }}</p>
+        <p class="card-text"><strong>Services:</strong> 
+            Can arrange transport: {% if profile.arrange_transport %}Yes{% else %}No{% endif %}. 
+            Can provide tools: {% if profile.provide_tools %}Yes{% else %}No{% endif %}.
+        </p>
+    </div>
+</div>
+{% endblock %}

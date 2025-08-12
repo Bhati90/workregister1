@@ -561,7 +561,7 @@ class IndividualLaborForm(forms.ModelForm):
         fields = [
             'gender', 'age', 'primary_source_income', 'employment_type',
             'willing_to_migrate', 'expected_wage', 'availability', 'want_training',
-            # 'adult_men_seeking_employment', 'adult_women_seeking_employment',
+            'adult_men_seeking_employment', 'adult_women_seeking_employment',
             'can_refer_others', 'referral_name', 'referral_contact'
         ]
         widgets = {
@@ -573,8 +573,8 @@ class IndividualLaborForm(forms.ModelForm):
             'expected_wage': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Amount in ₹'}),
             'availability': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'When are you available to work?'}),
             'want_training': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            # 'adult_men_seeking_employment': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
-            # 'adult_women_seeking_employment': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'adult_men_seeking_employment': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'adult_women_seeking_employment': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'can_refer_others': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'referral_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name of person you can refer'}),
             'referral_contact': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Contact number'})
@@ -681,3 +681,58 @@ class DataSharingAgreementForm(forms.Form):
         }),
         label="I agree to the data sharing terms and conditions including location data usage"
     )
+
+
+# registration/forms.py
+from django import forms
+from .models import JobBid
+
+class LabourChoiceFieldWithNumber(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, obj):
+        # For each labourer, display their name and mobile number
+        return f"{obj.full_name} - {obj.mobile_number}"
+
+
+class JobBidForm(forms.ModelForm):
+    registered_labourers = LabourChoiceFieldWithNumber(
+        queryset=IndividualLabor.objects.all(),
+        widget=forms.SelectMultiple(attrs={'class': 'form-control'}),
+        required=False
+    )
+    uses_registered_labourers = forms.ChoiceField(
+        choices=(('no', 'No'), ('yes', 'Yes')),
+        widget=forms.RadioSelect,
+        label="Are your labourers registered on our platform?"
+    )
+
+    class Meta:
+        model = JobBid
+        fields = [
+            'bid_price', 
+            'workers_provided', 
+            'notes_on_skills',
+            'uses_registered_labourers', # Add the new field to the list
+            'registered_labourers',    
+            'includes_transport', 
+            'includes_accommodation', 
+            'no_advance_required'
+        ]
+        widgets = {
+            'notes_on_skills': forms.Textarea(attrs={'rows': 3}),
+            'registered_labourers': forms.SelectMultiple(attrs={'class': 'form-control'}),
+ 
+        }
+        labels = {
+            'bid_price': 'Your Total Bid Price (₹)',
+            'workers_provided': 'Number of Workers You Can Provide',
+            'notes_on_skills': 'Notes on Worker Skills',
+            'includes_transport': 'I will arrange and cover transport',
+            'includes_accommodation': 'I will arrange and cover accommodation',
+            'no_advance_required': 'I do not require an advance payment',
+
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make the dropdown not required by default, we'll handle it with JavaScript
+        self.fields['registered_labourers'].required = False

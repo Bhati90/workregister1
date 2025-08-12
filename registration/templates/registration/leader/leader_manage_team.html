@@ -1,0 +1,130 @@
+{# templates/registration/leader/leader_manage_team.html #}
+{% extends 'registration/leader/leader_base.html' %}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    
+{% block content %}
+<h2 class="page-title mb-4">Manage Team & Status for: {{ job.title }}</h2>
+
+{% for item in assignments_with_status %}
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0">{{ item.assignment.worker.full_name }}</h5>
+         <button class="btn btn-outline-warning btn-sm"
+                data-bs-toggle="modal"
+                data-bs-target="#helpRequestModal"
+                data-assignment-id="{{ item.assignment.id }}"
+                data-worker-name="{{ item.assignment.worker.full_name }}">
+            <i class="fas fa-hands-helping me-1"></i> Requirement
+        </button>
+    </div>
+    <div class="card-body">
+        <p>
+            Current Status: 
+            <strong class="text-primary">
+                {{ item.latest_update.get_status_display|default:'Not Started' }}
+            </strong>
+        </p>
+
+        <!-- Status Stepper -->
+        <div class="btn-toolbar" role="toolbar">
+        {% for status_value, status_name in all_statuses %}
+            {% if status_value == item.next_status %}
+                <button class="btn btn-success me-2"
+                        data-bs-toggle="modal" 
+                        data-bs-target="#confirmationModal"
+                        data-assignment-id="{{ item.assignment.id }}"
+                        data-status-value="{{ status_value }}"
+                        data-status-name="{{ status_name }}">
+                    {{ status_name }}
+                </button>
+            {% else %}
+                <button class="btn btn-secondary me-2" disabled>{{ status_name }}</button>
+            {% endif %}
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmationModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm Status Update</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="updateStatusForm" action="" method="POST">
+          {% csrf_token %}
+          <div class="modal-body">
+            <p>Are you sure you want to update the status to <strong id="modalStatusName"></strong>?</p>
+            <p class="text-danger">This action cannot be undone.</p>
+            <input type="hidden" id="modalStatusValue" name="status" value="">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Confirm</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="helpRequestModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">New Requirement for <span id="modalWorkerName"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="helpRequestForm" action="" method="POST">
+        {% csrf_token %}
+        <div class="modal-body">
+            <div class="mb-3">
+                <label for="helpTypeSelect" class="form-label">Type of Help</label>
+                <select class="form-select" id="helpTypeSelect" name="request_type">
+                    <option value="Transport">Transport Help</option>
+                    <option value="Advance">Advance Money</option>
+                    <option value="Accommodation">Accommodation</option>
+                    <option value="Other">Other...</option>
+                </select>
+            </div>
+            <div class="mb-3" id="otherHelpField" style="display: none;">
+                <label for="otherHelpText" class="form-label">Please specify</label>
+                <input type="text" class="form-control" id="otherHelpText" name="details">
+            </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning">Submit Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const confirmationModal = document.getElementById('confirmationModal');
+    
+    confirmationModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const assignmentId = button.dataset.assignmentId;
+        const statusValue = button.dataset.statusValue;
+        const statusName = button.dataset.statusName;
+
+        const updateForm = confirmationModal.querySelector('#updateStatusForm');
+        const modalStatusName = confirmationModal.querySelector('#modalStatusName');
+        const modalStatusValue = confirmationModal.querySelector('#modalStatusValue');
+        
+        // Set the form's action URL dynamically
+        updateForm.action = `/register/leader/assignment/${assignmentId}/update-status/`;
+        
+        modalStatusName.textContent = statusName;
+        modalStatusValue.value = statusValue;
+    });
+});
+</script>
+{% endblock %}

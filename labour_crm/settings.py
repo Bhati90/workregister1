@@ -247,7 +247,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # 'authentication',       # PWA support
     'registration',
-    # 'pwa',  
+    'pwa',  
 ]
 
 MIDDLEWARE = [
@@ -272,6 +272,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.debug',
+                'registration.context_processors.notifications_processor', 
             ],
         },
     },

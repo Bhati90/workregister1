@@ -1,0 +1,24 @@
+{% extends 'registration/job/base.html' %} {# Or your main admin base template #}
+
+{% block title %}Profile: {{ mukadam.full_name }}{% endblock %}
+{% block content %}
+    <h2 class="page-title">Mukadam Profile: {{ mukadam.full_name }}</h2>
+    
+    <div class="row">
+        <!-- Stats -->
+        <div class="col-md-3"><div class="card text-center p-3"><h4>{{ stats.total_bids }}</h4><p class="text-muted mb-0">Total Bids</p></div></div>
+        <div class="col-md-3"><div class="card text-center p-3"><h4>{{ stats.bids_won }}</h4><p class="text-muted mb-0">Bids Won</p></div></div>
+        <div class="col-md-3"><div class="card text-center p-3"><h4>₹{{ stats.total_earnings|floatformat:2 }}</h4><p class="text-muted mb-0">Total Earnings</p></div></div>
+        <div class="col-md-3"><div class="card text-center p-3"><h4>{{ stats.average_rating|floatformat:1 }}/5.0</h4><p class="text-muted mb-0">Avg. Rating</p></div></div>
+    </div>
+
+    <h4 class="mt-5">Bid History</h4>
+    <table class="table">
+        <thead><tr><th>Job Title</th><th>Bid Price</th><th>Workers</th><th>Status</th></tr></thead>
+        <tbody>
+            {% for bid in all_bids %}
+            <tr><td>{{ bid.job.title }}</td><td>₹{{ bid.bid_price }}</td><td>{{ bid.workers_provided }}</td><td><span class="badge bg-secondary">{{ bid.get_status_display }}</span></td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

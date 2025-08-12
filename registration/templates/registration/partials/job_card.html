@@ -1,36 +1,56 @@
-<div class="job-card">
-    <div class="row align-items-center">
-        <div class="col-lg-8">
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <span class="job-tag {{ job.status_class }} mb-2">{{ job.status }}</span>
-                    <h5 class="job-title mt-1"><a href="#">{{ job.title }}</a></h5>
+{# registration/partials/job_card.html #}
+
+<div class="card job-card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <h5 class="job-title fw-bold mb-1">{{ job.title }}</h5>
+                <div class="job-meta mb-2">
+                    <span><i class="fas fa-map-marker-alt"></i> {{ job.location }}</span> &bull;
+                    <span>Posted on {{ job.created_at|date:"d M, Y" }}</span>
                 </div>
-                <small class="text-muted d-none d-md-block">Posted {{ job.created_at|timesince }} ago</small>
+                <div class="job-details d-flex flex-wrap gap-3">
+                    <span><i class="fas fa-users"></i> {{ job.workers_needed }} Workers</span>
+                    <span><i class="fas fa-calendar-alt"></i> {{ job.duration_days }} Days</span>
+                    <span><i class="fas fa-calendar-check"></i> By {{ job.required_by_date|date:"d M, Y" }}</span>
+                </div>
             </div>
-            <p class="job-details mb-2"><i class="fas fa-map-marker-alt"></i> {{ job.location }}</p>
-            <div class="d-flex flex-wrap job-meta align-items-center">
-                <span class="me-3"><i class="far fa-calendar-alt"></i> {{ job.duration_days }} days</span>
-                <span class="me-3"><i class="fas fa-users"></i> {{ job.workers_needed }} needed</span>
-                <span class="text-danger fw-bold"><i class="fas fa-exclamation-circle"></i> Needed by: {{ job.required_by_date|date:"d M, Y" }}</span>
+            <div class="col-md-4 text-md-end">
+                <div class="job-rate">₹{{ job.rate_per_day|floatformat:0 }}</div>
+                <div class="job-rate-label">Per Worker / Day</div>
+                <span class="job-tag mt-2 {{ job.status_class }}">{{ job.get_status_display }}</span>
             </div>
-            {% if job.finalized_leader %}
-            <div class="mt-2 pt-2 border-top"><p class="mb-0 small text-muted"><i class="fas fa-user-check text-success"></i> <strong>Finalized Leader:</strong> {{ job.finalized_leader.name }}</p></div>
-            {% endif %}
         </div>
-        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
-            <div><span class="job-meta-tag">{{ job.dates }}</span><span class="job-meta-tag {{ job.competition_class }}">{{ job.competition }}</span></div>
-            <div class="my-2"><span class="job-rate">₹{{ job.rate }}</span><span class="job-rate-label"> per day</span></div>
-            
-            {% if job.status == 'Pending' %}
-                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#allocateTeamModal-{{ job.id }}"><i class="fas fa-user-plus me-2"></i>Allocate Team</button>
-            {% elif job.status == 'Waiting for Response' %}
-                <a href="{% url 'registration:job_responses' job.id %}" class="btn btn-warning"><i class="fas fa-hourglass-half me-2"></i>Check Responses</a>
-            {% elif job.status == 'Ongoing' %}
-                 <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#completeJobModal-{{ job.id }}"><i class="fas fa-check-double me-2"></i>Mark as Complete</button>
-            {% elif job.status == 'Completed' %}
-                <button class="btn btn-secondary" disabled><i class="fas fa-check-circle me-2"></i>Completed</button>
-            {% endif %}
-        </div>
+      <hr>
+<div class="d-flex justify-content-end align-items-center">
+    <a href="{% url 'registration:job_detail' job.id %}" class="btn btn-sm btn-outline-secondary me-2">View Details</a>
+    
+    {% if job.status == 'pending' %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#allocateTeamModal-{{ job.id }}">
+            <i class="fas fa-users-cog me-2"></i>Allocate Team
+        </button>
+    {% elif job.status == 'leader_responded' %}
+        {# NEW BUTTON FOR ADMIN ACTION #}
+        <a href="{% url 'registration:view_leader_response' job.id %}" class="btn btn-warning">
+            <i class="fas fa-inbox me-2"></i>View Response
+        </a>
+
+{% elif job.status == 'ongoing' %}
+   
+    <a href="{% url 'registration:live_job_status' job.id %}" class="btn btn-info">
+        <i class="fas fa-satellite-dish me-2"></i>Live Status
+    </a>
+
+    {% elif job.status == 'ongoing' %}
+        <form action="#" method="POST" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-check-circle me-2"></i>Mark as Complete
+            </button>
+        </form>
+    {% elif job.status == 'waiting_for_response' %}
+         <button class="btn btn-info disabled"><i class="fas fa-hourglass-half me-2"></i>Awaiting Response</button>
+    {% endif %}
+</div>
     </div>
 </div>

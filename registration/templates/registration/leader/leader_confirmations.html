@@ -1,0 +1,28 @@
+{# templates/registration/leader/leader_confirmations.html #}
+{% extends 'registration/leader/leader_base.html' %}
+
+{% block content %}
+    <h2 class="page-title mb-4">Awaiting Your Confirmation</h2>
+    {% for job in jobs_awaiting_confirmation %}
+    <div class="card mb-3 border-warning">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="card-title mb-1">{{ job.title }}</h5>
+                <p class="card-subtitle text-muted">Admin has approved your team. Please confirm to start.</p>
+            </div>
+            <div>
+                <form action="{% url 'registration:leader_confirm_start' job.id %}" method="POST" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">Confirm Start</button>
+                </form>
+                <form action="{% url 'registration:leader_cancel_job' job.id %}" method="POST" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Cancel Job</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-secondary">You have no jobs awaiting your final confirmation.</div>
+    {% endfor %}
+{% endblock %}

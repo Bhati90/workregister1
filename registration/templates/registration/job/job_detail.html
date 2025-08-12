@@ -1,0 +1,106 @@
+{# templates/registration/job_detail.html #}
+{% extends 'registration/job/base.html' %}
+{% load static %}
+
+{% block title %}Job Details: {{ job.title }}{% endblock %}
+
+{% block content %}
+<div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Job Information</h5>
+    
+    {# UPDATED BADGE LOGIC #}
+    {% if job.status == 'awaiting_leader_confirmation' %}
+        <span class="badge bg-warning text-dark rounded-pill p-2">Awaiting Leader Confirmation</span>
+    {% elif job.status == 'ongoing' %}
+        <span class="badge bg-success rounded-pill p-2">Ongoing (Leader Confirmed)</span>
+    {% else %}
+        <span class="badge bg-primary rounded-pill p-2">{{ job.get_status_display }}</span>
+    {% endif %}
+</div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="page-title mb-0">{{ job.title }}</h2>
+        <p class="text-muted">Details for Job #{{ job.id }}</p>
+    </div>
+    <a href="{% url 'registration:job_requests' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to All Jobs
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Job Information</h5>
+        <span class="badge bg-primary rounded-pill p-2">{{ job.get_status_display }}</span>
+    </div>
+    <div class="card-body">
+        <p class="card-text">{{ job.description|linebreaksbr }}</p>
+        <div class="row">
+            <div class="col-md-6">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>Location:</strong> {{ job.location }}</li>
+                    <li class="list-group-item"><strong>Workers Needed:</strong> {{ job.workers_needed }}</li>
+                    <li class="list-group-item"><strong>Duration:</strong> {{ job.duration_days }} days</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>Rate per Day:</strong> ₹{{ job.rate_per_day }}</li>
+                    <li class="list-group-item"><strong>Required By:</strong> {{ job.required_by_date|date:"F d, Y" }}</li>
+                    <li class="list-group-item"><strong>Posted:</strong> {{ job.created_at|timesince }} ago</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# THIS SECTION IS DYNAMIC: It only appears for ongoing or completed jobs #}
+{% if job.status == 'ongoing' or job.status == 'completed' %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-users me-2"></i>Team & Leader Details</h5>
+    </div>
+    <div class="card-body">
+        {% if job.finalized_leader %}
+            <h6 class="card-title">Finalized Leader</h6>
+            <p><i class="fas fa-user-check me-2 text-success"></i>{{ job.finalized_leader.get_full_name|default:job.finalized_leader.username }}</p>
+        {% else %}
+             <p class="text-muted">Awaiting leader confirmation.</p>
+        {% endif %}
+
+        <hr>
+
+     
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-users me-2"></i>Assigned Team</h5>
+    </div>
+    <div class="card-body">
+        {% if assignments %}
+            <ul class="list-group">
+                {# Loop through each 'assignment' object sent from the view #}
+                {% for assignment in assignments %}
+                <li class="list-group-item">
+                    
+                    {# Access the worker object via 'assignment.worker' #}
+                    {# Then access the worker's details like 'full_name' #}
+                    <strong>{{ assignment.worker.full_name }}</strong> 
+                    
+                    <span class="badge bg-secondary ms-2">{{ assignment.worker.get_category_display }}</span>
+                    <br>
+                    <small class="text-muted">
+                        <i class="fas fa-phone-alt me-1"></i> {{ assignment.worker.mobile_number }} | 
+                        <i class="fas fa-map-marker-alt ms-2 me-1"></i> {{ assignment.worker.village }}, {{ assignment.worker.taluka }}
+                    </small>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-muted">No workers have been assigned to this job yet.</p>
+        {% endif %}
+    </div>
+</div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

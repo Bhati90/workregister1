@@ -1,0 +1,21 @@
+{% extends 'registration/job/base.html' %} {# Or your main admin base template #}
+
+{% block title %}Profile: {{ leader.username }}{% endblock %}
+{% block content %}
+    <h2 class="page-title">Leader Profile: {{ leader.username }}</h2>
+    
+    <div class="row">
+        <div class="col-md-4"><div class="card text-center p-3"><h4>{{ stats.total_jobs }}</h4><p class="text-muted mb-0">Total Jobs Managed</p></div></div>
+        <div class="col-md-4"><div class="card text-center p-3"><h4>{{ stats.completed_jobs }}</h4><p class="text-muted mb-0">Jobs Completed</p></div></div>
+        <div class="col-md-4"><div class="card text-center p-3"><h4>{{ stats.ongoing_jobs }}</h4><p class="text-muted mb-0">Ongoing Jobs</p></div></div>
+    </div>
+
+    <h4 class="mt-5">Managed Jobs History</h4>
+    <ul class="list-group">
+        {% for job in jobs_managed %}
+            <li class="list-group-item">{{ job.title }} ({{ job.get_status_display }})</li>
+        {% empty %}
+            <li class="list-group-item">No jobs managed by this leader.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

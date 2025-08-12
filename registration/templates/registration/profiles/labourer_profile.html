@@ -1,0 +1,20 @@
+{% extends 'registration/job/base.html' %} {# Or your main admin base template #}
+
+{% block title %}Profile: {{ labourer.full_name }}{% endblock %}
+{% block content %}
+    <h2 class="page-title">Labourer Profile: {{ labourer.full_name }}</h2>
+    
+    <div class="row">
+        <div class="col-md-6"><div class="card text-center p-3"><h4>{{ job_count }}</h4><p class="text-muted mb-0">Jobs Completed</p></div></div>
+        <div class="col-md-6"><div class="card text-center p-3"><h4>{{ average_rating|floatformat:1 }}/5.0</h4><p class="text-muted mb-0">Average Rating</p></div></div>
+    </div>
+
+    <h4 class="mt-5">Work History</h4>
+    <ul class="list-group">
+        {% for assignment in work_history %}
+            <li class="list-group-item">{{ assignment.job.title }} - Assigned on {{ assignment.assigned_at|date:"d M, Y" }}</li>
+        {% empty %}
+            <li class="list-group-item">No work history found.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

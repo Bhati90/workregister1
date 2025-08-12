@@ -1,0 +1,80 @@
+{% extends 'registration/mukadam/mukadam_base.html' %}
+
+{% block title %}Submit Bid{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Submit Your Bid for: {{ job.title }}</h3>
+        <p class="text-muted">{{ job.location }} | Requires {{ job.workers_needed }} workers</p>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">{{ form.bid_price.label_tag }} {{ form.bid_price }}</div>
+                <div class="col-md-6 mb-3">{{ form.workers_provided.label_tag }} {{ form.workers_provided }}</div>
+            </div>
+
+            <div class="mb-3">{{ form.notes_on_skills.label_tag }} {{ form.notes_on_skills }}</div>
+            
+            <hr>
+
+            <div class="mb-3">
+                <p>{{ form.uses_registered_labourers.label_tag }}</p>
+                {{ form.uses_registered_labourers }}
+            </div>
+
+            <div class="mb-3" id="labourer-dropdown-container" style="display: none;">
+                <label for="{{ form.registered_labourers.id_for_label }}" class="form-label">
+                    Select the registered labourers for this job
+                </label>
+                {{ form.registered_labourers }}
+                <small class="form-text text-muted">Hold Ctrl (or Cmd on Mac) to select multiple labourers.</small>
+            </div>
+            
+            <hr>
+            <h5>Services Included in Your Bid:</h5>
+            <div class="form-check mb-2">{{ form.includes_transport }} {{ form.includes_transport.label_tag }}</div>
+            <div class="form-check mb-2">{{ form.includes_accommodation }} {{ form.includes_accommodation.label_tag }}</div>
+            <div class="form-check mb-3">{{ form.no_advance_required }} {{ form.no_advance_required.label_tag }}</div>
+
+            <button type="submit" class="btn btn-success">Submit Bid</button>
+            <a href="{% url 'registration:mukadam_dashboard' %}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const radioButtons = document.querySelectorAll('input[name="uses_registered_labourers"]');
+    const labourerDropdown = document.getElementById('labourer-dropdown-container');
+    
+    function toggleDropdown() {
+        if (document.querySelector('input[name="uses_registered_labourers"]:checked').value === 'yes') {
+            labourerDropdown.style.display = 'block';
+        } else {
+            labourerDropdown.style.display = 'none';
+        }
+    }
+
+    radioButtons.forEach(radio => {
+        radio.addEventListener('change', toggleDropdown);
+    });
+
+    // Run on page load in case the form is re-rendered with a value
+    toggleDropdown();
+
+    $(document).ready(function() {
+        $('#{{ form.registered_labourers.id_for_label }}').select2({
+            placeholder: "Search and select labourers...",
+            width: '100%'
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends 'registration/job/base.html' %} {# Or your main admin base template #}
+
+{% block title %}Select a Profile to View{% endblock %}
+
+{% block content %}
+<h2 class="page-title">View Performance Profiles</h2>
+
+<div class="card">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <label for="role_select" class="form-label">1. Select a Role:</label>
+                <select id="role_select" class="form-select">
+                    <option value="">-- Choose a role --</option>
+                    <option value="labourer">Labourer</option>
+                    <option value="mukadam">Mukadam</option>
+                    <option value="leader">Leader</option>
+                </select>
+            </div>
+
+            <div class="col-md-5">
+                <label for="name_select" class="form-label">2. Select a Person:</label>
+                
+                <select id="labourer_select" class="form-select name-select" style="display: none;">
+                    <option value="">-- Select a Labourer --</option>
+                    {% for labourer in labourers %}
+                        <option value="{{ labourer.id }}">{{ labourer.full_name }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select id="mukadam_select" class="form-select name-select" style="display: none;">
+                    <option value="">-- Select a Mukadam --</option>
+                    {% for mukadam in mukadams %}
+                        <option value="{{ mukadam.id }}">{{ mukadam.full_name }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select id="leader_select" class="form-select name-select" style="display: none;">
+                     <option value="">-- Select a Leader --</option>
+                    {% for leader in leaders %}
+                        <option value="{{ leader.id }}">{{ leader.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3 d-flex align-items-end">
+                <button id="view_profile_btn" class="btn btn-primary w-100">View Profile</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_scripts1 %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roleSelect = document.getElementById('role_select');
+    const nameSelects = document.querySelectorAll('.name-select');
+    const viewProfileBtn = document.getElementById('view_profile_btn');
+
+    // When the role changes, show the correct name dropdown
+    roleSelect.addEventListener('change', function() {
+        const selectedRole = this.value;
+        
+        // Hide all name dropdowns first
+        nameSelects.forEach(select => {
+            select.style.display = 'none';
+        });
+
+        // Show the relevant dropdown
+        if (selectedRole) {
+            const selectedNameSelect = document.getElementById(selectedRole + '_select');
+            selectedNameSelect.style.display = 'block';
+        }
+    });
+
+    // When the "View Profile" button is clicked, go to the correct URL
+    // In templates/registration/profiles/profile_selector.html
+
+// ... (keep the top part of the script the same) ...
+
+// When the "View Profile" button is clicked, go to the correct URL
+viewProfileBtn.addEventListener('click', function() {
+    const selectedRole = roleSelect.value;
+    if (!selectedRole) {
+        alert('Please select a role first.');
+        return;
+    }
+
+    const selectedNameSelect = document.getElementById(selectedRole + '_select');
+    const selectedId = selectedNameSelect.value;
+
+    if (!selectedId) {
+        alert('Please select a person to view.');
+        return;
+    }
+
+    let profileUrl;
+
+    // --- THIS IS THE CORRECTED PART ---
+    // We add '/register' to the beginning of each URL
+    if (selectedRole === 'labourer') {
+        profileUrl = `/register/profile/labourer/${selectedId}/`;
+    } else if (selectedRole === 'mukadam') {
+        profileUrl = `/register/profile/mukadam/${selectedId}/`;
+    } else if (selectedRole === 'leader') {
+        profileUrl = `/register/profile/leader/${selectedId}/`;
+    }
+
+    // Redirect the browser to the correct profile page
+    if (profileUrl) {
+        window.location.href = profileUrl;
+    }
+});
+});
+</script>
+{% endblock %}

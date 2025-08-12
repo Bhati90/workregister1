@@ -1,0 +1,80 @@
+{# templates/registration/job/admin_view_response.html #}
+{% extends 'registration/job/base.html' %} {# Or your main admin base template #}
+
+{% block title %}Leader Response for: {{ job.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="page-title mb-0">Leader Response</h2>
+        <p class="text-muted">Review the proposed team for Job #{{ job.id }} - {{ job.title }}</p>
+    </div>
+    <a href="{% url 'registration:job_requests' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to All Jobs
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-users me-2"></i>Proposed Team & Details</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-4">Responding Leader:</dt>
+                    <dd class="col-sm-8">{{ job.finalized_leader.get_full_name|default:job.finalized_leader.username }}</dd>
+
+                    <dt class="col-sm-4">Leader's Quoted Price:</dt>
+                    <dd class="col-sm-8"><strong>₹{{ job.leader_quoted_price|default:job.rate_per_day|floatformat:2 }} / day</strong></dd>
+
+                    <dt class="col-sm-4">Leader's Notes:</dt>
+                    <dd class="col-sm-8"><em>"{{ job.leader_response_message|default:'No notes provided.'|linebreaksbr }}"</em></dd>
+                </dl>
+                <hr>
+                <h6>Selected Workers ({{ assignments|length }})</h6>
+                <ul class="list-group">
+                    {% for worker in assignments %}
+                    <li class="list-group-item">
+                        <strong>{{ worker.full_name }}</strong> ({{ worker.get_category_display }})
+                        <br>
+                        <small class="text-muted">{{ worker.village }}, {{ worker.taluka }}</small>
+                        <small class="text-muted">{{ worker.mobile_number }}</small>
+                   
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">The leader did not select any workers.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card bg-light">
+             <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Take Action</h5>
+            </div>
+            <div class="card-body text-center">
+                <p>Review the team and price. Once approved, the job will become 'Ongoing' and the leader will be notified.</p>
+                
+                <form action="{% url 'registration:approve_team' job.id %}" method="POST" class="d-grid gap-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-lg btn-success">
+                        <i class="fas fa-check-circle me-2"></i>Approve & Start Job
+                    </button>
+                </form>
+
+                <hr>
+                <p>If the team is not suitable, you can reject it. The job will become 'Pending' again and the workers will be released.</p>
+
+                <form action="{% url 'registration:reject_team' job.id %}" method="POST" class="d-grid gap-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-times-circle me-2"></i>Reject & Reallocate
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

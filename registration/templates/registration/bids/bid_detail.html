@@ -1,0 +1,82 @@
+{% extends 'registration/job/base.html' %}
+{% block title %}Bids for {{ job.title }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="page-title mb-0">Bids for: {{ job.title }}</h2>
+        <p class="text-muted">{{ job.location }}</p>
+    </div>
+    <a href="{% url 'registration:live_bids_dashboard' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to All Bids
+    </a>
+</div>
+
+{% if allocations %}
+<div class="alert alert-success">
+    <h5 class="alert-heading">Allocated Leaders</h5>
+    <p>This job is also being managed by the following leader(s). You can notify them of a good bid.</p>
+    <hr>
+    {% for allocation in allocations %}
+        <span class="badge bg-dark me-2 fs-6">{{ allocation.leader.username }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Current Bids (Lowest First)</h5>
+        {% if bids %}
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Mukadam Name</th>
+                    <th>Bid Price (₹)</th>
+                    <th>Workers</th>
+                    <th>Skill</th>
+                    <th>Registered Labourers in Bid</th>
+                    <th>Services Included</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bid in bids %}
+                <tr>
+                    <td>{{ bid.mukadam.full_name }}</td>
+                    <td><strong>{{ bid.bid_price|floatformat:2 }}</strong></td>
+                    <td>{{ bid.workers_provided }}</td>
+                    <td>{{ bid.notes_on_skills }}</td>
+                     <td>
+                        {% if bid.registered_labourers.all %}
+                            <ul class="list-unstyled mb-0">
+                            {% for labourer in bid.registered_labourers.all %}
+                                <li>{{ labourer.full_name }}</li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span class="text-muted">None specified</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if bid.includes_transport %}<span class="badge bg-info">Transport</span>{% endif %}
+                        {% if bid.includes_accommodation %}<span class="badge bg-info">Accommodation</span>{% endif %}
+                        {% if bid.no_advance_required %}<span class="badge bg-warning">No Advance</span>{% endif %}
+                    </td>
+                    <td>
+                        <form action="{% url 'registration:notify_leader_of_bid' bid.id %}" method="POST">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-primary" {% if not allocations %}disabled title="No leader allocated"{% endif %}>
+                                <i class="fas fa-paper-plane"></i> Notify Leader
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">No bids have been placed for this job yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

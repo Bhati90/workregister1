@@ -1,0 +1,100 @@
+{% extends 'registration/job/base.html' %}
+{% load static %}
+
+{% block title %}Job Requests{% endblock %}
+
+{% block extra_styles %}
+    {# Your CSS styles here #}
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title mb-0">Job Requests</h2>
+    </div>
+
+    <ul class="nav nav-pills sub-nav-pills mb-4" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation"><button class="nav-link active" id="pills-latest-tab" data-bs-toggle="pill" data-bs-target="#pills-latest" type="button" role="tab">Latest <span class="badge bg-danger rounded-pill badge-count">{{ latest_jobs|length }}</span></button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="pills-pending-tab" data-bs-toggle="pill" data-bs-target="#pills-pending" type="button" role="tab">Pending <span class="badge bg-secondary rounded-pill badge-count">{{ pending_jobs|length }}</span></button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="pills-ongoing-tab" data-bs-toggle="pill" data-bs-target="#pills-ongoing" type="button" role="tab">Ongoing <span class="badge bg-secondary rounded-pill badge-count">{{ ongoing_jobs|length }}</span></button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="pills-completed-tab" data-bs-toggle="pill" data-bs-target="#pills-completed" type="button" role="tab">Completed <span class="badge bg-secondary rounded-pill badge-count">{{ completed_jobs|length }}</span></button></li>
+    </ul>
+
+    <div class="tab-content" id="pills-tabContent">
+        <div class="tab-pane fade show active" id="pills-latest" role="tabpanel">
+            {% for job in latest_jobs %}{% include 'registration/partials/job_card.html' %}{% empty %}
+            <div class="alert alert-light text-center p-4">✨ No new job requests in the last 4 days.</div>{% endfor %}
+        </div>
+        <div class="tab-pane fade" id="pills-pending" role="tabpanel">
+            {% for job in pending_jobs %}{% include 'registration/partials/job_card.html' %}{% empty %}
+            <div class="alert alert-light text-center p-4">No older jobs are pending allocation.</div>{% endfor %}
+        </div>
+        <div class="tab-pane fade" id="pills-ongoing" role="tabpanel">
+            {% for job in ongoing_jobs %}{% include 'registration/partials/job_card.html' %}{% empty %}
+            <div class="alert alert-light text-center p-4">No jobs are currently ongoing.</div>{% endfor %}
+        </div>
+        <div class="tab-pane fade" id="pills-completed" role="tabpanel">
+            {% for job in completed_jobs %}{% include 'registration/partials/job_card.html' %}{% empty %}
+            <div class="alert alert-light text-center p-4">No jobs have been completed yet.</div>{% endfor %}
+        </div>
+    </div>
+
+  {# templates/registration/job_requests.html #}
+{# ... (the top part with tabs and job card loops is the same) ... #}
+
+{% for job in allocatable_jobs %}
+<div class="modal fade" id="allocateTeamModal-{{ job.id }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg"> {# <-- Changed to modal-lg for more space #}
+        <div class="modal-content">
+            <form action="{% url 'registration:allocate_job' job.id %}" method="POST">
+                {% csrf_token %}
+                <div class="modal-header border-0">
+                    <h5 class="modal-title">Allocate Team for: {{ job.title }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Location</dt>
+                        <dd class="col-sm-9">{{ job.location }}</dd>
+
+                        <dt class="col-sm-3">Workers Needed</dt>
+                        <dd class="col-sm-9">{{ job.workers_needed }}</dd>
+
+                        <dt class="col-sm-3">Duration</dt>
+                        <dd class="col-sm-9">{{ job.duration_days }} days</dd>
+
+                        <dt class="col-sm-3">Rate</dt>
+                        <dd class="col-sm-9">₹{{ job.rate_per_day }} / day</dd>
+
+                        <dt class="col-sm-3">Required By</dt>
+                        <dd class="col-sm-9">{{ job.required_by_date|date:"F d, Y" }}</dd>
+
+                        <dt class="col-sm-3">Description</dt>
+                        <dd class="col-sm-9">{{ job.description|truncatewords:30 }}</dd>
+                    </dl>
+                    <hr>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select Team Leaders</label>
+                        <select name="leaders" class="form-select" multiple required size="5">
+                            {% for leader in team_leaders %}
+                                <option value="{{ leader.id }}">{{ leader.get_full_name|default:leader.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Hold Ctrl (or Cmd on Mac) to select multiple leaders.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-2"></i>Send Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block extra_scripts %}
+{# The complex JS for adding/removing rows is no longer needed with a simpler multi-select box. #}
+{# If you prefer the 'Add More' UI, the original JS can be adapted, but this is more robust. #}
+{% endblock %}

@@ -1,0 +1,34 @@
+{# templates/registration/leader/leader_ongoing_jobs.html #}
+{% extends 'registration/leader/leader_base.html' %}
+
+{% block content %}
+    <h2 class="page-title mt-5 mb-4">Your Ongoing Jobs</h2>
+    {% for job in ongoing_jobs %}
+    <div class="card mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="card-title mb-1">{{ job.title }}</h5>
+                <p class="card-subtitle text-muted">{{ job.location }}</p>
+            </div>
+            <div class="btn-group">
+                <a href="{% url 'registration:leader_manage_team' job.id %}" class="btn btn-primary">
+            Manage Team & Status
+        </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    {% for status_value, status_name in job.LEADER_STATUS_CHOICES %}
+                    <li>
+                        <form action="{% url 'registration:leader_update_status' job.id %}" method="POST">
+                            {% csrf_token %}
+                            <input type="hidden" name="status" value="{{ status_value }}">
+                            <button type="submit" class="dropdown-item">{{ status_name }}</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-secondary">You have no jobs currently in progress.</div>
+    {% endfor %}
+{% endblock %}
