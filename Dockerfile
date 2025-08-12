@@ -22,9 +22,14 @@ ENV C_INCLUDE_PATH=/usr/include/gdal
 COPY requirements.txt /app/
 RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
+# (The top part of your Dockerfile remains the same)
+...
 
-# Copy the project files
+# Copy the project files (this also copies startup.sh)
 COPY . /app/
+
+# Make the startup script executable
+RUN chmod +x /app/startup.sh
 
 # Collect static files
 RUN python manage.py collectstatic --noinput
@@ -32,14 +37,9 @@ RUN python manage.py collectstatic --noinput
 # Expose the port
 EXPOSE 8000
 
-# ---- NEW LINES START HERE ----
-
-# Copy the startup script into the container
-COPY startup.sh /app/
-
-# The CMD now executes the startup script
+# Set the startup script as the command to run
+# This REPLACES your old CMD line
 CMD ["/app/startup.sh"]
-
 # # Use official Python image
 # FROM python:3.12
 
