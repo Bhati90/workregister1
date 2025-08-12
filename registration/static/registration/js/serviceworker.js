@@ -176,57 +176,59 @@ async function syncLaborRegistrations() {
     }
 }
 
-async function syncSingleRegistration(reg, pendingStore, imageStore) {
-    const formData = new FormData();
-    const { step1, step2, step3 } = reg.data;
+// async function syncSingleRegistration(reg, pendingStore, imageStore) {
+//     const formData = new FormData();
+//     const { step1, step2, step3 } = reg.data;
 
-    // Append all text data from all steps
-    const allSteps = { ...step1, ...step2, ...step3 };
-    for (const key in allSteps) {
-        if (Object.prototype.hasOwnProperty.call(allSteps, key) && key !== 'photoId' && key !== 'photoBase64') {
-            const value = allSteps[key];
-            if (typeof value === 'object' && value !== null) {
-                formData.append(key, JSON.stringify(value));
-            } else {
-                formData.append(key, value);
-            }
-        }
-    }
+//     // Append all text data from all steps
+//     const allSteps = { ...step1, ...step2, ...step3 };
+//     for (const key in allSteps) {
+//         if (Object.prototype.hasOwnProperty.call(allSteps, key) && key !== 'photoId' && key !== 'photoBase64') {
+//             const value = allSteps[key];
+//             if (typeof value === 'object' && value !== null) {
+//                 formData.append(key, JSON.stringify(value));
+//             } else {
+//                 formData.append(key, value);
+//             }
+//         }
+//     }
 
-    // --- CORRECTED IMAGE HANDLING ---
-    // This now exclusively uses the reliable Base64 method for offline syncs.
-    if (step1.photoId) {
-        try {
-            const imageData = await imageStore.get(step1.photoId);
-            if (imageData && imageData.image) {
-                const base64String = await blobToBase64(imageData.image);
-                formData.append('photo_base64', base64String);
-                console.log(`[Service Worker] Image (ID: ${step1.photoId}) successfully converted to Base64 and appended.`);
-            }
-        } catch (error) {
-            console.error(`[Service Worker] Error processing image for sync:`, error);
-        }
-    }
+//     // --- CORRECTED IMAGE HANDLING ---
+//     // This now exclusively uses the reliable Base64 method for offline syncs.
+//     if (step1.photoId) {
+//         try {
+//             const imageData = await imageStore.get(step1.photoId);
+//             if (imageData && imageData.image) {
+//                 const base64String = await blobToBase64(imageData.image);
+//                 formData.append('photo_base64', base64String);
+//                 console.log(`[Service Worker] Image (ID: ${step1.photoId}) successfully converted to Base64 and appended.`);
+//             }
+//         } catch (error) {
+//             console.error(`[Service Worker] Error processing image for sync:`, error);
+//         }
+//     }
 
-    // Submit to server
-    const response = await fetch('/register/api/submit-registration/', {
-        method: 'POST',
-        body: formData,
-    });
+//     // Submit to server
+//     const response = await fetch('/register/api/submit-registration/', {
+//         method: 'POST',
+//         body: formData,
+//     });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Server responded with status ${response.status}: ${errorText}`);
-    }
+//     if (!response.ok) {
+//         const errorText = await response.text();
+//         throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+//     }
 
-    // If successful, remove from pending store and clean up images
-    await pendingStore.delete(reg.id);
-    if (step1.photoId) {
-        await imageStore.delete(step1.photoId);
-    }
-    console.log(`[Service Worker] Registration ID ${reg.id} synced and cleaned up successfully.`);
-}
+//     // If successful, remove from pending store and clean up images
+//     await pendingStore.delete(reg.id);
+//     if (step1.photoId) {
+//         await imageStore.delete(step1.photoId);
+//     }
+//     console.log(`[Service Worker] Registration ID ${reg.id} synced and cleaned up successfully.`);
+// }
 // Handle messages from client
+
+
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SYNC_NOW') {
         console.log('[Service Worker] Manual sync requested from client');
