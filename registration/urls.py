@@ -10,6 +10,8 @@ urlpatterns = [
     path('', views.home_view, name='home'),
     path('registration/', views.MultiStepRegistrationView.as_view(), name='registration'),
     path('success/', views.success_view, name='success_page'),
+     
+    
 
     # API endpoints
     path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),

@@ -28,7 +28,7 @@ urlpatterns = [
     # All URLs from 'registration.urls' will be prefixed with 'register/'
     path('register/', include('registration.urls', namespace='registration')), # Added namespace
 
-    # path('', include('pwa.urls')), # PWA URLs at the root level
+    path('', include('pwa.urls')), # PWA URLs at the root level
 
     # A root URL that redirects to the registration home page.
     # Be careful with conflicts here. This will match before pwa.urls if ordered higher.
