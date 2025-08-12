@@ -23,7 +23,7 @@ COPY requirements.txt /app/
 RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
 # (The top part of your Dockerfile remains the same)
-...
+
 
 # Copy the project files (this also copies startup.sh)
 COPY . /app/
