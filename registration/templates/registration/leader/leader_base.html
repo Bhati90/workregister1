@@ -1,4 +1,3 @@
-{# templates/registration/leader/leader_base.html #}
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
@@ -9,16 +8,71 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Your leader_base styles from the prompt go here */
+        :root {
+            --leader-primary: #0d6efd;
+            --leader-light: #f8f9fa;
+            --leader-dark: #212529;
+            --leader-bg: #eef2f7;
+        }
+
+        body {
+            background-color: var(--leader-bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .navbar-leader {
+            background-color: #ffffff;
+            border-bottom: 1px solid #dee2e6;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .navbar-brand {
+            font-weight: 600;
+            color: var(--leader-dark);
+        }
+
+        .navbar-nav .nav-link {
+            color: #555;
+            font-weight: 500;
+            transition: color 0.2s ease-in-out;
+        }
+
+        .navbar-nav .nav-link.active,
+        .navbar-nav .nav-link:hover {
+            color: var(--leader-primary);
+        }
+
+        .main-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 991.98px) {
+            .navbar-nav {
+                padding-top: 1rem;
+            }
+            .navbar-user-info {
+                padding-top: 1rem;
+                padding-bottom: 0.5rem;
+                border-top: 1px solid #eee;
+                margin-top: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
-   
+    
 <nav class="navbar navbar-expand-lg navbar-leader sticky-top">
     <div class="container">
         <a class="navbar-brand" href="{% url 'registration:leader_dashboard' %}">
             <i class="fas fa-users-cog text-primary"></i> Leader Portal
         </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
@@ -34,57 +88,62 @@
                        href="{% url 'registration:leader_ongoing_jobs' %}">Ongoing Jobs</a>
                 </li>
                 <li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.url_name == 'leader_bids' %}active{% endif %}" 
-       href="{% url 'registration:leader_bids' %}">
-        Bids
-        {% if unread_bids_count > 0 %}
-            <span class="badge bg-warning text-dark ms-1">{{ unread_bids_count }}</span>
-        {% endif %}
-    </a>
-</li>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'leader_bids' %}active{% endif %}" 
+                       href="{% url 'registration:leader_bids' %}">
+                        Bids
+                        {% if unread_bids_count > 0 %}
+                            <span class="badge bg-warning text-dark ms-1">{{ unread_bids_count }}</span>
+                        {% endif %}
+                    </a>
+                </li>
             </ul>
             
-            <div class="dropdown me-3">
-                <a href="#" class="nav-link text-secondary" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-bell fs-5 position-relative">
-                        {% if unread_count > 0 %}
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6em;">
-                            {{ unread_count }}
-                        </span>
-                        {% endif %}
-                    </i>
-                </a>
-                <div class="dropdown-menu dropdown-menu-end shadow-lg border-0" style="width: 350px;">
-                    <div class="dropdown-header">Notifications</div>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        {% for notification in notifications %}
-                        <a href="{% url 'registration:read_notification' notification.id %}" 
-                           class="dropdown-item d-flex align-items-start py-2 {% if not notification.is_read %}bg-light fw-bold{% endif %}">
-                            <i class="fas fa-briefcase text-primary mt-1 me-3"></i>
-                            <div>
-                                <p class="mb-0 small">{{ notification.message }}</p>
-                                <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
-                            </div>
-                        </a>
-                        {% empty %}
-                        <div class="text-center p-4 text-muted small">You have no new notifications.</div>
-                        {% endfor %}
+            <ul class="navbar-nav">
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-bell fs-5 position-relative">
+                            {% if unread_count > 0 %}
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6em;">
+                                {{ unread_count }}
+                            </span>
+                            {% endif %}
+                        </i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end shadow-lg border-0" style="width: 350px;">
+                        <div class="dropdown-header">Notifications</div>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            {% for notification in notifications %}
+                            <a href="{% url 'registration:read_notification' notification.id %}" 
+                               class="dropdown-item d-flex align-items-start py-2 {% if not notification.is_read %}bg-light fw-bold{% endif %}">
+                                <i class="fas fa-briefcase text-primary mt-1 me-3"></i>
+                                <div>
+                                    <p class="mb-0 small">{{ notification.message }}</p>
+                                    <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                                </div>
+                            </a>
+                            {% empty %}
+                            <div class="text-center p-4 text-muted small">You have no new notifications.</div>
+                            {% endfor %}
+                        </div>
                     </div>
-                </div>
-            </div>
-
-            <span class="navbar-text me-3">Welcome, {{ request.user.get_full_name|default:request.user.username }}</span>
-            <a href="{% url 'registration:logout' %}" class="btn btn-outline-secondary btn-sm">Logout</a>
+                </li>
+                <li class="nav-item navbar-user-info">
+                     <span class="navbar-text me-3">Welcome, {{ request.user.get_full_name|default:request.user.username }}</span>
+                </li>
+                <li class="nav-item">
+                    <a href="{% url 'registration:logout' %}" class="btn btn-outline-secondary btn-sm">Logout</a>
+                </li>
+            </ul>
         </div>
     </div>
 </nav>
-    <main class="container my-4">
-        {% block content %}{% endblock %}
-    </main>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script> -->
 
-    {% block extra_scripts %}
-    {% endblock %}
+<main class="container my-4">
+    {% block content %}{% endblock %}
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_scripts %}
+{% endblock %}
 </body>
 </html>

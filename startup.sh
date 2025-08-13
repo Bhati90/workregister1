@@ -4,12 +4,12 @@
 set -e
 
 # Run database migrations
-echo "Applying database migrations..."
-python manage.py migrate
+# echo "Applying database migrations..."
+# python manage.py migrate
 
-# Create the superuser using the custom command
-echo "Creating initial superuser..."
-python manage.py create_initial_superuser
+# # Create the superuser using the custom command
+# echo "Creating initial superuser..."
+# python manage.py create_initial_superuser
 
 # Start the Gunicorn web server
 echo "Starting Gunicorn server..."
