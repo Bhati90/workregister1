@@ -741,7 +741,7 @@
                             <div></div> {# Placeholder to maintain flex-box spacing #}
                         {% endif %}
 
-                        <button type="button" class="btn btn-primary btn-navigation" id="nextStepBtn"> {# Changed to type="button" as JS handles submission #}
+                        <button type="submit" class="btn btn-primary btn-navigation" id="nextStepBtn"> {# Changed to type="button" as JS handles submission #}
                             {% if step == 3 %}
                                 <i class="fas fa-check me-2"></i>Submit
                             {% else %}
@@ -753,8 +753,47 @@
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Alternative: Inline script to ensure functions are available -->
+<script>
+// Quick fix: Define functions globally if not already available
+if (typeof manualSync === 'undefined') {
+    window.manualSync = async function() {
+        console.log('Manual sync called');
+        if ('serviceWorker' in navigator) {
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                if (registration.active) {
+                    registration.active.postMessage({ type: 'SYNC_NOW' });
+                    alert('Sync requested! Check console for details.');
+                }
+                if (registration.sync) {
+                    await registration.sync.register('sync-labor-registration');
+                }
+            } catch (error) {
+                console.error('Manual sync failed:', error);
+                alert('Sync failed: ' + error.message);
+            }
+        }
+    };
+}
 
+// Quick debug function
+window.debugSync = function() {
+    console.log('=== SYNC DEBUG INFO ===');
+    console.log('Navigator online:', navigator.onLine);
+    console.log('ServiceWorker supported:', 'serviceWorker' in navigator);
+    console.log('Background Sync supported:', 'sync' in (window.ServiceWorkerRegistration?.prototype || {}));
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+            console.log('Service Worker ready:', !!registration);
+            console.log('Active worker:', !!registration.active);
+            console.log('Sync available:', !!registration.sync);
+        });
+    }
+};
+</script>
     <script type="module" src="/static/registration/js/multi_step_form_client.js"></script>
 </body>
 </html>

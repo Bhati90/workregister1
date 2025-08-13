@@ -70,7 +70,7 @@ urlpatterns = [
    # registration/urls.py
 
 # ... (inside your urlpatterns list) ...
-path('job/<int:job_id>/advanced-search/', views.advanced_labor_search_view, name='advanced_labor_search'),
+   path('job/<int:job_id>/advanced-search/', views.advanced_labor_search_view, name='advanced_labor_search'),
    
    path('leader/job/<int:job_id>/confirm-start/', views.leader_confirm_start_view, name='leader_confirm_start'),
    path('leader/job/<int:job_id>/cancel-job/', views.leader_cancel_job_view, name='leader_cancel_job'),

@@ -174,8 +174,6 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' 
 
 
 # PWA Settings
-PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration/static/registration/js', 'serviceworker.js')
-
 PWA_APP_NAME = 'AgroIntel'
 PWA_APP_DESCRIPTION = "AgroIntel - Connecting Farmers with Labours"
 PWA_APP_THEME_COLOR = '#2196f3'
@@ -211,8 +209,6 @@ CLOUDINARY_STORAGE = {
 
 # Set Cloudinary as the default file storage
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
-
 
 
 
