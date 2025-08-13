@@ -27,7 +27,6 @@ const urlsToCache = [
 ];
 
 // Import idb at the top level (cached version)
-let idbModule = null;
 
 /**
  * Converts a Blob to a Base64 string.
@@ -42,19 +41,19 @@ function blobToBase64(blob) {
         reader.readAsDataURL(blob);
     });
 }
-importScripts('https://unpkg.com/idb@7.1.1/build/index.js'); // Use a CDN or your local path
-
-async function getIDB() {
-    if (!idbModule) {
-        try {
-            idbModule = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
-        } catch (error) {
-            console.error('[Service Worker] Failed to import idb:', error);
-            throw error;
-        }
-    }
-    return idbModule;
-}
+// importScripts('https://unpkg.com/idb@7.1.1/build/index.js'); // Use a CDN or your local path
+importScripts('/static/registration/js/idb.js'); 
+// async function getIDB() {
+//     if (!idbModule) {
+//         try {
+//             idbModule = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
+//         } catch (error) {
+//             console.error('[Service Worker] Failed to import idb:', error);
+//             throw error;
+//         }
+//     }
+//     return idbModule;
+// }
 
 // Installation: Cache all essential assets
 self.addEventListener('install', (event) => {
@@ -458,7 +457,7 @@ async function syncLaborRegistrations() {
             throw new Error('Still offline');
         }
 
-        const { openDB } = await getIDB();
+        // const { openDB } = await getIDB();
         
         const db = await openDB(DB_NAME, DB_VERSION, {
             upgrade(db) {

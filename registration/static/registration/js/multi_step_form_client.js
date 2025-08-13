@@ -18,18 +18,18 @@ const STORE_PENDING_REGISTRATIONS = 'pending_registrations'; // Store for comple
 const STORE_OFFLINE_IMAGES = 'offline_images'; // Store for captured image Blobs
 
 // --- PWA Service Worker Registration ---
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        // Register the service worker as a module to allow for import statements
-        navigator.serviceWorker.register('/static/registration/js/serviceworker.js', { type: 'module' })
-            .then(registration => {
-                console.log('Service Worker registered successfully:', registration.scope);
-            })
-            .catch(error => {
-                console.error('Service Worker registration failed:', error);
-            });
-    });
-}
+// if ('serviceWorker' in navigator) {
+//     window.addEventListener('load', () => {
+//         // Register the service worker as a module to allow for import statements
+//         navigator.serviceWorker.register('/static/registration/js/serviceworker.js', { type: 'module' })
+//             .then(registration => {
+//                 console.log('Service Worker registered successfully:', registration.scope);
+//             })
+//             .catch(error => {
+//                 console.error('Service Worker registration failed:', error);
+//             });
+//     });
+// }
 
 // --- IndexedDB Initialization ---
 async function initDB() {
