@@ -1591,16 +1591,16 @@ async function handleNextSubmit(event) {
                 }
             }
 
-            const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
-            const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
-            if (adultMen < 0) {
-                document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid');
-                isValid = false;
-            }
-            if (adultWomen < 0) {
-                document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid');
-                isValid = false;
-            }
+            // const adultMen = parseInt(document.querySelector('[name="adult_men_seeking_employment"]').value) || 0;
+            // const adultWomen = parseInt(document.querySelector('[name="adult_women_seeking_employment"]').value) || 0;
+            // if (adultMen < 0) {
+            //     document.querySelector('[name="adult_men_seeking_employment"]').classList.add('is-invalid');
+            //     isValid = false;
+            // }
+            // if (adultWomen < 0) {
+            //     document.querySelector('[name="adult_women_seeking_employment"]').classList.add('is-invalid');
+            //     isValid = false;
+            // }
 
         } else if (currentCategory === 'mukkadam') {
             const skillCheckboxes = getCheckboxValues('skills');

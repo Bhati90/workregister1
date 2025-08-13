@@ -13,4 +13,5 @@ python manage.py create_initial_superuser
 
 # Start the Gunicorn web server
 echo "Starting Gunicorn server..."
-exec gunicorn labour_crm.wsgi:application --bind 0.0.0.0:$PORT
+# startup.sh (AFTER)
+exec gunicorn labour_crm.wsgi:application --bind 0.0.0.0:${PORT:-8000}

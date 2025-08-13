@@ -6,57 +6,57 @@ const DB_VERSION = 2;
 const STORE_PENDING_REGISTRATIONS = 'pending_registrations';
 const STORE_OFFLINE_IMAGES = 'offline_images';
 
-
-const urlsToCache = [
-    // Core Registration Flow (Existing)
-    '/register/',
-    '/register/registration/',
-    '/register/success/',
-    '/offline.html',
-
-    // Authentication
-    '/register/login/',
-
-    // Main User Dashboards
-    '/register/dashboard/',
-    '/register/leader/dashboard/',
-    '/register/mukadam/dashboard/',
-
-    // Key Leader Views
-    '/register/leader/confirmations/',
-    '/register/leader/ongoing-jobs/',
-    '/register/leader/bids/',
-
-    // Static Assets (Existing)
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
-    '/static/registration/js/multi_step_form_client.js',
-    '/static/registration/js/idb.js', // Assuming you have a local copy of idb.js
-
-    // App Icons (Existing)
-    '/static/images/android-chrome-192x192.png',
-    '/static/images/android-chrome-512x512.png',
-];
+// CLOUDINARY_URL  cloudinary://196762722111821:nKpyWbKl0UAdaqgkjI9W0HpQkR4@df8f5bxfp
 // const urlsToCache = [
+//     // Core Registration Flow (Existing)
 //     '/register/',
 //     '/register/registration/',
-//     '/register/registration/?step=1',
-//     '/register/registration/?step=2',
-//     '/register/registration/?step=3',
 //     '/register/success/',
 //     '/offline.html',
+
+//     // Authentication
+//     '/register/login/',
+
+//     // Main User Dashboards
+//     '/register/dashboard/',
+//     '/register/leader/dashboard/',
+//     '/register/mukadam/dashboard/',
+
+//     // Key Leader Views
+//     '/register/leader/confirmations/',
+//     '/register/leader/ongoing-jobs/',
+//     '/register/leader/bids/',
+
+//     // Static Assets (Existing)
 //     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
 //     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
 //     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
-//     'https://cdn.jsdelivr.net/npm/idb@7/+esm', // Cache the idb library
 //     '/static/registration/js/multi_step_form_client.js',
-//     '/static/registration/images/my_app_icon_192.png',
-//     '/static/registration/images/my_app_icon_512.png',
-//     '/static/registration/images/splash_screen_480x320.png',
+//     '/static/registration/js/idb.js', // Assuming you have a local copy of idb.js
+
+//     // App Icons (Existing)
 //     '/static/images/android-chrome-192x192.png',
 //     '/static/images/android-chrome-512x512.png',
 // ];
+const urlsToCache = [
+    '/register/',
+    '/register/registration/',
+    '/register/registration/?step=1',
+    '/register/registration/?step=2',
+    '/register/registration/?step=3',
+    '/register/success/',
+    '/offline.html',
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+    'https://cdn.jsdelivr.net/npm/idb@7/+esm', // Cache the idb library
+    '/static/registration/js/multi_step_form_client.js',
+    '/static/registration/images/my_app_icon_192.png',
+    '/static/registration/images/my_app_icon_512.png',
+    '/static/registration/images/splash_screen_480x320.png',
+    '/static/images/android-chrome-192x192.png',
+    '/static/images/android-chrome-512x512.png',
+];
 
 // Import idb at the top level (cached version)
 let idbModule = null;
