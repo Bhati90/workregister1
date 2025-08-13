@@ -39,7 +39,7 @@ const STORE_OFFLINE_IMAGES = 'offline_images';
 //     '/static/images/android-chrome-512x512.png',
 // ];
 const urlsToCache = [
-    '/register/',
+    // '/register/',
     '/register/registration/',
     '/register/registration/?step=1',
     '/register/registration/?step=2',
