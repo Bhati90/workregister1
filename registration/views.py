@@ -176,8 +176,8 @@ def submit_registration_api(request):
         category = data.get('category')
         # Check for duplicate mobile number here for immediate feedback
         mobile_number = data.get('mobile_number')
-        if mobile_number and IndividualLabor.objects.filter(mobile_number=mobile_number).exists():
-            return JsonResponse({'status': 'error', 'error_type': 'duplicate_mobile', 'message': 'This mobile number is already registered.'}, status=409)
+        # if mobile_number and IndividualLabor.objects.filter(mobile_number=mobile_number).exists():
+        #     return JsonResponse({'status': 'error', 'error_type': 'duplicate_mobile', 'message': 'This mobile number is already registered.'}, status=409)
 
         common_data = {
             'full_name': data.get('full_name'),
