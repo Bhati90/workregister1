@@ -146,23 +146,42 @@ class MultiStepRegistrationView(View):
 #     except Exception as e:
 #         logger.error(f"Error checking mobile number: {e}")
 #         return JsonResponse({'exists': False, 'message': 'Server error'}, status=500)
-
+# Helper function to get JSON data safely
+def get_json_data(data, key):
+    """
+    Safely retrieves and decodes a JSON string from request data.
+    Returns an empty list if the data is not a valid JSON string.
+    """
+    try:
+        val_str = data.get(key, '[]')
+        # Handle empty string case explicitly
+        if not val_str:
+            return []
+        return json.loads(val_str)
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f"JSONDecodeError or TypeError for key '{key}': {data.get(key)}. Error: {e}")
+        return []
 
 @csrf_exempt
 @require_POST
 def submit_registration_api(request):
     """
     Handles both ONLINE and OFFLINE submissions and saves the image to Cloudinary.
+    This version includes robust error handling for JSON fields and duplicate mobile numbers.
     """
     logger.info("API received a submission.")
     try:
-        data = request.POST
         
-        # --- Create Model Instance ---
+        data = request.POST
         category = data.get('category')
+        # Check for duplicate mobile number here for immediate feedback
+        mobile_number = data.get('mobile_number')
+        if mobile_number and IndividualLabor.objects.filter(mobile_number=mobile_number).exists():
+            return JsonResponse({'status': 'error', 'error_type': 'duplicate_mobile', 'message': 'This mobile number is already registered.'}, status=409)
+
         common_data = {
             'full_name': data.get('full_name'),
-            'mobile_number': data.get('mobile_number'),
+            'mobile_number': mobile_number,
             'taluka': data.get('taluka'),
             'village': data.get('village'),
             'data_sharing_agreement': data.get('data_sharing_agreement') == 'true'
@@ -170,11 +189,9 @@ def submit_registration_api(request):
         
         instance = None
         if category == 'individual_labor':
-            # ... (your existing logic for creating the model instance) ...
-            skills_str = data.get('skills', '[]')
-            skills = json.loads(skills_str)
-            comm_prefs_str = data.get('communication_preferences', '[]')
-            communication_preferences = json.loads(comm_prefs_str)
+            skills = get_json_data(data, 'skills')
+            communication_preferences = get_json_data(data, 'communication_preferences')
+            
             instance = IndividualLabor(
                 **common_data,
                 gender=data.get('gender'),
@@ -184,21 +201,20 @@ def submit_registration_api(request):
                 willing_to_migrate=data.get('willing_to_migrate') == 'true',
                 expected_wage=Decimal(data.get('expected_wage', 0)),
                 availability=data.get('availability'),
-                skill_pruning='pruning' in skills,
-                skill_harvesting='harvesting' in skills,
-                skill_dipping='dipping' in skills,
-                skill_thinning='thinning' in skills,
-                comm_mobile_app='mobile_app' in communication_preferences,
-                comm_whatsapp='whatsapp' in communication_preferences,
-                comm_calling='calling' in communication_preferences,
-                comm_sms='sms' in communication_preferences,
             )
+            instance.skill_pruning = 'pruning' in skills
+            instance.skill_harvesting = 'harvesting' in skills
+            instance.skill_dipping = 'dipping' in skills
+            instance.skill_thinning = 'thinning' in skills
+            instance.comm_mobile_app = 'mobile_app' in communication_preferences
+            instance.comm_whatsapp = 'whatsapp' in communication_preferences
+            instance.comm_calling = 'calling' in communication_preferences
+            instance.comm_sms = 'sms' in communication_preferences
+
         elif category == 'mukkadam':
-            # ... (your existing logic for Mukkadam) ...
-            skills_str = data.get('skills', '[]')
-            skills = json.loads(skills_str)
-            supply_areas_str = data.get('supply_areas', '[]')
-            supply_areas = json.loads(supply_areas_str)
+            skills = get_json_data(data, 'skills')
+            supply_areas = get_json_data(data, 'supply_areas')
+            
             instance = Mukkadam(
                 **common_data,
                 providing_labour_count=int(data.get('providing_labour_count', 0)),
@@ -207,31 +223,30 @@ def submit_registration_api(request):
                 labour_supply_availability=data.get('labour_supply_availability'),
                 arrange_transport=data.get('arrange_transport'),
                 arrange_transport_other=data.get('arrange_transport_other'),
-                # The service worker sends these as a JSON array, so handle accordingly
-                skill_pruning='pruning' in skills,
-                skill_harvesting='harvesting' in skills,
-                skill_dipping='dipping' in skills,
-                skill_thinning='thinning' in skills,
-                supply_areas_local='local' in supply_areas,
-                supply_areas_taluka='taluka' in supply_areas,
-                supply_areas_district='district' in supply_areas,
             )
+            instance.skill_pruning = 'pruning' in skills
+            instance.skill_harvesting = 'harvesting' in skills
+            instance.skill_dipping = 'dipping' in skills
+            instance.skill_thinning = 'thinning' in skills
+            instance.supply_areas_local = 'local' in supply_areas
+            instance.supply_areas_taluka = 'taluka' in supply_areas
+            instance.supply_areas_district = 'district' in supply_areas
+
         elif category == 'transport':
-            # ... (your existing logic for Transport) ...
-            service_areas_str = data.get('service_areas', '[]')
-            service_areas = json.loads(service_areas_str)
+            service_areas = get_json_data(data, 'service_areas')
+            
             instance = Transport(
                 **common_data,
                 vehicle_type=data.get('vehicle_type'),
                 people_capacity=int(data.get('people_capacity', 0)),
                 expected_fair=Decimal(data.get('expected_fair', 0)),
                 availability=data.get('availability'),
-                service_areas_local='local' in service_areas,
-                service_areas_taluka='taluka' in service_areas,
-                service_areas_district='district' in service_areas,
             )
+            instance.service_areas_local = 'local' in service_areas
+            instance.service_areas_taluka = 'taluka' in service_areas
+            instance.service_areas_district = 'district' in service_areas
+
         elif category == 'others':
-            # ... (your existing logic for Others) ...
             instance = Others(
                 **common_data,
                 business_name=data.get('business_name'),
@@ -256,10 +271,9 @@ def submit_registration_api(request):
         # --- Handle and Save Photo (Unified Logic) ---
         photo_file = request.FILES.get('photo')
         if photo_file:
-            instance.photo.save(photo_file.name, photo_file, save=False) # Don't save yet to do a single transaction
+            instance.photo.save(photo_file.name, photo_file, save=False)
             logger.info(f"Photo for {common_data['full_name']} attached to instance from file upload.")
         else:
-            # Fallback for old data or if photo fails to upload for some reason
             photo_base64 = data.get('photo_base64')
             if photo_base64:
                 try:
@@ -273,7 +287,6 @@ def submit_registration_api(request):
                 except Exception as e:
                     logger.error(f"Failed to save photo from Base64. Error: {e}", exc_info=True)
 
-        # --- Save the main model data and photo in one go ---
         instance.save()
         logger.info("Instance and photo saved successfully.")
         
@@ -282,7 +295,7 @@ def submit_registration_api(request):
     except Exception as e:
         logger.error(f"Critical error in submit_registration_api: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': 'An unexpected server error occurred.'}, status=500)
-    
+
 def success_view(request):
     return render(request, 'registration/success.html')
 
