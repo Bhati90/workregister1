@@ -152,17 +152,12 @@ class MultiStepRegistrationView(View):
 @require_POST
 def submit_registration_api(request):
     """
-    Handles both ONLINE (file upload) and OFFLINE (base64 string) submissions
-    and saves the image to Cloudinary. This is the fully corrected version.
+    Handles both ONLINE and OFFLINE submissions and saves the image to Cloudinary.
     """
     logger.info("API received a submission.")
     try:
         data = request.POST
         
-        # --- Get Image Data (handles both online and offline paths) ---
-        photo_file = request.FILES.get('photo')
-        photo_base64 = data.get('photo_base64')
-
         # --- Create Model Instance ---
         category = data.get('category')
         common_data = {
@@ -175,6 +170,7 @@ def submit_registration_api(request):
         
         instance = None
         if category == 'individual_labor':
+            # ... (your existing logic for creating the model instance) ...
             skills_str = data.get('skills', '[]')
             skills = json.loads(skills_str)
             comm_prefs_str = data.get('communication_preferences', '[]')
@@ -198,26 +194,45 @@ def submit_registration_api(request):
                 comm_sms='sms' in communication_preferences,
             )
         elif category == 'mukkadam':
-             instance = Mukkadam(
+            # ... (your existing logic for Mukkadam) ...
+            skills_str = data.get('skills', '[]')
+            skills = json.loads(skills_str)
+            supply_areas_str = data.get('supply_areas', '[]')
+            supply_areas = json.loads(supply_areas_str)
+            instance = Mukkadam(
                 **common_data,
                 providing_labour_count=int(data.get('providing_labour_count', 0)),
                 total_workers_peak=int(data.get('total_workers_peak', 0)),
                 expected_charges=Decimal(data.get('expected_charges', 0)),
                 labour_supply_availability=data.get('labour_supply_availability'),
                 arrange_transport=data.get('arrange_transport'),
-                supply_areas=data.get('supply_areas'),
+                arrange_transport_other=data.get('arrange_transport_other'),
+                # The service worker sends these as a JSON array, so handle accordingly
+                skill_pruning='pruning' in skills,
+                skill_harvesting='harvesting' in skills,
+                skill_dipping='dipping' in skills,
+                skill_thinning='thinning' in skills,
+                supply_areas_local='local' in supply_areas,
+                supply_areas_taluka='taluka' in supply_areas,
+                supply_areas_district='district' in supply_areas,
             )
         elif category == 'transport':
+            # ... (your existing logic for Transport) ...
+            service_areas_str = data.get('service_areas', '[]')
+            service_areas = json.loads(service_areas_str)
             instance = Transport(
                 **common_data,
                 vehicle_type=data.get('vehicle_type'),
                 people_capacity=int(data.get('people_capacity', 0)),
                 expected_fair=Decimal(data.get('expected_fair', 0)),
                 availability=data.get('availability'),
-                service_areas=data.get('service_areas')
+                service_areas_local='local' in service_areas,
+                service_areas_taluka='taluka' in service_areas,
+                service_areas_district='district' in service_areas,
             )
         elif category == 'others':
-             instance = Others(
+            # ... (your existing logic for Others) ...
+            instance = Others(
                 **common_data,
                 business_name=data.get('business_name'),
                 help_description=data.get('help_description'),
@@ -238,38 +253,36 @@ def submit_registration_api(request):
             except Exception as e:
                 logger.warning(f"Could not parse location data '{location_str}'. Error: {e}")
 
-        # --- Save the main model data (without photo yet) ---
-        instance.save()
-
-        # --- FINAL DEBUGGING CHECK ---
-        print("\n--- RUNTIME STORAGE CHECK ---")
-        print(f"The default_storage object being used is: {default_storage}")
-        print(f"The class of the storage object is: {default_storage.__class__}")
-        print("---------------------------\n")
-
-        # --- Save Photo to Cloudinary (Handles both paths) ---
+        # --- Handle and Save Photo (Unified Logic) ---
+        photo_file = request.FILES.get('photo')
         if photo_file:
-            instance.photo.save(photo_file.name, photo_file, save=True)
-            logger.info(f"Photo for {common_data['full_name']} saved to Cloudinary from direct upload.")
-        elif photo_base64:
-            try:
-                header, img_str = photo_base64.split(';base64,')
-                ext = header.split('/')[-1]
-                file_name = f"{uuid.uuid4().hex}.{ext}"
-                decoded_file = base64.b64decode(img_str)
-                content_file = ContentFile(decoded_file, name=file_name)
-                instance.photo.save(file_name, content_file, save=True)
-                logger.info(f"Photo for {common_data['full_name']} saved to Cloudinary from offline sync.")
-            except Exception as e:
-                logger.error(f"Failed to save photo from Base64. Error: {e}", exc_info=True)
+            instance.photo.save(photo_file.name, photo_file, save=False) # Don't save yet to do a single transaction
+            logger.info(f"Photo for {common_data['full_name']} attached to instance from file upload.")
+        else:
+            # Fallback for old data or if photo fails to upload for some reason
+            photo_base64 = data.get('photo_base64')
+            if photo_base64:
+                try:
+                    header, img_str = photo_base64.split(';base64,')
+                    ext = header.split('/')[-1]
+                    file_name = f"{uuid.uuid4().hex}.{ext}"
+                    decoded_file = base64.b64decode(img_str)
+                    content_file = ContentFile(decoded_file, name=file_name)
+                    instance.photo.save(file_name, content_file, save=False)
+                    logger.info(f"Photo for {common_data['full_name']} attached to instance from Base64 string.")
+                except Exception as e:
+                    logger.error(f"Failed to save photo from Base64. Error: {e}", exc_info=True)
 
+        # --- Save the main model data and photo in one go ---
+        instance.save()
+        logger.info("Instance and photo saved successfully.")
+        
         return JsonResponse({'status': 'success', 'message': 'Registration saved.'}, status=200)
 
     except Exception as e:
         logger.error(f"Critical error in submit_registration_api: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': 'An unexpected server error occurred.'}, status=500)
-
-
+    
 def success_view(request):
     return render(request, 'registration/success.html')
 
