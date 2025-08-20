@@ -125,27 +125,27 @@ class MultiStepRegistrationView(View):
 
         return render(request, self.template_name, context)
 
-@csrf_exempt
-@require_POST
-def check_mobile_number_api(request):
-    """
-    API endpoint to check if a mobile number already exists in the database.
-    """
-    # This function is preserved exactly as you had it.
-    try:
-        data = json.loads(request.body)
-        mobile_number = data.get('mobile_number', '').strip()
-        if not mobile_number:
-            return JsonResponse({'exists': False, 'message': 'No mobile number provided'})
+# @csrf_exempt
+# @require_POST
+# def check_mobile_number_api(request):
+#     """
+#     API endpoint to check if a mobile number already exists in the database.
+#     """
+#     # This function is preserved exactly as you had it.
+#     try:
+#         data = json.loads(request.body)
+#         mobile_number = data.get('mobile_number', '').strip()
+#         if not mobile_number:
+#             return JsonResponse({'exists': False, 'message': 'No mobile number provided'})
         
-        exists = mobile_number_exists(mobile_number)
-        return JsonResponse({
-            'exists': exists,
-            'message': 'Mobile number already registered' if exists else 'Mobile number available'
-        })
-    except Exception as e:
-        logger.error(f"Error checking mobile number: {e}")
-        return JsonResponse({'exists': False, 'message': 'Server error'}, status=500)
+#         exists = mobile_number_exists(mobile_number)
+#         return JsonResponse({
+#             'exists': exists,
+#             'message': 'Mobile number already registered' if exists else 'Mobile number available'
+#         })
+#     except Exception as e:
+#         logger.error(f"Error checking mobile number: {e}")
+#         return JsonResponse({'exists': False, 'message': 'Server error'}, status=500)
 
 
 @csrf_exempt

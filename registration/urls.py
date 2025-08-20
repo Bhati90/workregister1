@@ -14,7 +14,7 @@ urlpatterns = [
     
 
     # API endpoints
-    path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
+    # path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
     path('api/location-status/', views.location_status_api, name='location_status_api'),
     path('api/submit-registration/', views.submit_registration_api, name='submit_registration_api'),
 
