@@ -1,6 +1,6 @@
 // registration/static/registration/js/serviceworker.js
 
-const CACHE_NAME = 'labor-registration-cache-v2';
+const CACHE_NAME = 'labor-registration-cache-v3';
 const DB_NAME = 'LaborRegistrationDB';
 const DB_VERSION = 2;
 const STORE_PENDING_REGISTRATIONS = 'pending_registrations';
@@ -20,6 +20,7 @@ const urlsToCache = [
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
     'https://cdn.jsdelivr.net/npm/idb@7/+esm', // Cache the idb library
     '/static/registration/js/multi_step_form_client.js',
+    'https://unpkg.com/idb@7/build/umd.js',
     '/static/registration/images/my_app_icon_192.png',
     '/static/registration/images/my_app_icon_512.png',
     '/static/registration/images/splash_screen_480x320.png',
@@ -39,8 +40,6 @@ function blobToBase64(blob) {
         reader.readAsDataURL(blob);
     });
 }
-importScripts('https://unpkg.com/idb@7/build/umd.js');
-
 
 async function getIDB() {
     if (!idbModule) {
@@ -141,7 +140,11 @@ self.addEventListener('sync', (event) => {
         event.waitUntil(syncLaborRegistrations());
     }
 });
-
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SYNC_NOW') {
+        event.waitUntil(syncLaborRegistrations());
+    }
+});
 
 
 async function syncLaborRegistrations() {
@@ -153,7 +156,8 @@ async function syncLaborRegistrations() {
             throw new Error('Still offline');
         }
 
-         const { openDB } = await getIDB();
+         importScripts('https://unpkg.com/idb@7/build/umd.js');
+        const { openDB } = self.idb;
         const db = await openDB(DB_NAME, DB_VERSION);
         const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
         const pendingStore = tx.objectStore(STORE_PENDING_REGISTRATIONS);
