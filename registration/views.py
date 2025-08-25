@@ -362,9 +362,24 @@ def login_view(request):
             password = form.cleaned_data.get('password')
             user = authenticate(username=username, password=password)
             if user is not None:
-                login(request, user)
-                # After successful login, redirect them to the All Laborers page
-                return redirect('registration:leader_dashboard')
+                # --- START OF CHANGE ---
+                # Check if the authenticated user is a mukadam.
+                # Adjust the condition `user.is_mukadam` to match your model's field name.
+                # getattr() is used for a safe check in case the attribute doesn't exist.
+                if getattr(user, 'is_mukadam', False):
+                    login(request, user)
+                    # After successful login, redirect them to the dashboard
+                    return redirect('registration:leader_dashboard')
+                else:
+                    # User is valid, but not a mukadam. Show an error.
+                    messages.error(request, "Access Denied: You do not have permission to log in here.")
+                # --- END OF CHANGE ---
+            else:
+                # This handles cases where username/password is incorrect.
+                messages.error(request, "Invalid username or password.")
+        else:
+            # Form itself is invalid (e.g., empty fields)
+            messages.error(request, "Invalid username or password.")
     else:
         form = AuthenticationForm()
     return render(request, 'registration/login.html', {'form': form})
@@ -404,7 +419,9 @@ def job_requests_view(request):
 
     # Get all team leaders
     # Note: Assumes leaders are not superusers to filter out main admins.
-    team_leaders = User.objects.filter(is_superuser=False).distinct()
+    # team_leaders = User.objects.filter(is_superuser=False & is_mukadam = False).distinct()
+    # Excludes any user who is a member of the group named 'Mukadam'
+    team_leaders = User.objects.exclude(groups__name='Mukadams')
     ongoing_jobs = Job.objects.filter(
     status__in=['waiting_for_response', 'leader_responded', 'ongoing']
 ).order_by('-updated_at')
