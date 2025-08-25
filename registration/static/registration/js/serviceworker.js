@@ -39,18 +39,20 @@ function blobToBase64(blob) {
         reader.readAsDataURL(blob);
     });
 }
+importScripts('https://unpkg.com/idb@7/build/umd.js');
 
-async function getIDB() {
-    if (!idbModule) {
-        try {
-            idbModule = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
-        } catch (error) {
-            console.error('[Service Worker] Failed to import idb:', error);
-            throw error;
-        }
-    }
-    return idbModule;
-}
+
+// async function getIDB() {
+//     if (!idbModule) {
+//         try {
+//             idbModule = await import('https://cdn.jsdelivr.net/npm/idb@7/+esm');
+//         } catch (error) {
+//             console.error('[Service Worker] Failed to import idb:', error);
+//             throw error;
+//         }
+//     }
+//     return idbModule;
+// }
 // Installation: Cache all essential assets
 self.addEventListener('install', (event) => {
     console.log('[Service Worker] Installing...');
@@ -145,12 +147,13 @@ self.addEventListener('sync', (event) => {
 async function syncLaborRegistrations() {
     console.log('[Service Worker] Attempting to sync offline registrations...');
     try {
+        
         if (!navigator.onLine) {
             console.log('[Service Worker] Still offline, sync will retry later');
             throw new Error('Still offline');
         }
 
-        const { openDB } = await getIDB();
+         const { openDB } = self.idb; 
         const db = await openDB(DB_NAME, DB_VERSION);
         const tx = db.transaction([STORE_PENDING_REGISTRATIONS, STORE_OFFLINE_IMAGES], 'readwrite');
         const pendingStore = tx.objectStore(STORE_PENDING_REGISTRATIONS);

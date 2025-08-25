@@ -1,7 +1,7 @@
 # registration/urls.py
 from django.urls import path
 from . import views
-from .dashboard_views import DashboardView, CategoryDetailView, export_data, dashboard_api
+from .dashboard_views import DashboardView,job_create_view,dashboard_login, CategoryDetailView, export_data, dashboard_api
 
 app_name = 'registration'
 
@@ -17,7 +17,7 @@ urlpatterns = [
     # path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
     path('api/location-status/', views.location_status_api, name='location_status_api'),
     path('api/submit-registration/', views.submit_registration_api, name='submit_registration_api'),
-
+    # path("dashboard/login/", views.dashboard_login, name="dashboard_login"),
     # Authentication
     path('login/', views.login_view, name='login'),
    
@@ -62,13 +62,14 @@ urlpatterns = [
     path('job/<int:job_id>/reject-team/', views.reject_team_view, name='reject_team'),   # <-- ADD THIS
     # path('job/<int:job_id>/complete/', views.mark_job_complete, name='mark_job_complete'),
     path('job/<int:job_id>/live-status/', views.live_job_status_view, name='live_job_status'),
-
+     path('job/create/', views.job_create_view, name='create_job'), 
+  
   
     # Leader Portal
     #  path('leader/respond-job/<int:job_id>/', views.respond_to_job_api, name='respond_to_job'),
    path('leader/assignment/<int:assignment_id>/update-status/', views.update_worker_status_view, name='update_worker_status'),
-   # registration/urls.py
-
+   path('leader/assignment/<int:assignment_id>/request-help/', views.request_help_view, name='request_help'),# registration/urls.py
+   path('admin/help-request/<int:request_id>/resolve/', views.resolve_help_request_view, name='resolve_help_request'),
 # ... (inside your urlpatterns list) ...
    path('job/<int:job_id>/advanced-search/', views.advanced_labor_search_view, name='advanced_labor_search'),
    
@@ -85,6 +86,7 @@ urlpatterns = [
 
 
     # Dashboard URLs
+    path('dashboard/login', dashboard_login, name='dashboard'),
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
     path('dashboard/category/<str:category>/', CategoryDetailView.as_view(), name='category_detail'),
     path('dashboard/export/', export_data, name='export_all'),

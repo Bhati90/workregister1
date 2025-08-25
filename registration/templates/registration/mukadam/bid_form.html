@@ -31,6 +31,7 @@
                     Select the registered labourers for this job
                 </label>
                 {{ form.registered_labourers }}
+                
                 <small class="form-text text-muted">Hold Ctrl (or Cmd on Mac) to select multiple labourers.</small>
             </div>
             
@@ -69,12 +70,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Run on page load in case the form is re-rendered with a value
     toggleDropdown();
 
-    $(document).ready(function() {
-        $('#{{ form.registered_labourers.id_for_label }}').select2({
-            placeholder: "Search and select labourers...",
-            width: '100%'
-        });
-    });
+    // $(document).ready(function() {
+    //     $('#{{ form.registered_labourers.id_for_label }}').select2({
+    //         placeholder: "Search and select labourers...",
+    //         width: '100%'
+    //     });
+    // });
 });
 </script>
 {% endblock %}

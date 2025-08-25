@@ -9,13 +9,33 @@
 <div class="card mb-3">
     <div class="card-header">
         <h5 class="mb-0">{{ item.assignment.worker.full_name }}</h5>
-         <button class="btn btn-outline-warning btn-sm"
+          {# --- MODIFIED SECTION --- #}
+            {% if item.help_request and item.help_request.status == 'pending' %}
+        <span class="badge bg-secondary"><i class="fas fa-clock me-1"></i> Request Pending</span>
+
+    {# Otherwise (if no request, or if it's approved/rejected), show the button #}
+    {% else %}
+
+        {# First, optionally show the status of the *last* request #}
+        {% if item.help_request %}
+            {% if item.help_request.status == 'approved' %}
+                <span class="badge bg-success me-2"><i class="fas fa-check me-1"></i> Last Approved</span>
+            {% elif item.help_request.status == 'rejected' %}
+                <span class="badge bg-danger me-2"><i class="fas fa-times me-1"></i> Last Rejected</span>
+            {% endif %}
+        {% endif %}
+
+        {# Always show the button to create a new request in this case #}
+        <button class="btn btn-outline-warning btn-sm"
                 data-bs-toggle="modal"
                 data-bs-target="#helpRequestModal"
                 data-assignment-id="{{ item.assignment.id }}"
-                data-worker-name="{{ item.assignment.worker.full_name }}">
-            <i class="fas fa-hands-helping me-1"></i> Requirement
+                data-worker-name="{{ item.assignment.content_object.full_name }}">
+            <i class="fas fa-hands-helping me-1"></i> New Requirement
         </button>
+
+    {% endif %}
+            {# --- END MODIFIED SECTION --- #}
     </div>
     <div class="card-body">
         <p>
@@ -107,24 +127,54 @@
 {% block extra_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // --- Section 1: Logic for the Confirmation Modal ---
     const confirmationModal = document.getElementById('confirmationModal');
-    
-    confirmationModal.addEventListener('show.bs.modal', function (event) {
-        const button = event.relatedTarget;
-        const assignmentId = button.dataset.assignmentId;
-        const statusValue = button.dataset.statusValue;
-        const statusName = button.dataset.statusName;
+    if (confirmationModal) {
+        confirmationModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const assignmentId = button.dataset.assignmentId;
+            const statusValue = button.dataset.statusValue;
+            const statusName = button.dataset.statusName;
 
-        const updateForm = confirmationModal.querySelector('#updateStatusForm');
-        const modalStatusName = confirmationModal.querySelector('#modalStatusName');
-        const modalStatusValue = confirmationModal.querySelector('#modalStatusValue');
-        
-        // Set the form's action URL dynamically
-        updateForm.action = `/register/leader/assignment/${assignmentId}/update-status/`;
-        
-        modalStatusName.textContent = statusName;
-        modalStatusValue.value = statusValue;
-    });
+            const updateForm = confirmationModal.querySelector('#updateStatusForm');
+            const modalStatusName = confirmationModal.querySelector('#modalStatusName');
+            const modalStatusValue = confirmationModal.querySelector('#modalStatusValue');
+            
+            // Set the form's action URL dynamically
+            updateForm.action = `/register/leader/assignment/${assignmentId}/update-status/`;
+            
+            modalStatusName.textContent = statusName;
+            modalStatusValue.value = statusValue;
+        });
+    }
+
+    // --- Section 2: Logic for the Help Request Modal (now separate) ---
+    const helpRequestModal = document.getElementById('helpRequestModal');
+    if (helpRequestModal) {
+        const helpRequestForm = helpRequestModal.querySelector('#helpRequestForm');
+        const modalWorkerName = helpRequestModal.querySelector('#modalWorkerName');
+        const helpTypeSelect = helpRequestModal.querySelector('#helpTypeSelect');
+        const otherHelpField = helpRequestModal.querySelector('#otherHelpField');
+
+        helpRequestModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const assignmentId = button.dataset.assignmentId;
+            const workerName = button.dataset.workerName;
+
+            // Set the form's action URL dynamically
+            helpRequestForm.action = `/register/leader/assignment/${assignmentId}/request-help/`;
+            
+            modalWorkerName.textContent = workerName;
+        });
+
+        helpTypeSelect.addEventListener('change', function() {
+            if (this.value === 'Other') {
+                otherHelpField.style.display = 'block';
+            } else {
+                otherHelpField.style.display = 'none';
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

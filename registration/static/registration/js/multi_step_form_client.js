@@ -345,6 +345,14 @@ async function loadStep2Data() {
 
     if (step2Data.business_name) document.querySelector('[name="business_name"]').value = step2Data.business_name;
     if (step2Data.help_description) document.querySelector('[name="help_description"]').value = step2Data.help_description;
+     if (step2Data.labourers && Array.isArray(step2Data.labourers)) {
+        const container = document.getElementById('labourer-forms-container');
+        if (container) {
+            step2Data.labourers.forEach(labourer => {
+                addLabourerForm(labourer.name, labourer.mobile_number);
+            });
+        }
+    }
 }
 
 async function loadStep3Data() {
@@ -389,7 +397,26 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+// In multi_step_form_client.js
 
+async function requestNotificationPermission() {
+    if (!('Notification' in window)) {
+        console.warn('This browser does not support notifications.');
+        return false;
+    }
+
+    const permission = await Notification.requestPermission();
+    // permission can be 'granted', 'denied', or 'default' (user closed the pop-up)
+    
+    if (permission === 'granted') {
+        console.log('Notification permission granted.');
+        return true;
+    } else {
+        console.warn('Notification permission was not granted.');
+        alert('To enable automatic background sync when offline, please allow notification permissions for this site.');
+        return false;
+    }
+}
 function initializeCameraAndLocation() {
     setTimeout(() => {
         getCurrentLocation();
@@ -715,7 +742,7 @@ function showLocationError(message) {
 function initializeFormElements() {
     const canReferCheckbox = document.querySelector('input[name="can_refer_others"]');
     const referralFields = document.getElementById('referral-fields');
-
+    initializeMukkadamLabourerFormset();
     if (canReferCheckbox && referralFields) {
         canReferCheckbox.addEventListener('change', function() {
             referralFields.style.display = this.checked ? 'block' : 'none';
@@ -802,7 +829,7 @@ async function goBack() {
             stepData = {
                 providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
                 labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
-                supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
+                supply_areas: getFieldValue('supply_areas'), skills: getCheckboxValues('skills'),
             };
         } else if (currentCategory === 'transport') {
             stepData = {
@@ -1286,16 +1313,21 @@ async function processAndSendRegistration(fullRegistrationData, dbKey = null) {
         const allSteps = { ...fullRegistrationData.step1, ...fullRegistrationData.step2, ...fullRegistrationData.step3 };
         for (const key in allSteps) {
             if (allSteps.hasOwnProperty(key)) {
-                if (Array.isArray(allSteps[key]) || (typeof allSteps[key] === 'object' && allSteps[key] !== null && key !== 'location')) {
-                    formData.append(key, JSON.stringify(allSteps[key]));
-                } else if (key === 'location' && allSteps[key] !== null) {
-                    formData.append(key, JSON.stringify(allSteps[key]));
-                } else if (key !== 'photoId' && key !== 'photoBase64') {
-                    formData.append(key, allSteps[key]);
-                }
-            }
-        }
+                const value = allSteps[key];
 
+                if (key === 'skills' || key === 'communication_preferences' || key === 'service_areas' || key === 'labourers') {
+            // Your Python view expects these as a JSON string.
+                formData.append(key, JSON.stringify(value));
+        } 
+                else if (typeof value === 'object' && value !== null && key === 'location') {
+            // Location object is also sent as a JSON string
+                formData.append(key, JSON.stringify(value));
+        } 
+                else if (key !== 'photoId' && key !== 'photoBase64') {
+            // All other fields (like supply_areas) are sent as plain values.
+                formData.append(key, value === null ? '' : value);  }
+         }
+        }
         // --- CORRECTED IMAGE HANDLING LOGIC ---
         let imageBlob = null;
         let imageName = 'captured_image.jpeg';
@@ -1529,7 +1561,7 @@ async function handleNextSubmit(event) {
             case 'mukkadam':
                 requiredFields = [
                     'providing_labour_count', 'total_workers_peak', 'expected_charges',
-                    'labour_supply_availability', 'arrange_transport', 'supply_areas'
+                    'labour_supply_availability', 'arrange_transport', 'supply_areas','skills'
                 ];
                 break;
             case 'transport':
@@ -1582,6 +1614,13 @@ async function handleNextSubmit(event) {
                     isValid = false;
                 }
             }
+             const expectedChargesField = form.querySelector('[name="expected_charges"]');
+    const expectedChargesValue = expectedChargesField.value;
+    if (isNaN(parseFloat(expectedChargesValue))) {
+        alert('Please enter a valid number for Expected Charges.');
+        expectedChargesField.classList.add('is-invalid');
+        isValid = false;
+    }
 
             const providingCount = parseInt(getFieldValue('providing_labour_count')) || 0;
             const peakCount = parseInt(getFieldValue('total_workers_peak')) || 0;
@@ -1622,14 +1661,16 @@ async function handleNextSubmit(event) {
             stepData = {
                 providing_labour_count: parseInt(getFieldValue('providing_labour_count')) || null, total_workers_peak: parseInt(getFieldValue('total_workers_peak')) || null, expected_charges: getFieldValue('expected_charges'),
                 labour_supply_availability: getFieldValue('labour_supply_availability'), arrange_transport: getFieldValue('arrange_transport'), arrange_transport_other: getFieldValue('arrange_transport_other'),
-                supply_areas: getCheckboxValues('supply_areas'), skills: getCheckboxValues('skills'),
-            };
+                supply_areas: getFieldValue('supply_areas'), 
+                 labourers: getLabourerDataFromForms(),
+                skills: getCheckboxValues('skills'),  };
         } else if (currentCategory === 'transport') {
             stepData = {
                 vehicle_type: getFieldValue('vehicle_type'), people_capacity: parseInt(getFieldValue('people_capacity')) || null, expected_fair: getFieldValue('expected_fair'),
                 availability: getFieldValue('availability'), 
                 // FIX: Use getCheckboxValues for the checkboxes
                 service_areas: getCheckboxValues('service_areas'),
+                
             };
         } else if (currentCategory === 'others') {
             stepData = {
@@ -1661,6 +1702,8 @@ async function handleNextSubmit(event) {
 }
 
 // Updated submit full registration with better error handling
+// In multi_step_form_client.js
+
 async function submitFullRegistration() {
     const fullRegistrationData = await getCurrentRegistrationData();
     if (!fullRegistrationData || !fullRegistrationData.step1 || !fullRegistrationData.step2 || !fullRegistrationData.step3) {
@@ -1692,21 +1735,33 @@ async function submitFullRegistration() {
         }
     }
 
-    // Store for offline sync
+    // ▼▼▼ MODIFICATION START ▼▼▼
+    // If submission fails or user is offline, request permission before saving for sync.
+    console.log('Preparing to save for offline sync. Checking notification permissions first...');
+    const permissionGranted = await requestNotificationPermission();
+
+    // Always save the data locally regardless of permission
     await saveForBackgroundSync(fullRegistrationData);
     await clearCurrentRegistrationAndImage();
 
-    if ('serviceWorker' in navigator && 'SyncManager' in window) {
-        const registration = await navigator.serviceWorker.ready;
-        await registration.sync.register('sync-labor-registration');
-        alert('You are offline. Your registration will be submitted when you are back online.');
+    if (permissionGranted && 'serviceWorker' in navigator && 'SyncManager' in window) {
+        // If permission was granted, register the background sync
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.sync.register('sync-labor-registration');
+            alert('Your registration has been saved and will be submitted automatically when you are back online.');
+        } catch (err) {
+            console.error('Background sync registration failed even with permission:', err);
+            alert('Your data is saved locally, but automatic sync could not be set up.');
+        }
     } else {
-        alert('Your data is saved locally. It might be lost if you clear browser data.');
+        // If permission was denied, just inform the user the data is saved locally
+        alert('Your data is saved locally. Please enable notifications and use the "Sync Now" button to submit when you are online.');
     }
     
     window.location.href = '/register/success/';
+    // ▲▲▲ MODIFICATION END ▲▲▲
 }
-
 // Add event listener for mobile number field
 document.addEventListener('DOMContentLoaded', function() {
     // ... existing DOMContentLoaded code ...
@@ -1720,21 +1775,80 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Helper functions (add these if not already present)
-function getFieldValue(name) {
-    const element = document.querySelector(`[name="${name}"]`);
-    if (!element) return null;
-    if (element.type === 'checkbox' || element.type === 'radio') {
-        const selected = document.querySelector(`[name="${name}"]:checked`);
-        return selected ? selected.value : '';
-    }
-    if (element.tagName === 'SELECT') {
-        return element.value;
-    }
-    return element.value.trim();
+// function getFieldValue(name) {
+//     const element = document.querySelector(`[name="${name}"]`);
+//     if (!element) return null;
+//     if (element.type === 'checkbox' || element.type === 'radio') {
+//         const selected = document.querySelector(`[name="${name}"]:checked`);
+//         return selected ? selected.value : '';
+//     }
+//     if (element.tagName === 'SELECT') {
+//         return element.value;
+//     }
+//     return element.value.trim();
+// }
+
+// function getCheckboxValues(name) {
+//     const checkboxes = document.querySelectorAll(`input[name="${name}"]:checked`);
+//     return Array.from(checkboxes).map(cb => cb.value);
+// }
+
+
+// In multi_step_form_client.js (add these new functions)
+
+/**
+ * Collects data from all the dynamic labourer forms on the page.
+ * @returns {Array} An array of labourer objects, e.g., [{name: 'John', mobile_number: '123'}]
+ */
+function getLabourerDataFromForms() {
+    const labourers = [];
+    const forms = document.querySelectorAll('#labourer-forms-container .labourer-form');
+    forms.forEach(form => {
+        const nameInput = form.querySelector('input[name="labourer_name"]');
+        const mobileInput = form.querySelector('input[name="labourer_mobile"]');
+        if (nameInput && nameInput.value.trim() !== '') {
+            labourers.push({
+                name: nameInput.value.trim(),
+                mobile_number: mobileInput.value.trim(),
+            });
+        }
+    });
+    return labourers;
 }
 
-function getCheckboxValues(name) {
-    const checkboxes = document.querySelectorAll(`input[name="${name}"]:checked`);
-    return Array.from(checkboxes).map(cb => cb.value);
+/**
+ * Creates and appends a new labourer form to the container.
+ * Can be used to add a blank form or pre-fill one with existing data.
+ * @param {string} name - The name to pre-fill.
+ * @param {string} mobile - The mobile number to pre-fill.
+ */
+function addLabourerForm(name = '', mobile = '') {
+    const container = document.getElementById('labourer-forms-container');
+    const template = document.getElementById('empty-form-template');
+    if (!container || !template) return;
+
+    // Clone the template
+    const newForm = template.firstElementChild.cloneNode(true);
+    
+    // Set the values if they are provided
+    newForm.querySelector('input[name="labourer_name"]').value = name;
+    newForm.querySelector('input[name="labourer_mobile"]').value = mobile;
+    
+    // Add event listener for the new remove button
+    newForm.querySelector('.remove-labourer-btn').addEventListener('click', function() {
+        newForm.remove();
+    });
+    
+    container.appendChild(newForm);
 }
+
+
+// This function should be called when step 2 is initialized
+function initializeMukkadamLabourerFormset() {
+    const addBtn = document.getElementById('add-labourer-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => addLabourerForm());
+    }
+}
+
 

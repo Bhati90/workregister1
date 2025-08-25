@@ -216,7 +216,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 
-# # local setup
+# local setup
 # from pathlib import Path
 # import os
 

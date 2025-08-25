@@ -315,20 +315,14 @@ from .models import IndividualLabor, Mukkadam, Transport, Others
 # admin.site.site_title = "Labor Management Admin"
 # admin.site.index_title = "Welcome to Labor Management System Administration"
 
-# # registration/admin.py
+# registration/admin.py
 # from django.contrib import admin
-# from .models import TeamLeader, Laborer, Job, JobAssignment
+from .models import  Job, JobAssignment
 
-# admin.site.register(TeamLeader)
-# admin.site.register(Laborer)
+
 # admin.site.register(Job)
 # admin.site.register(JobAssignment)
-# registration/admin.py
-# registration/admin.py
 
-# registration/admin.py
-
-# registration/admin.py
 
 from django.contrib import admin
 from django.utils.html import format_html

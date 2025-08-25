@@ -49,12 +49,12 @@ from .models import (
     IndividualLabor, Mukkadam, Transport, Others
 )
 
-
+from .forms import JobForm
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.utils.timezone import now, timedelta
-from .models import Job, Notification # Make sure to import your models
+from .models import Job, Notification,RegisteredLabourer # Make sure to import your models
 
 from .forms import (
     BaseInformationForm, IndividualLaborForm, MukkadamForm,
@@ -213,24 +213,47 @@ def submit_registration_api(request):
 
         elif category == 'mukkadam':
             skills = get_json_data(data, 'skills')
-            supply_areas = get_json_data(data, 'supply_areas')
-            
+            # ▼▼▼ MODIFIED HERE ▼▼▼
+            # REMOVED: supply_areas = get_json_data(data, 'supply_areas')
+            # 'supply_areas' is a simple TextField, not a JSON array. We get it directly.
+            # --- SAFER NUMBER HANDLING ---
+            labour_count_str = data.get('providing_labour_count')
+            peak_workers_str = data.get('total_workers_peak')
+            charges_str = data.get('expected_charges')
+
             instance = Mukkadam(
                 **common_data,
-                providing_labour_count=int(data.get('providing_labour_count', 0)),
-                total_workers_peak=int(data.get('total_workers_peak', 0)),
-                expected_charges=Decimal(data.get('expected_charges', 0)),
+                providing_labour_count=int(labour_count_str) if labour_count_str else 0,
+                total_workers_peak=int(peak_workers_str) if peak_workers_str else 0,
+                expected_charges=Decimal(charges_str) if charges_str else Decimal('0.00'),
                 labour_supply_availability=data.get('labour_supply_availability'),
                 arrange_transport=data.get('arrange_transport'),
-                arrange_transport_other=data.get('arrange_transport_other'),
+                transport_other=data.get('arrange_transport_other'),
+                # ADDED: Pass the 'supply_areas' string directly to the model.
+                supply_areas=data.get('supply_areas', '') 
             )
+            # ▲▲▲ MODIFICATION END ▲▲▲
+            instance.save()
+        logger.info(f"Main instance for '{instance.full_name}' saved successfully.")
+
+        # ▼▼▼ ADD THIS NEW BLOCK HERE ▼▼▼
+        # After the main instance is saved, we can now save its related laborers.
+        if category == 'mukkadam':
+            labourers_data = get_json_data(data, 'labourers')
+            if labourers_data and isinstance(labourers_data, list):
+                for labourer_info in labourers_data:
+                    # Create a RegisteredLabourer object for each item in the list
+                    RegisteredLabourer.objects.create(
+                        mukkadam=instance, # Link it to the Mukkadam we just saved
+                        name=labourer_info.get('name'),
+                        mobile_number=labourer_info.get('mobile_number', '')
+                    )
+                logger.info(f"Saved {len(labourers_data)} registered labourers for Mukkadam {instance.full_name}.")
+        # ▲▲▲ END OF NEW BLOCK ▲▲▲
             instance.skill_pruning = 'pruning' in skills
             instance.skill_harvesting = 'harvesting' in skills
             instance.skill_dipping = 'dipping' in skills
             instance.skill_thinning = 'thinning' in skills
-            instance.supply_areas_local = 'local' in supply_areas
-            instance.supply_areas_taluka = 'taluka' in supply_areas
-            instance.supply_areas_district = 'district' in supply_areas
 
         elif category == 'transport':
             service_areas = get_json_data(data, 'service_areas')
@@ -329,7 +352,8 @@ def mobile_number_exists(mobile_number):
     if Others.objects.filter(mobile_number__endswith=cleaned_number).exists():
         return True
     return False
-
+ 
+    return render(request, 'dashboard/login.html', {'form': form})
 def login_view(request):
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
@@ -395,6 +419,26 @@ def job_requests_view(request):
         'today_date': today.isoformat(),
     }
     return render(request, 'registration/job/job_requests.html', context)
+
+@login_required
+def job_create_view(request):
+    """View to create a new job."""
+    if request.method == 'POST':
+        # If the form is submitted, process the data
+        form = JobForm(request.POST)
+        if form.is_valid():
+            form.save() # The new job is created and saved
+            # Redirect to the main job list page after successful creation
+            return redirect('registration:job_requests') 
+    else:
+        # If it's a GET request, show an empty form
+        form = JobForm()
+    
+    context = {
+        'form': form
+    }
+    return render(request, 'registration/job/job_form.html', context)
+
 
 @login_required
 def job_detail_view(request, job_id):
@@ -666,6 +710,44 @@ def assign_team_to_job_view(request, job_id):
     return redirect('registration:find_laborers_for_job', job_id=job.id)
 
 
+@login_required
+def request_help_view(request, assignment_id):
+    assignment = get_object_or_404(JobAssignment, id=assignment_id)
+    if request.method == 'POST':
+        # Prevent duplicate pending requests
+        if HelpRequest.objects.filter(assignment=assignment, status='pending').exists():
+            messages.error(request, 'There is already a pending request for this worker.')
+        else:
+            request_type = request.POST.get('request_type')
+            details = request.POST.get('details', '')
+            HelpRequest.objects.create(
+                assignment=assignment,
+                request_type=request_type,
+                details=details
+            )
+            messages.success(request, 'Your requirement request has been sent to the admin.')
+            
+    return redirect('registration:leader_manage_team', job_id=assignment.job.id)
+
+@login_required
+# @user_passes_test(lambda u: u.is_superuser) # Optional: ensure only admins can access
+def resolve_help_request_view(request, request_id):
+    help_request = get_object_or_404(HelpRequest, id=request_id)
+    job_id = help_request.assignment.job.id
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'approve':
+            help_request.status = 'approved'
+            messages.success(request, 'The request has been approved.')
+        elif action == 'reject':
+            help_request.status = 'rejected'
+            messages.warning(request, 'The request has been rejected.')
+        
+        help_request.resolved_at = timezone.now()
+        help_request.save()
+
+    return redirect('registration:live_job_status', job_id=job_id)
 
 @login_required
 def view_leader_response_view(request, job_id):
@@ -690,7 +772,7 @@ def view_leader_response_view(request, job_id):
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Job, JobAssignment, StatusUpdate, User,JobLeaderAllocation
+from .models import Job, JobAssignment,HelpRequest, StatusUpdate, User,JobLeaderAllocation
 
 @login_required
 def leader_manage_team_view(request, job_id):
@@ -723,16 +805,19 @@ def leader_manage_team_view(request, job_id):
             # If there's no status yet, the first one is the next logical step
             next_status = status_sequence[0]
 
+        help_request = HelpRequest.objects.filter(assignment=assignment).order_by('-created_at').first()
+        
         assignments_with_status.append({
             'assignment': assignment,
             'latest_update': latest_update,
-            'next_status': next_status
+            'next_status': next_status,
+            'help_request': help_request # Add this to the context item
         })
 
     context = {
         'job': job,
         'assignments_with_status': assignments_with_status,
-        'all_statuses': StatusUpdate.STATUS_CHOICES, # Pass all statuses for the stepper display
+        'all_statuses': StatusUpdate.STATUS_CHOICES,
     }
     return render(request, 'registration/leader/leader_manage_team.html', context)
 @login_required
@@ -777,32 +862,51 @@ def update_worker_status_view(request, assignment_id):
     return fallback_redirect
 
 
+from django.db.models import Exists, OuterRef
+# registration/views.py
+
 @login_required
 def live_job_status_view(request, job_id):
-    """
-    Admin-only view to see a live, detailed timeline of a job's progress.
-    """
+    # ... (code at the top of the view is the same)
     job = get_object_or_404(Job, id=job_id)
-    assignments = JobAssignment.objects.filter(job=job)
-    status_updates = StatusUpdate.objects.filter(assignment__in=assignments).order_by('-timestamp')
-    
-    # Check if all workers have reached the final status
-    all_complete = True
-    if assignments.exists():
-        for assignment in assignments:
-            if not assignment.status_updates.filter(status='payment_processed').exists():
-                all_complete = False
-                break
-    else:
-        all_complete = False # No assignments means not complete
 
+    # UPDATED QUERY FOR STATUS UPDATES
+    status_updates = StatusUpdate.objects.filter(
+        assignment__job=job
+    ).select_related('assignment').prefetch_related(
+        'assignment__content_object'  # CHANGED from assigned_object
+    ).order_by('-timestamp')
+
+    all_help_requests = HelpRequest.objects.filter(
+        assignment__job=job
+    ).select_related(
+        'assignment'
+    ).prefetch_related(
+        'assignment__content_object'
+    ).order_by('-created_at') 
+
+    pending_help_requests = [req for req in all_help_requests if req.status == 'pending']
+    resolved_help_requests = [req for req in all_help_requests if req.status != 'pending']
+    # --- END MODIFIED SECTION ---
+
+
+    # ... (The rest of your view for checking completion is the same)
+    total_assignments = JobAssignment.objects.filter(job=job).count()
+    incomplete_assignments_exist = JobAssignment.objects.filter(
+        job=job
+    ).exclude(
+        status_updates__status='payment_processed'
+    ).exists()
+    all_complete = (total_assignments > 0) and not incomplete_assignments_exist
+    
     context = {
         'job': job,
         'status_updates': status_updates,
+        'pending_help_requests': pending_help_requests,  # Pass the pending list
+        'resolved_help_requests': resolved_help_requests, # Pass the resolved list
         'show_complete_button': all_complete,
     }
     return render(request, 'registration/job/live_job_status.html', context)
-
 
 @login_required
 def approve_team_view(request, job_id):
@@ -973,79 +1077,6 @@ def respond_to_job_api(request, job_id):
 
 # registration/views.py
 
-# from decimal import Decimal
-# from geopy.geocoders import GoogleV3
-# from geopy.distance import geodesic
-# from .models import LaboursAdvancedProfiles # Add this import
-
-# # ... (keep all your existing views) ...
-
-# @login_required
-# def advanced_labor_search_view(request, job_id):
-#     job = get_object_or_404(Job, id=job_id)
-    
-#     # IMPORTANT: Replace with your actual API key
-#     # It's best practice to store this in your settings.py or environment variables
-#     API_KEY = "AIzaSyC0gN6MTJX6Nn1I0Ia41XeTMbThF3Nu_dY"
-#     geolocator = GoogleV3(api_key=API_KEY)
-
-#     try:
-#         job_geocode = geolocator.geocode(job.location)
-#         if not job_geocode:
-#             messages.error(request, f"Could not find coordinates for job location: {job.location}")
-#             return redirect('registration:find_laborers_view', job_id=job.id)
-#         job_coords = (job_geocode.latitude, job_geocode.longitude)
-#     except Exception as e:
-#         messages.error(request, f"Location service error: {e}")
-#         return redirect('registration:find_laborers_view', job_id=job.id)
-
-#     # Find profiles available on the job's required date
-#     required_date_str = job.required_by_date.strftime('%Y-%m-%d')
-#     available_profiles = LaboursAdvancedProfiles.objects.filter(
-#         available_dates__contains=required_date_str
-#     )
-    
-#     ranked_laborers = []
-#     for profile in available_profiles:
-#         transport_cost = Decimal(0)
-#         if profile.requires_transport:
-#             try:
-#                 labourer_location_str = f"{profile.labour.village}, {profile.labour.taluka}"
-#                 labourer_geocode = geolocator.geocode(labourer_location_str)
-#                 if labourer_geocode:
-#                     labourer_coords = (labourer_geocode.latitude, labourer_geocode.longitude)
-#                     distance_km = geodesic(job_coords, labourer_coords).kilometers
-#                     # Your formula: 5 rs/km
-#                     transport_cost = Decimal(distance_km * 5)
-#                 else:
-#                     # Skip this labourer if we can't find their location
-#                     continue
-#             except Exception:
-#                 # Also skip if there's an API error for this specific labourer
-#                 continue
-
-#         # Calculate total cost and profit
-#         labourer_total_cost = (profile.advanced_rate_per_day * job.duration_days) + transport_cost
-#         job_total_revenue = job.rate_per_day * job.duration_days
-#         profit = job_total_revenue - labourer_total_cost
-
-#         # Only include profitable options
-#         if profit > 0:
-#             ranked_laborers.append({
-#                 'profile': profile,
-#                 'profit': profit,
-#                 'transport_cost': transport_cost,
-#                 'labourer': profile.labour
-#             })
-
-#     # Sort the final list by profit, highest first
-#     ranked_laborers.sort(key=lambda x: x['profit'], reverse=True)
-    
-#     context = {
-#         'job': job,
-#         'ranked_laborers': ranked_laborers,
-#     }
-#     return render(request, 'registration/labours/advanced_search_results.html', context)
 
 # registration/views.py
 
@@ -1178,37 +1209,6 @@ def mukadam_logout_view(request):
 from django.db.models import Q # Make sure Q is imported
 # registration/views.py
 
-# registration/views.py
-
-# @mukadam_required
-# def mukadam_dashboard_view(request):
-#     mukadam_profile = get_object_or_404(Mukkadam, user=request.user)
-    
-#     open_jobs = Job.objects.filter(
-#         status='pending',
-#         bidding_deadline__gte=timezone.now()
-#     ).order_by('required_by_date')
-
-#     # --- START OF DEBUG CODE ---
-#     print("\n--- Mukadam Dashboard Debug ---")
-#     print(f"Searching for jobs with status='pending' and deadline after {timezone.now()}")
-#     print(f"Found {open_jobs.count()} open jobs in the database query.")
-
-#     for job in open_jobs:
-#         print(f"  -> Job Title: {job.title}, Status: {job.status}, Deadline: {job.bidding_deadline}")
-#     print("-----------------------------\n")
-#     # --- END OF DEBUG CODE ---
-
-#     my_bids = JobBid.objects.filter(mukadam=mukadam_profile).select_related('job')
-#     my_bid_job_ids = [bid.job.id for bid in my_bids]
-
-#     context = {
-#         'open_jobs': open_jobs,
-#         'my_bids': my_bids,
-#         'my_bid_job_ids': my_bid_job_ids,
-#         'mukadam_profile': mukadam_profile,
-#     }
-#     return render(request, 'registration/mukadam/dashboard.html', context)
 
 
 # registration/views.py
@@ -1245,38 +1245,43 @@ def mukadam_profile_view(request):
     return render(request, 'registration/mukadam/profile.html', context)
 
 
+# In mukadam_views.py (or views.py)
+
 @mukadam_required
 def mukadam_bid_view(request, job_id):
     job = get_object_or_404(Job, id=job_id, bidding_deadline__gte=timezone.now())
     mukadam_profile = get_object_or_404(Mukkadam, user=request.user)
     
-    # Check if a bid already exists to pre-fill the form
-    try:
-        existing_bid = JobBid.objects.get(job=job, mukadam=mukadam_profile)
-    except JobBid.DoesNotExist:
-        existing_bid = None
+    # ▼▼▼ 1. ADD THIS LINE ▼▼▼
+    # Get the count of this Mukkadam's registered laborers for the template.
+    mukkadam_labourer_count = mukadam_profile.registered_labourers.count()
+    
+    existing_bid = JobBid.objects.filter(job=job, mukadam=mukadam_profile).first()
 
     if request.method == 'POST':
-        form = JobBidForm(request.POST, instance=existing_bid)
+        # ▼▼▼ 2. PASS MUKKADAM HERE ▼▼▼
+        # Pass the mukkadam's profile into the form so it can filter the dropdown.
+        form = JobBidForm(request.POST, instance=existing_bid, mukkadam=mukadam_profile)
         if form.is_valid():
             bid = form.save(commit=False)
             bid.job = job
             bid.mukadam = mukadam_profile
             bid.save()
+            form.save_m2m() # Saves the many-to-many relationship for labourers
             
-            form.save_m2m() 
-            
-            messages.success(request, f"Your bid for '{job.title}' has been submitted successfully!")
+            messages.success(request, f"Your bid for '{job.title}' has been updated successfully!")
             return redirect('registration:mukadam_dashboard')
     else:
-        form = JobBidForm(instance=existing_bid)
+        # ▼▼▼ 2. PASS MUKKADAM HERE AS WELL ▼▼▼
+        form = JobBidForm(instance=existing_bid, mukkadam=mukadam_profile)
 
     context = {
         'form': form,
-        'job': job
+        'job': job,
+        # ▼▼▼ 3. ADD THE COUNT TO THE CONTEXT ▼▼▼
+        'mukkadam_labourer_count': mukkadam_labourer_count,
     }
     return render(request, 'registration/mukadam/bid_form.html', context)
-
 # registration/views.py
 from django.db.models import Prefetch # Make sure to import Prefetch
 

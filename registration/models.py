@@ -163,6 +163,20 @@ class Mukkadam(BaseRegistration):
 
     provide_tools = models.BooleanField(default=False)
     supply_areas = models.TextField()
+class RegisteredLabourer(models.Model):
+    mukkadam = models.ForeignKey(Mukkadam, on_delete=models.CASCADE, related_name='registered_labourers')
+    name = models.CharField(max_length=100)
+    mobile_number = models.CharField(max_length=15, blank=True)
+
+    def __str__(self):
+        if self.mobile_number:
+            return f"{self.name} - {self.mobile_number}"
+        return self.name
+
+    class Meta:
+        # Prevent a mukkadam from adding the same labourer twice
+        unique_together = ('mukkadam', 'name')
+
 
 class Transport(BaseRegistration):
     vehicle_type = models.CharField(max_length=200)
@@ -323,7 +337,7 @@ class JobAssignment(models.Model):
     
     assigned_by = models.ForeignKey(User, on_delete=models.CASCADE)
     assigned_at = models.DateTimeField(auto_now_add=True)
-    
+    content_object = GenericForeignKey('content_type', 'object_id') 
     class Meta:
         unique_together = ('job', 'content_type', 'object_id')
     
@@ -557,3 +571,32 @@ class LaboursAdvancedProfiles(models.Model):
 
     def __str__(self):
         return f"Advanced Profile for {self.labour.full_name}"
+    
+
+# registration/models.py
+
+# ... (at the end of the file, after your other models)
+class HelpRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    REQUEST_TYPE_CHOICES = [
+        ('Transport', 'Transport Help'),
+        ('Advance', 'Advance Money'),
+        ('Accommodation', 'Accommodation'),
+        ('Other', 'Other'),
+    ]
+
+    assignment = models.ForeignKey('JobAssignment', on_delete=models.CASCADE, related_name='help_requests')
+    request_type = models.CharField(max_length=50, choices=REQUEST_TYPE_CHOICES)
+    details = models.TextField(blank=True, help_text="Details if request type is 'Other' or for additional info.")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.get_request_type_display()} for {self.assignment.worker.full_name} ({self.get_status_display()})"

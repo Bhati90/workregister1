@@ -692,18 +692,34 @@ class LabourChoiceFieldWithNumber(forms.ModelMultipleChoiceField):
         # For each labourer, display their name and mobile number
         return f"{obj.full_name} - {obj.mobile_number}"
 
+# registration/forms.py
+from django import forms
+from .models import JobBid, RegisteredLabourer # Make sure to import RegisteredLabourer
 
 class JobBidForm(forms.ModelForm):
-    registered_labourers = LabourChoiceFieldWithNumber(
-        queryset=IndividualLabor.objects.all(),
+    # This field is now a standard Django field. Its choices will be set dynamically.
+    registered_labourers = forms.ModelMultipleChoiceField(
+        queryset=RegisteredLabourer.objects.none(), # Start with an empty list
         widget=forms.SelectMultiple(attrs={'class': 'form-control'}),
-        required=False
+        required=False,
+        label="Select from your registered labourers"
     )
+    
     uses_registered_labourers = forms.ChoiceField(
-        choices=(('no', 'No'), ('yes', 'Yes')),
+        choices=(('no', 'No, I will use other labourers'), ('yes', 'Yes, I will use my registered labourers')),
         widget=forms.RadioSelect,
-        label="Are your labourers registered on our platform?"
+        initial='no',
+        label="Are you using your pre-registered labourers for this job?"
     )
+
+    def __init__(self, *args, **kwargs):
+        # Expect a 'mukkadam' object to be passed in from the view.
+        mukkadam = kwargs.pop('mukkadam', None)
+        super().__init__(*args, **kwargs)
+
+        if mukkadam:
+            # This is the key change: filter the queryset to show ONLY this Mukkadam's laborers.
+            self.fields['registered_labourers'].queryset = RegisteredLabourer.objects.filter(mukkadam=mukkadam)
 
     class Meta:
         model = JobBid
@@ -711,16 +727,16 @@ class JobBidForm(forms.ModelForm):
             'bid_price', 
             'workers_provided', 
             'notes_on_skills',
-            'uses_registered_labourers', # Add the new field to the list
+            'uses_registered_labourers',
             'registered_labourers',    
             'includes_transport', 
             'includes_accommodation', 
             'no_advance_required'
         ]
         widgets = {
-            'notes_on_skills': forms.Textarea(attrs={'rows': 3}),
-            'registered_labourers': forms.SelectMultiple(attrs={'class': 'form-control'}),
- 
+            'bid_price': forms.NumberInput(attrs={'class': 'form-control'}),
+            'workers_provided': forms.NumberInput(attrs={'class': 'form-control'}),
+            'notes_on_skills': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         }
         labels = {
             'bid_price': 'Your Total Bid Price (₹)',
@@ -729,10 +745,65 @@ class JobBidForm(forms.ModelForm):
             'includes_transport': 'I will arrange and cover transport',
             'includes_accommodation': 'I will arrange and cover accommodation',
             'no_advance_required': 'I do not require an advance payment',
-
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Make the dropdown not required by default, we'll handle it with JavaScript
-        self.fields['registered_labourers'].required = False
+from django import forms
+from .models import Job
+
+class JobForm(forms.ModelForm):
+    # Use a DateInput widget to get a nice calendar picker in the browser
+    required_by_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+    )
+
+    class Meta:
+        model = Job
+        # Specify the fields you want the user to fill out
+        fields = [
+            'title', 
+            'location', 
+            'description', 
+            'workers_needed', 
+            'duration_days', 
+            'rate_per_day', 
+            'required_by_date', 
+            'competition_level', 
+            'is_urgent'
+        ]
+        # Add widgets to style the form fields with Bootstrap classes
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'location': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'workers_needed': forms.NumberInput(attrs={'class': 'form-control'}),
+            'duration_days': forms.NumberInput(attrs={'class': 'form-control'}),
+            'rate_per_day': forms.NumberInput(attrs={'class': 'form-control'}),
+            'competition_level': forms.Select(attrs={'class': 'form-select'}),
+            'is_urgent': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+# registration/forms.py
+from django.forms import inlineformset_factory
+from .models import Mukkadam, RegisteredLabourer # Add RegisteredLabourer
+
+# ... your other forms ...
+
+# --- ADD THESE NEW FORMS ---
+class LabourerForm(forms.ModelForm):
+    class Meta:
+        model = RegisteredLabourer
+        fields = ['name', 'mobile_number']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Labourer Full Name'}),
+            'mobile_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Mobile Number (Optional)'}),
+        }
+
+# This creates a set of LabourerForms linked to a Mukkadam instance
+LabourerFormSet = inlineformset_factory(
+    Mukkadam,          # The parent model
+    RegisteredLabourer, # The child model
+    form=LabourerForm, # The form to use for each child
+    extra=1,           # Start with one blank form
+    can_delete=True,   # Allow deleting laborers
+    can_delete_extra=True,
+)
