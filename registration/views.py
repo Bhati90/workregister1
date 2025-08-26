@@ -234,26 +234,26 @@ def submit_registration_api(request):
             )
             # ▲▲▲ MODIFICATION END ▲▲▲
             instance.save()
-        logger.info(f"Main instance for '{instance.full_name}' saved successfully.")
+            logger.info(f"Main instance for '{instance.full_name}' saved successfully.")
 
         # ▼▼▼ ADD THIS NEW BLOCK HERE ▼▼▼
         # After the main instance is saved, we can now save its related laborers.
-        if category == 'mukkadam':
-            labourers_data = get_json_data(data, 'labourers')
-            if labourers_data and isinstance(labourers_data, list):
-                for labourer_info in labourers_data:
+            if category == 'mukkadam':
+                labourers_data = get_json_data(data, 'labourers')
+                if labourers_data and isinstance(labourers_data, list):
+                    for labourer_info in labourers_data:
                     # Create a RegisteredLabourer object for each item in the list
-                    RegisteredLabourer.objects.create(
-                        mukkadam=instance, # Link it to the Mukkadam we just saved
-                        name=labourer_info.get('name'),
-                        mobile_number=labourer_info.get('mobile_number', '')
-                    )
-                logger.info(f"Saved {len(labourers_data)} registered labourers for Mukkadam {instance.full_name}.")
+                        RegisteredLabourer.objects.create(
+                            mukkadam=instance, # Link it to the Mukkadam we just saved
+                            name=labourer_info.get('name'),
+                            mobile_number=labourer_info.get('mobile_number', '')
+                        )
+                    logger.info(f"Saved {len(labourers_data)} registered labourers for Mukkadam {instance.full_name}.")
         # ▲▲▲ END OF NEW BLOCK ▲▲▲
-            instance.skill_pruning = 'pruning' in skills
-            instance.skill_harvesting = 'harvesting' in skills
-            instance.skill_dipping = 'dipping' in skills
-            instance.skill_thinning = 'thinning' in skills
+                instance.skill_pruning = 'pruning' in skills
+                instance.skill_harvesting = 'harvesting' in skills
+                instance.skill_dipping = 'dipping' in skills
+                instance.skill_thinning = 'thinning' in skills
 
         elif category == 'transport':
             service_areas = get_json_data(data, 'service_areas')
