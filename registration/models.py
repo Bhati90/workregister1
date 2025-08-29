@@ -8,7 +8,17 @@ from django.db import models
 from django.core.validators import RegexValidator
 import uuid
 import os
+class WhatsAppLog(models.Model):
+    recipient_number = models.CharField(max_length=20)
+    template_name = models.CharField(max_length=100)
+    status = models.CharField(max_length=20) # e.g., 'sent', 'failed'
+    message_id = models.CharField(max_length=100, blank=True, null=True) # From Meta's response
+    timestamp = models.DateTimeField(auto_now_add=True)
+    details = models.TextField(blank=True, null=True) # To store any error messages
 
+    def __str__(self):
+        return f"To: {self.recipient_number} | Template: {self.template_name} | Status: {self.status}"
+        
 def photo_upload_path(instance, filename):
     """Generate upload path for captured photos"""
     ext = filename.split('.')[-1]

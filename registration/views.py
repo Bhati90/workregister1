@@ -162,6 +162,10 @@ def get_json_data(data, key):
         logger.error(f"JSONDecodeError or TypeError for key '{key}': {data.get(key)}. Error: {e}")
         return []
 
+
+
+from .whats_app import send_whatsapp_template
+from .models import WhatsAppLog
 @csrf_exempt
 @require_POST
 def submit_registration_api(request):
@@ -312,7 +316,42 @@ def submit_registration_api(request):
 
         instance.save()
         logger.info("Instance and photo saved successfully.")
-        
+        try:
+            recipient_name = instance.full_name
+            recipient_number = str(instance.mobile_number)
+
+            if recipient_number:
+                if recipient_number.startswith('+'):
+                    recipient_number = recipient_number[1:]
+
+                template_config = {
+                    'individual_labor': {'name': 'labourintro_1', 'image_url': 'https://workregister1.onrender.com/sattic/images/image1.webp'},
+                    'mukkadam': {'name': 'labour_message_1', 'image_url': 'https://workregister1.onrender.com/sattic/images/image2.webp'},
+                    'transport': {'name': 'labour_message_1', 'image_url': 'https://workregister1.onrender.com/sattic/images/image2.webp'},
+                    'others': {'name': 'labour_message_1', 'image_url': 'https://workregister1.onrender.com/sattic/images/image2.webp'},
+                }
+                config = template_config.get(category)
+                
+                if config:
+                    components = [
+                        {"type": "header", "parameters": [{"type": "image", "image": {"link": config['image_url']}}]},
+                        {"type": "body", "parameters": [{"type": "text", "text": recipient_name}]}
+                    ]
+                    success, details = send_whatsapp_template(
+                        to_number=recipient_number,
+                        template_name=config['name'],
+                        components=components
+                    )
+                    WhatsAppLog.objects.create(
+                        recipient_number=recipient_number,
+                        template_name=config['name'],
+                        status='sent' if success else 'failed',
+                        details=str(details)
+                    )
+        except Exception as e:
+            logger.error(f"Failed to send WhatsApp message for {instance.full_name}. Error: {e}")
+        # --- WHATSAPP INTEGRATION END ---
+
         return JsonResponse({'status': 'success', 'message': 'Registration saved.'}, status=200)
 
     except Exception as e:
