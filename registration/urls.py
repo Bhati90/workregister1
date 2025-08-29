@@ -12,7 +12,16 @@ urlpatterns = [
     path('success/', views.success_view, name='success_page'),
      
     
+     path('chat/', views.chat_contact_list_view, name='chat_contact_list'),
+    
+    # This page will show the detailed conversation for a specific contact
+    path('chat/<str:wa_id>/', views.chat_detail_view, name='chat_detail'),
+    
+    # This is an API endpoint for sending replies from the frontend
+    path('api/chat/send-reply/', views.send_reply_api_view, name='send_reply_api'),
 
+
+    
     # API endpoints
     # path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
     path('api/location-status/', views.location_status_api, name='location_status_api'),

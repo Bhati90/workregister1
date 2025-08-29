@@ -8,6 +8,63 @@ from django.db import models
 from django.core.validators import RegexValidator
 import uuid
 import os
+
+from django.db import models
+
+# ... your other existing models ...
+
+class ChatContact(models.Model):
+    """ Represents a single WhatsApp user you are communicating with. """
+    wa_id = models.CharField(max_length=50, unique=True, help_text="The user's WhatsApp ID (their phone number).")
+    name = models.CharField(max_length=100, blank=True, null=True, help_text="The user's WhatsApp profile name.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_contact_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name or self.wa_id
+
+class Message(models.Model):
+    """ Represents a single message, either incoming or outgoing. """
+    
+    class MessageDirection(models.TextChoices):
+        INBOUND = 'inbound', 'Inbound'
+        OUTBOUND = 'outbound', 'Outbound'
+
+    class MessageType(models.TextChoices):
+        TEXT = 'text', 'Text'
+        IMAGE = 'image', 'Image'
+        VIDEO = 'video', 'Video'
+        AUDIO = 'audio', 'Audio'
+        DOCUMENT = 'document', 'Document'
+        STICKER = 'sticker', 'Sticker'
+        REACTION = 'reaction', 'Reaction'
+        UNKNOWN = 'unknown', 'Unknown'
+        
+    class MessageStatus(models.TextChoices):
+        SENT = 'sent', 'Sent'
+        DELIVERED = 'delivered', 'Delivered'
+        READ = 'read', 'Read'
+        FAILED = 'failed', 'Failed'
+
+    contact = models.ForeignKey(ChatContact, on_delete=models.CASCADE, related_name='messages')
+    wamid = models.CharField(max_length=255, unique=True, help_text="The unique WhatsApp Message ID from Meta.")
+    direction = models.CharField(max_length=10, choices=MessageDirection.choices)
+    message_type = models.CharField(max_length=20, choices=MessageType.choices, default=MessageType.UNKNOWN)
+    
+    # Content fields - only one will typically be used per message
+    text_content = models.TextField(blank=True, null=True, help_text="Content for text messages or emoji reactions.")
+    media_id = models.CharField(max_length=255, blank=True, null=True, help_text="Meta's ID for the uploaded media.")
+    media_url = models.URLField(max_length=1024, blank=True, null=True, help_text="Public URL for the media file.")
+    
+    timestamp = models.DateTimeField(help_text="Timestamp from the WhatsApp message.")
+    status = models.CharField(max_length=20, choices=MessageStatus.choices, blank=True, null=True, help_text="Status for outbound messages.")
+    raw_data = models.JSONField(help_text="The raw, complete webhook payload from Meta for debugging.")
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"{self.direction.capitalize()} message {self.id} to/from {self.contact.wa_id}"
 class WhatsAppLog(models.Model):
     recipient_number = models.CharField(max_length=20)
     template_name = models.CharField(max_length=100)
@@ -18,7 +75,7 @@ class WhatsAppLog(models.Model):
 
     def __str__(self):
         return f"To: {self.recipient_number} | Template: {self.template_name} | Status: {self.status}"
-        
+
 def photo_upload_path(instance, filename):
     """Generate upload path for captured photos"""
     ext = filename.split('.')[-1]

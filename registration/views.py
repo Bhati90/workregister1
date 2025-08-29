@@ -325,10 +325,10 @@ def submit_registration_api(request):
                     recipient_number = recipient_number[1:]
 
                 template_config = {
-                    'individual_labor': {'name': 'labourintro_1', 'image_url': 'https://workregister1.onrender.com/sattic/images/image1.webp'},
-                    'mukkadam': {'name': 'labour_message_1', 'image_url': 'https://workregister1.onrender.com/sattic/images/image2.webp'},
-                    'transport': {'name': 'labour_message_1', 'image_url': 'https://workregister1.onrender.com/sattic/images/image2.webp'},
-                    'others': {'name': 'labour_message_1', 'image_url': 'https://workregister1.onrender.com/sattic/images/image2.webp'},
+                    'individual_labor': {'name': 'labourintro_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
+                    'mukkadam': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
+                    'transport': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
+                    'others': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
                 }
                 config = template_config.get(category)
                 
@@ -358,6 +358,63 @@ def submit_registration_api(request):
         logger.error(f"Critical error in submit_registration_api: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': 'An unexpected server error occurred.'}, status=500)
 
+
+
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from .models import ChatContact, Message
+from .whats_app import send_whatsapp_text_message # We will create this next
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+import json
+
+@login_required
+def chat_contact_list_view(request):
+    """ Displays a list of all contacts, ordered by the most recent conversation. """
+    contacts = ChatContact.objects.all().order_by('-last_contact_at')
+    return render(request, 'registration/chat/chat_list.html', {'contacts': contacts})
+
+@login_required
+def chat_detail_view(request, wa_id):
+    """ Displays the full conversation history for a single contact. """
+    contact = get_object_or_404(ChatContact, wa_id=wa_id)
+    messages = contact.messages.all().order_by('timestamp')
+    return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': messages})
+
+@require_POST
+@login_required
+def send_reply_api_view(request):
+    """ API endpoint that handles sending a text message reply. """
+    try:
+        data = json.loads(request.body)
+        to_number = data.get('to_number')
+        message_text = data.get('message_text')
+
+        if not to_number or not message_text:
+            return JsonResponse({'status': 'error', 'message': 'Missing number or message.'}, status=400)
+
+        # 1. Send the message via the WhatsApp API
+        success, details = send_whatsapp_text_message(to_number, message_text)
+        
+        if not success:
+            return JsonResponse({'status': 'error', 'message': 'Failed to send message via API.'}, status=500)
+
+        # 2. Save the outgoing message to our database
+        contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
+        Message.objects.create(
+            contact=contact,
+            wamid=details.get('messages', [{}])[0].get('id'),
+            direction='outbound',
+            message_type='text',
+            text_content=message_text,
+            timestamp=timezone.now(), # Use current time for sent messages
+            status='sent',
+            raw_data=details
+        )
+        return JsonResponse({'status': 'success', 'message': 'Reply sent.'})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 def success_view(request):
     return render(request, 'registration/success.html')
 
