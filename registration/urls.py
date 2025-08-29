@@ -19,9 +19,9 @@ urlpatterns = [
     
     # This is an API endpoint for sending replies from the frontend
     path('api/chat/send-reply/', views.send_reply_api_view, name='send_reply_api'),
+    path('whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
 
 
-    
     # API endpoints
     # path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
     path('api/location-status/', views.location_status_api, name='location_status_api'),
@@ -92,7 +92,7 @@ urlpatterns = [
     path('profile/mukadam/<int:mukadam_id>/', views.mukadam_performance_profile_view, name='mukadam_profile'),
     path('profile/labourer/<int:labourer_id>/', views.labourer_profile_view, name='labourer_profile'),
     path('profiles/select/', views.profile_selector_view, name='profile_selector'),
-
+    
 
     # Dashboard URLs
     path('dashboard/login', dashboard_login, name='dashboard'),

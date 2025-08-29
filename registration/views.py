@@ -325,7 +325,7 @@ def submit_registration_api(request):
                     recipient_number = recipient_number[1:]
 
                 template_config = {
-                    'individual_labor': {'name': 'farmer_labour_intro', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
+                    'individual_labor': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
                     'mukkadam': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
                     'transport': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
                     'others': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
@@ -368,6 +368,63 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 import json
 
+from .models import ChatContact, Message
+
+logger = logging.getLogger(__name__)
+
+@csrf_exempt # The central webhook service cannot use Django's CSRF tokens
+def whatsapp_webhook_view(request):
+    """
+    This view now acts as the endpoint for your central forwarded-response service.
+    It receives POST requests and saves the incoming messages to the database.
+    """
+    if request.method == 'POST':
+        try:
+            # The forwarded data will be in the request body
+            data = json.loads(request.body)
+            logger.info(f"Received forwarded webhook data: {json.dumps(data, indent=2)}")
+
+            # --- This logic is the same as before ---
+            # It extracts message details from the complex payload Meta sends
+            for entry in data.get('entry', []):
+                for change in entry.get('changes', []):
+                    value = change.get('value', {})
+                    if 'messages' in value:
+                        for message_data in value.get('messages', []):
+                            contact_wa_id = message_data.get('from')
+                            contact_name = value.get('contacts', [{}])[0].get('profile', {}).get('name')
+                            message_type = message_data.get('type')
+                            wamid = message_data.get('id')
+                            timestamp = timezone.datetime.fromtimestamp(int(message_data.get('timestamp')))
+
+                            # Find or create the contact in our database
+                            contact, _ = ChatContact.objects.get_or_create(wa_id=contact_wa_id, defaults={'name': contact_name})
+                            
+                            # Create and save the new Message object
+                            new_message = Message(
+                                contact=contact,
+                                wamid=wamid,
+                                direction='inbound',
+                                message_type=message_type,
+                                timestamp=timestamp,
+                                raw_data=message_data
+                            )
+
+                            if message_type == 'text':
+                                new_message.text_content = message_data.get('text', {}).get('body')
+                            # ... add more elif blocks here for image, video, etc. ...
+                            
+                            new_message.save()
+            
+            # Send a success response back to your central service
+            return JsonResponse({'status': 'success', 'message': 'Data received by Django'}, status=200)
+
+        except Exception as e:
+            logger.error(f"Error processing forwarded webhook: {e}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': 'Error processing data'}, status=500)
+
+    # Reject any method that is not POST
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
 @login_required
 def chat_contact_list_view(request):
     """ Displays a list of all contacts, ordered by the most recent conversation. """
@@ -415,6 +472,8 @@ def send_reply_api_view(request):
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
 def success_view(request):
     return render(request, 'registration/success.html')
 
