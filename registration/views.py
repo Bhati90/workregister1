@@ -325,7 +325,7 @@ def submit_registration_api(request):
                     recipient_number = recipient_number[1:]
 
                 template_config = {
-                    'individual_labor': {'name': 'labourintro_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
+                    'individual_labor': {'name': 'farmer_labour_intro', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
                     'mukkadam': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
                     'transport': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
                     'others': {'name': 'labour_message_1', 'image_url': 'https://images.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png'},
