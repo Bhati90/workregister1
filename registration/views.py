@@ -457,6 +457,8 @@ def chat_contact_list_view(request):
     contacts = ChatContact.objects.all().order_by(F('last_contact_at').desc(nulls_last=True))
     return render(request, 'registration/chat/chat_list.html', {'contacts': contacts})
 
+from types import SimpleNamespace
+
 @login_required
 def chat_detail_view(request, wa_id):
     """Displays a unified conversation history from the Message and WhatsAppLog models."""
@@ -476,14 +478,13 @@ def chat_detail_view(request, wa_id):
                 message_type='template',
                 media_file=None,
                 caption=None,
-                replied_to=None # The initial message is never a reply
+                replied_to=None 
             )
             conversation_messages.append(initial_message)
             conversation_messages.sort(key=lambda msg: msg['timestamp'])
     except Exception as e:
         logger.error(f"Could not query WhatsAppLog: {e}")
     return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': conversation_messages})
-
 
 import os
 
@@ -537,6 +538,8 @@ def send_reply_api_view(request):
         return JsonResponse({'status': 'success', 'data': response_data})
     else:
         return JsonResponse({'status': 'error', 'data': response_data}, status=500)
+
+
 def success_view(request):
     return render(request, 'registration/success.html')
 
