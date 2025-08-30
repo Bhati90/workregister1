@@ -13,6 +13,21 @@
     .replied-to-block p { margin: 0; font-size: 0.9em; color: #555; }
     .contact-card { background-color: #fafafa; border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
     .caption { margin-top: 5px; font-size: 0.9em; color: #333; }
+    .chat-bubble { position: relative; }
+    .reply-btn {
+        position: absolute; top: 5px; right: 5px;
+        background: rgba(0,0,0,0.1); border: none; border-radius: 50%;
+        width: 24px; height: 24px; cursor: pointer;
+        display: none; align-items: center; justify-content: center;
+    }
+    .chat-bubble:hover .reply-btn { display: flex; }
+    #reply-context-banner {
+        display: none; padding: 8px; background: #f0f0f0;
+        border-left: 3px solid #007bff; margin-bottom: 5px; border-radius: 4px;
+    }
+    #reply-context-banner p { margin: 0; font-size: 0.9em; font-style: italic; }
+    #cancel-reply-btn { margin-left: 10px; cursor: pointer; font-weight: bold; }
+
 </style>
 {% endblock %}
 
@@ -24,7 +39,8 @@
         <div class="chat-wrapper" id="chat-wrapper">
             {% for message in messages %}
             <div class="chat-bubble {{ message.direction }}">
-
+                <button class="reply-btn" data-wamid="{{ message.wamid }}" data-text="{{ message.text_content|truncatechars:30 }}">↪</button>
+                
                 {% if message.replied_to %}
                 <div class="replied-to-block">
                     <strong>{{ message.replied_to.contact.name|default:message.replied_to.contact.wa_id }}</strong>
@@ -69,9 +85,15 @@
         </div>
     </div>
 
+    <div id="reply-context-banner">
+        <span id="reply-context-text"></span>
+        <span id="cancel-reply-btn">✖</span>
+    </div>
+
     <form id="reply-form" enctype="multipart/form-data">
+        <input type="hidden" id="replied-to-wamid" name="replied_to_wamid">
         <div class="input-group">
-            <input type="text" id="reply-message-input" class="form-control" placeholder="Type a message or caption...">
+            <input type="text" id="reply-message-input" class="form-control" placeholder="Type a message...">
             <label class="btn btn-secondary mb-0" for="media-file-input">📎</label>
             <input type="file" id="media-file-input" name="media_file" style="display: none;">
             <button type="submit" class="btn btn-primary">Send</button>
@@ -84,28 +106,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatContainer = document.getElementById('chat-container');
     const replyForm = document.getElementById('reply-form');
     const messageInput = document.getElementById('reply-message-input');
-    const mediaInput = document.getElementById('media-file-input');
+    const repliedToWamidInput = document.getElementById('replied-to-wamid');
+    const replyBanner = document.getElementById('reply-context-banner');
+    const replyBannerText = document.getElementById('reply-context-text');
+    const cancelReplyBtn = document.getElementById('cancel-reply-btn');
     const csrfToken = "{{ csrf_token }}";
+
 
     // Scroll to the bottom of the chat on page load
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
+    document.querySelectorAll('.reply-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const wamid = button.dataset.wamid;
+            const text = button.dataset.text;
+            repliedToWamidInput.value = wamid;
+            replyBannerText.textContent = `Replying to: "${text}"`;
+            replyBanner.style.display = 'block';
+            messageInput.focus();
+        });
+    });
+
+    cancelReplyBtn.addEventListener('click', () => {
+        repliedToWamidInput.value = '';
+        replyBanner.style.display = 'none';
+    });
+
     replyForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        const messageText = messageInput.value.trim();
-        const file = mediaInput.files[0];
-
-        if (!messageText && !file) {
-            return; // Don't send empty messages
-        }
-
-        const formData = new FormData();
+        const formData = new FormData(replyForm);
         formData.append('to_number', "{{ contact.wa_id }}");
-        formData.append('message_text', messageText);
-        if (file) {
-            formData.append('media_file', file);
-        }
         
         messageInput.disabled = true;
 
@@ -115,16 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'X-CSRFToken': csrfToken },
                 body: formData,
             });
-
-            if (response.ok) {
-                window.location.reload();
-            } else {
-                alert('Failed to send message. Please check the server logs.');
-                messageInput.disabled = false;
-            }
+            if (response.ok) { window.location.reload(); }
+            else { alert('Failed to send message.'); messageInput.disabled = false; }
         } catch (error) {
             console.error('Error sending reply:', error);
-            alert('An error occurred while sending the message.');
+            alert('An error occurred.');
             messageInput.disabled = false;
         }
     });

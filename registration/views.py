@@ -462,20 +462,30 @@ def chat_detail_view(request, wa_id):
     """Displays a unified conversation history from the Message and WhatsAppLog models."""
     wa_id = wa_id.strip()
     contact = get_object_or_404(ChatContact, wa_id=wa_id)
-    conversation_messages = list(contact.messages.all().order_by('timestamp').values())
+    conversation_messages = list(contact.messages.select_related('replied_to').order_by('timestamp'))
+
     try:
         search_number = wa_id[2:] if wa_id.startswith('91') else wa_id
         initial_template_log = WhatsAppLog.objects.filter(recipient_number=search_number, status='sent').order_by('timestamp').first()
         if initial_template_log:
-            initial_message = {
-                'direction': 'outbound', 'text_content': f"Sent template: {initial_template_log.template_name}",
-                'timestamp': initial_template_log.timestamp, 'status': 'sent',
-            }
+            initial_message = SimpleNamespace(
+                direction='outbound',
+                text_content=f"Sent registration template: {initial_template_log.template_name}",
+                timestamp=initial_template_log.timestamp,
+                status='sent',
+                message_type='template',
+                media_file=None,
+                caption=None,
+                replied_to=None # The initial message is never a reply
+            )
             conversation_messages.append(initial_message)
             conversation_messages.sort(key=lambda msg: msg['timestamp'])
     except Exception as e:
         logger.error(f"Could not query WhatsAppLog: {e}")
     return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': conversation_messages})
+
+
+import os
 
 @csrf_exempt
 @login_required
@@ -484,11 +494,28 @@ def send_reply_api_view(request):
     to_number = request.POST.get('to_number')
     message_text = request.POST.get('message_text') # Can be a message or a caption
     media_file = request.FILES.get('media_file')
+    replied_to_wamid = request.POST.get('replied_to_wamid')
+    
+    META_API_URL = f"https://graph.facebook.com/v19.0/{phone_id}/messages"
+    phone_id = "694609297073147"
+    META_ACCESS_TOKEN ="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+    PHONE_NUMBER_ID = "694609297073147"
+
+
+    PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID')
+    url = f"{META_API_URL}/{PHONE_NUMBER_ID}/messages"
+    headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
+    payload = {"messaging_product": "whatsapp", "to": to_number}
+
 
     contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
     payload = {"messaging_product": "whatsapp", "to": to_number}
     message_type = 'text'
     content_to_save = message_text
+    
+
+    if replied_to_wamid:
+        payload['context'] = {'message_id': replied_to_wamid}
 
     if media_file:
         media_id = upload_media_to_meta(media_file)
