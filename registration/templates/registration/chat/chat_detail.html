@@ -54,10 +54,7 @@
                     <video controls style="max-width: 100%; border-radius: 10px;"><source src="{{ message.media_file.url }}"></video>
                 {% elif message.message_type == 'audio' and message.media_file %}
                     <audio controls src="{{ message.media_file.url }}"></audio>
-                {% elif message.message_type == 'contacts' %}
-                    <div class="contact-card">
-                        <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
-                    </div>
+               
                 {% elif message.message_type == 'location' and message.latitude and message.longitude %}
     <div class="location-card">
         <a href="https://www.google.com/maps/search/?api=1&query={{ message.latitude }},{{ message.longitude }}" target="_blank" rel="noopener noreferrer">
@@ -68,12 +65,12 @@
             <span class="view-map-link">View on Google Maps →</span>
         </a>
     </div>
-    {% elif message.message_type == 'contact' %}
+    {% elif message.message_type == 'contacts' and message.contact_name and message.contact_id %}
     <div class="contact-card">
         <div class="contact-header">👤 Contact</div>
         <div class="contact-body">
-            <p><strong>Name:</strong> {{ message.contact_name|default:'N/A' }}</p>
-            <p><strong>Phone:</strong> {{ message.contact_phone|default:'N/A' }}</p>
+            <p><strong>Name:</strong> {{ message.contact_name }}</p>
+            <p><strong>Phone:</strong> {{ message.contact_phone}}</p>
         </div>
     </div>
                 {% else %}
