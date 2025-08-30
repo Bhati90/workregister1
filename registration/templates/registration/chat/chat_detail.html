@@ -58,6 +58,24 @@
                     <div class="contact-card">
                         <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
                     </div>
+                {% elif message.message_type == 'location' and message.latitude and message.longitude %}
+    <div class="location-card">
+        <a href="https://www.google.com/maps/search/?api=1&query={{ message.latitude }},{{ message.longitude }}" target="_blank" rel="noopener noreferrer">
+            <p class="mb-1">📍 Location Shared</p>
+            {% if message.text_content %}
+                <small>{{ message.text_content }}</small> {# Optional: For named locations #}
+            {% endif %}
+            <span class="view-map-link">View on Google Maps →</span>
+        </a>
+    </div>
+    {% elif message.message_type == 'contact' %}
+    <div class="contact-card">
+        <div class="contact-header">👤 Contact</div>
+        <div class="contact-body">
+            <p><strong>Name:</strong> {{ message.contact_name|default:'N/A' }}</p>
+            <p><strong>Phone:</strong> {{ message.contact_phone|default:'N/A' }}</p>
+        </div>
+    </div>
                 {% else %}
                     <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
                 {% endif %}
