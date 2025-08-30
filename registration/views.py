@@ -367,6 +367,7 @@ from .whats_app import send_whatsapp_text_message # We will create this next
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 import json
+from django.db.models import Q
 
 from .models import ChatContact, Message
 
@@ -432,13 +433,93 @@ def chat_contact_list_view(request):
     """ Displays a list of all contacts, ordered by the most recent conversation. """
     contacts = ChatContact.objects.all().order_by('-last_contact_at')
     return render(request, 'registration/chat/chat_list.html', {'contacts': contacts})
+# @login_required
+# def chat_detail_view(request, wa_id):
+#     """
+#     Displays a unified conversation history with a more robust query
+#     to find the initial template message from the log.
+#     """
+#     contact = get_object_or_404(ChatContact, wa_id=wa_id)
+    
+#     # 1. Get the normal conversation history
+#     conversation_messages = list(contact.messages.all().order_by('timestamp').values(
+#         'direction', 'text_content', 'timestamp', 'status', 'media_url', 'message_type'
+#     ))
 
+#     # 2. Get the initial registration template with a better query
+#     try:
+#         # --- THIS IS THE KEY CHANGE ---
+#         # Create a flexible query to find the number in different formats
+#         phone_number_query = Q(recipient_number=wa_id) | Q(recipient_number=wa_id.strip('91'))
+        
+#         initial_template_log = WhatsAppLog.objects.filter(
+#             phone_number_query,
+#             status='sent'
+#         ).order_by('timestamp').first()
+
+#         if initial_template_log:
+#             initial_message = {
+#                 'direction': 'outbound',
+#                 'text_content': f"Sent registration template: {initial_template_log.template_name}",
+#                 'timestamp': initial_template_log.timestamp,
+#                 'status': 'sent',
+#                 'media_url': None,
+#                 'message_type': 'template'
+#             }
+#             conversation_messages.append(initial_message)
+            
+#             # 3. Sort the combined list by the 'timestamp' key
+#             conversation_messages.sort(key=lambda msg: msg['timestamp'])
+
+#     except Exception as e:
+#         logger.error(f"Could not query WhatsAppLog: {e}")
+
+#     return render(request, 'registration/chat/chat_detail.html', {
+#         'contact': contact, 
+#         'messages': conversation_messages
+#     })
+
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+import logging
+
+from .models import ChatContact, Message, WhatsAppLog
+
+logger = logging.getLogger(__name__)
+
+# --- Your other views ---
 @login_required
 def chat_detail_view(request, wa_id):
-    """ Displays the full conversation history for a single contact. """
+    """ Displays a unified conversation history from the Message and WhatsAppLog models. """
+    wa_id = wa_id.strip() # Clean up the phone number from the URL
     contact = get_object_or_404(ChatContact, wa_id=wa_id)
-    messages = contact.messages.all().order_by('timestamp')
-    return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': messages})
+    
+    # Get standard conversation messages
+    conversation_messages = list(contact.messages.all().order_by('timestamp').values(
+        'direction', 'text_content', 'timestamp', 'status', 'media_url', 'message_type'
+    ))
+
+    # Get the initial template from the log table
+    try:
+        phone_number_query = Q(recipient_number=wa_id) | Q(recipient_number=wa_id.lstrip('91'))
+        initial_template_log = WhatsAppLog.objects.filter(phone_number_query, status='sent').order_by('timestamp').first()
+        if initial_template_log:
+            initial_message = {
+                'direction': 'outbound',
+                'text_content': f"Sent registration template: {initial_template_log.template_name}",
+                'timestamp': initial_template_log.timestamp, 'status': 'sent',
+                'media_url': None, 'message_type': 'template'
+            }
+            conversation_messages.append(initial_message)
+            conversation_messages.sort(key=lambda msg: msg['timestamp'])
+    except Exception as e:
+        logger.error(f"Could not query WhatsAppLog: {e}")
+
+    return render(request, 'registration/chat/chat_detail.html', {
+        'contact': contact, 
+        'messages': conversation_messages
+    })
 
 @require_POST
 @login_required

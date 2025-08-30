@@ -7,7 +7,7 @@
     .inbound { background-color: #f1f0f0; align-self: flex-start; }
     .outbound { background-color: #dcf8c6; align-self: flex-end; }
     .chat-wrapper { display: flex; flex-direction: column; }
-    .message-status { font-size: 0.75rem; color: #999; text-align: right; }
+    .bubble-footer { display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-size: 0.75rem; color: #999; margin-top: 5px; }
     .status-read { color: #53bdeb; }
 </style>
 {% endblock %}
@@ -20,12 +20,12 @@
         <div class="chat-wrapper" id="chat-wrapper">
             {% for message in messages %}
                 <div class="chat-bubble {{ message.direction }}">
-                    {% if message.message_type == 'image' %}
+                    {% if message.message_type == 'image' and message.media_url %}
                         <img src="{{ message.media_url }}" alt="Image from user" style="max-width: 100%; border-radius: 10px;">
                     {% else %}
                         <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
                     {% endif %}
-                    <div class="message-status">
+                    <div class="bubble-footer">
                         <span>{{ message.timestamp|date:"h:i A" }}</span>
                         {% if message.direction == 'outbound' %}
                             {% if message.status == 'read' %}
@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const messageText = messageInput.value.trim();
         if (!messageText) return;
 
-        messageInput.disabled = true; // Disable input while sending
+        messageInput.disabled = true;
 
         try {
             const response = await fetch("{% url 'registration:send_reply_api' %}", {
@@ -82,8 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (response.ok) {
-                // For a full experience, you'd add the new message to the UI here
-                // For now, we'll just reload the page to see the new message
+                // Reload the page to see the new message and history
                 window.location.reload();
             } else {
                 alert('Failed to send message.');
