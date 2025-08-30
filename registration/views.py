@@ -406,7 +406,8 @@ def whatsapp_webhook_view(request):
                             message_type = msg.get('type')
                             defaults = {
                                 'contact': contact, 'direction': 'inbound',
-                                'timestamp': datetime.datetime.fromtimestamp(int(msg['timestamp']), tz=datetime.timezone.utc)
+                                'timestamp': datetime.datetime.fromtimestamp(int(msg['timestamp']), tz=datetime.timezone.utc),
+                                'raw_data': msg
                             }
                             if 'context' in msg and msg['context'].get('id'):
                                 replied_wamid = msg['context']['id']
@@ -425,9 +426,17 @@ def whatsapp_webhook_view(request):
                                 defaults['caption'] = media_info.get('caption', '')
                                 file_name, file_content = download_media_from_meta(media_info['id'])
                                 if file_name and file_content:
-                                    message_instance = Message(wamid=msg['id'], **defaults)
+                                    message_instance, created = Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
                                     message_instance.media_file.save(file_name, file_content, save=True)
                                     continue
+                            elif message_type == 'contacts':
+                                contact_info = msg['contacts'][0]['name']['formatted_name']
+                                defaults['text_content'] = f"Contact Card: {contact_info}"
+                            
+                            elif message_type == 'location':
+                                loc = msg['location']
+                                defaults['text_content'] = f"Location: {loc['latitude']}, {loc['longitude']}"
+                            
                             elif message_type == 'reaction':
                                 emoji = msg['reaction']['emoji']
                                 Message.objects.filter(wamid=msg['reaction']['message_id']).update(status=f"Reacted with {emoji}")
