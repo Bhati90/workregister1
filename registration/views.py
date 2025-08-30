@@ -425,6 +425,8 @@ def whatsapp_webhook_view(request):
 
     # Reject any method that is not POST
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
+
 @login_required
 def chat_contact_list_view(request):
     """ Displays a list of all contacts, ordered by the most recent conversation. """
