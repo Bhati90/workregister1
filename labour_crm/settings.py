@@ -26,12 +26,6 @@ AUTH_USER_MODEL = 'auth.User'
 
 # Application definition
 # Configure Cloudinary (you already have this, but make sure it's properly set)
-cloudinary.config(
-    cloud_name="df8f5bxfp",  # Your cloud name from the URL
-    api_key="196762722111821",  # Your API key from the URL  
-    api_secret="nKpyWbKl0UAdaqgkjI9W0HpQkR4",  # Your API secret from the URL
-    secure=True
-)
 
 # Optional: Add logging configuration for better debugging
 LOGGING = {
@@ -64,6 +58,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+ # Django staticfiles
+    'whitenoise.storage',
     # 'authentication', 
     #       # PWA support
     'cloudinary',
@@ -171,7 +167,7 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' # <--- CORRECTED TYPO HERE
-
+MEDIA_ROOT = BASE_DIR/'media'
 
 # PWA Settings
 PWA_APP_NAME = 'AgroIntel'
