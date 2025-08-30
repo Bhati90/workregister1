@@ -373,190 +373,135 @@ from .models import ChatContact, Message
 
 logger = logging.getLogger(__name__)
 
-@csrf_exempt # The central webhook service cannot use Django's CSRF tokens
-def whatsapp_webhook_view(request):
-    """
-    This view now acts as the endpoint for your central forwarded-response service.
-    It receives POST requests and saves the incoming messages to the database.
-    """
-    if request.method == 'POST':
-        try:
-            # The forwarded data will be in the request body
-            data = json.loads(request.body)
-            logger.info(f"Received forwarded webhook data: {json.dumps(data, indent=2)}")
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+from django.db.models import F, Q
+import json
+import logging
 
-            # --- This logic is the same as before ---
-            # It extracts message details from the complex payload Meta sends
+from .models import ChatContact, Message, WhatsAppLog
+from .whats_app import download_media_from_meta, upload_media_to_meta, send_whatsapp_message, save_outgoing_message
+
+logger = logging.getLogger(__name__)
+
+@csrf_exempt
+def whatsapp_webhook_view(request):
+    """Handles all incoming WhatsApp events, including text, media, replies and reactions."""
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        logger.info(f"Webhook received: {json.dumps(data, indent=2)}")
+        try:
             for entry in data.get('entry', []):
                 for change in entry.get('changes', []):
                     value = change.get('value', {})
                     if 'messages' in value:
-                        for message_data in value.get('messages', []):
-                            contact_wa_id = message_data.get('from')
-                            contact_name = value.get('contacts', [{}])[0].get('profile', {}).get('name')
-                            message_type = message_data.get('type')
-                            wamid = message_data.get('id')
-                            timestamp = timezone.datetime.fromtimestamp(int(message_data.get('timestamp')))
+                        for msg in value.get('messages', []):
+                            contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
+                            contact.last_contact_at = timezone.now()
+                            contact.save()
 
-                            # Find or create the contact in our database
-                            contact, _ = ChatContact.objects.get_or_create(wa_id=contact_wa_id, defaults={'name': contact_name})
-                            
-                            # Create and save the new Message object
-                            new_message = Message(
-                                contact=contact,
-                                wamid=wamid,
-                                direction='inbound',
-                                message_type=message_type,
-                                timestamp=timestamp,
-                                raw_data=message_data
-                            )
+                            message_type = msg.get('type')
+                            defaults = {
+                                'contact': contact, 'direction': 'inbound',
+                                'timestamp': timezone.datetime.fromtimestamp(int(msg['timestamp']), tz=timezone.utc),
+                                'raw_data': msg
+                            }
+                            if 'context' in msg and msg['context'].get('id'):
+                                replied_wamid = msg['context']['id']
+                                try:
+                                    # Find the original message in our DB and link to it
+                                    original_message = Message.objects.get(wamid=replied_wamid)
+                                    defaults['replied_to'] = original_message
+                                except Message.DoesNotExist:
+                                    defaults['replied_to'] = None
 
                             if message_type == 'text':
-                                new_message.text_content = message_data.get('text', {}).get('body')
-                            # ... add more elif blocks here for image, video, etc. ...
+                                defaults['text_content'] = msg['text']['body']
+                            elif message_type in ['image', 'video', 'audio', 'document']:
+                                media_info = msg[message_type]
+                                defaults['media_id'] = media_info['id']
+                                defaults['caption'] = media_info.get('caption', '')
+                                file_name, file_content = download_media_from_meta(media_info['id'])
+                                if file_name and file_content:
+                                    message_instance = Message(wamid=msg['id'], **defaults)
+                                    message_instance.media_file.save(file_name, file_content, save=True)
+                                    continue
+                            elif message_type == 'reaction':
+                                emoji = msg['reaction']['emoji']
+                                Message.objects.filter(wamid=msg['reaction']['message_id']).update(status=f"Reacted with {emoji}")
+                                continue
                             
-                            new_message.save()
-            
-            # Send a success response back to your central service
-            return JsonResponse({'status': 'success', 'message': 'Data received by Django'}, status=200)
+                            Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
 
+                    elif 'statuses' in value:
+                        for status_data in value.get('statuses', []):
+                            Message.objects.filter(wamid=status_data['id']).update(status=status_data['status'])
         except Exception as e:
-            logger.error(f"Error processing forwarded webhook: {e}", exc_info=True)
-            return JsonResponse({'status': 'error', 'message': 'Error processing data'}, status=500)
-
-    # Reject any method that is not POST
-    return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
-
+            logger.error(f"Error in webhook: {e}", exc_info=True)
+        return JsonResponse({"status": "success"}, status=200)
 
 @login_required
 def chat_contact_list_view(request):
-    """ Displays a list of all contacts, ordered by the most recent conversation. """
-    contacts = ChatContact.objects.all().order_by('-last_contact_at')
+    """Displays contacts, ordered by the most recent conversation."""
+    contacts = ChatContact.objects.all().order_by(F('last_contact_at').desc(nulls_last=True))
     return render(request, 'registration/chat/chat_list.html', {'contacts': contacts})
-# @login_required
-# def chat_detail_view(request, wa_id):
-#     """
-#     Displays a unified conversation history with a more robust query
-#     to find the initial template message from the log.
-#     """
-#     contact = get_object_or_404(ChatContact, wa_id=wa_id)
-    
-#     # 1. Get the normal conversation history
-#     conversation_messages = list(contact.messages.all().order_by('timestamp').values(
-#         'direction', 'text_content', 'timestamp', 'status', 'media_url', 'message_type'
-#     ))
 
-#     # 2. Get the initial registration template with a better query
-#     try:
-#         # --- THIS IS THE KEY CHANGE ---
-#         # Create a flexible query to find the number in different formats
-#         phone_number_query = Q(recipient_number=wa_id) | Q(recipient_number=wa_id.strip('91'))
-        
-#         initial_template_log = WhatsAppLog.objects.filter(
-#             phone_number_query,
-#             status='sent'
-#         ).order_by('timestamp').first()
-
-#         if initial_template_log:
-#             initial_message = {
-#                 'direction': 'outbound',
-#                 'text_content': f"Sent registration template: {initial_template_log.template_name}",
-#                 'timestamp': initial_template_log.timestamp,
-#                 'status': 'sent',
-#                 'media_url': None,
-#                 'message_type': 'template'
-#             }
-#             conversation_messages.append(initial_message)
-            
-#             # 3. Sort the combined list by the 'timestamp' key
-#             conversation_messages.sort(key=lambda msg: msg['timestamp'])
-
-#     except Exception as e:
-#         logger.error(f"Could not query WhatsAppLog: {e}")
-
-#     return render(request, 'registration/chat/chat_detail.html', {
-#         'contact': contact, 
-#         'messages': conversation_messages
-#     })
-
-from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.db.models import Q
-import logging
-
-from .models import ChatContact, Message, WhatsAppLog
-
-logger = logging.getLogger(__name__)
-
-# --- Your other views ---
 @login_required
 def chat_detail_view(request, wa_id):
-    """ Displays a unified conversation history from the Message and WhatsAppLog models. """
-    wa_id = wa_id.strip() # Clean up the phone number from the URL
+    """Displays a unified conversation history from the Message and WhatsAppLog models."""
+    wa_id = wa_id.strip()
     contact = get_object_or_404(ChatContact, wa_id=wa_id)
-    
-    # Get standard conversation messages
-    conversation_messages = list(contact.messages.all().order_by('timestamp').values(
-        'direction', 'text_content', 'timestamp', 'status', 'media_url', 'message_type'
-    ))
-
-    # Get the initial template from the log table
+    conversation_messages = list(contact.messages.all().order_by('timestamp').values())
     try:
         search_number = wa_id[2:] if wa_id.startswith('91') else wa_id
-        initial_template_log = WhatsAppLog.objects.filter(recipient_number = search_number, status='sent').order_by('timestamp').first()
+        initial_template_log = WhatsAppLog.objects.filter(recipient_number=search_number, status='sent').order_by('timestamp').first()
         if initial_template_log:
             initial_message = {
-                'direction': 'outbound',
-                'text_content': f"Sent registration template: {initial_template_log.template_name}",
+                'direction': 'outbound', 'text_content': f"Sent template: {initial_template_log.template_name}",
                 'timestamp': initial_template_log.timestamp, 'status': 'sent',
-                'media_url': None, 'message_type': 'template'
             }
             conversation_messages.append(initial_message)
             conversation_messages.sort(key=lambda msg: msg['timestamp'])
     except Exception as e:
         logger.error(f"Could not query WhatsAppLog: {e}")
+    return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': conversation_messages})
 
-    return render(request, 'registration/chat/chat_detail.html', {
-        'contact': contact, 
-        'messages': conversation_messages
-    })
-
-@require_POST
+@csrf_exempt
 @login_required
 def send_reply_api_view(request):
-    """ API endpoint that handles sending a text message reply. """
-    try:
-        data = json.loads(request.body)
-        to_number = data.get('to_number')
-        message_text = data.get('message_text')
+    """A powerful sender that can send text or media and saves the outgoing message."""
+    to_number = request.POST.get('to_number')
+    message_text = request.POST.get('message_text') # Can be a message or a caption
+    media_file = request.FILES.get('media_file')
 
-        if not to_number or not message_text:
-            return JsonResponse({'status': 'error', 'message': 'Missing number or message.'}, status=400)
+    contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
+    payload = {"messaging_product": "whatsapp", "to": to_number}
+    message_type = 'text'
+    content_to_save = message_text
 
-        # 1. Send the message via the WhatsApp API
-        success, details = send_whatsapp_text_message(to_number, message_text)
-        
-        if not success:
-            return JsonResponse({'status': 'error', 'message': 'Failed to send message via API.'}, status=500)
+    if media_file:
+        media_id = upload_media_to_meta(media_file)
+        if not media_id:
+            return JsonResponse({'status': 'error', 'message': 'Failed to upload media'}, status=500)
+        file_type = media_file.content_type.split('/')[0]
+        payload.update({"type": file_type, file_type: {"id": media_id, "caption": message_text}})
+        message_type = file_type
+    else:
+        payload.update({"type": "text", "text": {"body": message_text}})
 
-        # 2. Save the outgoing message to our database
-        contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
-        Message.objects.create(
-            contact=contact,
-            wamid=details.get('messages', [{}])[0].get('id'),
-            direction='outbound',
-            message_type='text',
-            text_content=message_text,
-            timestamp=timezone.now(), # Use current time for sent messages
-            status='sent',
-            raw_data=details
+    success, response_data = send_whatsapp_message(to_number, payload)
+    if success:
+        save_outgoing_message(
+            contact=contact, wamid=response_data['messages'][0]['id'],
+            message_type=message_type, text_content=content_to_save,
+            caption=message_text if media_file else "", raw_data=response_data
         )
-        return JsonResponse({'status': 'success', 'message': 'Reply sent.'})
-
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
+        return JsonResponse({'status': 'success', 'data': response_data})
+    else:
+        return JsonResponse({'status': 'error', 'data': response_data}, status=500)
 def success_view(request):
     return render(request, 'registration/success.html')
 

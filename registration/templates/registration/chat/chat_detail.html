@@ -3,12 +3,16 @@
 {% block extra_head %}
 <style>
     .chat-container { max-height: 70vh; overflow-y: auto; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    .chat-wrapper { display: flex; flex-direction: column; }
     .chat-bubble { max-width: 70%; padding: 10px 15px; border-radius: 15px; margin-bottom: 10px; word-wrap: break-word; }
     .inbound { background-color: #f1f0f0; align-self: flex-start; }
     .outbound { background-color: #dcf8c6; align-self: flex-end; }
-    .chat-wrapper { display: flex; flex-direction: column; }
     .bubble-footer { display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-size: 0.75rem; color: #999; margin-top: 5px; }
     .status-read { color: #53bdeb; }
+    .replied-to-block { background-color: rgba(0, 0, 0, 0.05); padding: 8px; border-radius: 8px; border-left: 3px solid #007bff; margin-bottom: 8px; }
+    .replied-to-block p { margin: 0; font-size: 0.9em; color: #555; }
+    .contact-card { background-color: #fafafa; border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
+    .caption { margin-top: 5px; font-size: 0.9em; color: #333; }
 </style>
 {% endblock %}
 
@@ -19,32 +23,57 @@
     <div class="chat-container my-3" id="chat-container">
         <div class="chat-wrapper" id="chat-wrapper">
             {% for message in messages %}
-                <div class="chat-bubble {{ message.direction }}">
-                    {% if message.message_type == 'image' and message.media_url %}
-                        <img src="{{ message.media_url }}" alt="Image from user" style="max-width: 100%; border-radius: 10px;">
-                    {% else %}
-                        <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
-                    {% endif %}
-                    <div class="bubble-footer">
-                        <span>{{ message.timestamp|date:"h:i A" }}</span>
-                        {% if message.direction == 'outbound' %}
-                            {% if message.status == 'read' %}
-                                <span class="status-read">✓✓</span>
-                            {% elif message.status == 'delivered' %}
-                                <span>✓✓</span>
-                            {% else %}
-                                <span>✓</span>
-                            {% endif %}
-                        {% endif %}
-                    </div>
+            <div class="chat-bubble {{ message.direction }}">
+
+                {% if message.replied_to %}
+                <div class="replied-to-block">
+                    <strong>{{ message.replied_to.contact.name|default:message.replied_to.contact.wa_id }}</strong>
+                    <p>{{ message.replied_to.text_content|truncatechars:50 }}</p>
                 </div>
+                {% endif %}
+
+                {% if message.message_type == 'image' and message.media_file %}
+                    <img src="{{ message.media_file.url }}" alt="Image" style="max-width: 100%; border-radius: 10px;">
+                {% elif message.message_type == 'video' and message.media_file %}
+                    <video controls style="max-width: 100%; border-radius: 10px;"><source src="{{ message.media_file.url }}"></video>
+                {% elif message.message_type == 'audio' and message.media_file %}
+                    <audio controls src="{{ message.media_file.url }}"></audio>
+                {% elif message.message_type == 'contact' %}
+                    <div class="contact-card">
+                        <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
+                    </div>
+                {% else %}
+                    <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
+                {% endif %}
+                
+                {% if message.caption %}
+                    <p class="caption">{{ message.caption }}</p>
+                {% endif %}
+
+                <div class="bubble-footer">
+                    <span>{{ message.timestamp|date:"h:i A" }}</span>
+                    {% if message.direction == 'outbound' %}
+                        {% if message.status == 'read' %}
+                            <span class="status-read">✓✓</span>
+                        {% elif message.status|slice:":8" == 'Reacted' %}
+                            <span class="status-read">{{ message.status|slice:"13:" }}</span>
+                        {% elif message.status == 'delivered' %}
+                            <span>✓✓</span>
+                        {% else %}
+                            <span>✓</span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
             {% endfor %}
         </div>
     </div>
 
-    <form id="reply-form">
+    <form id="reply-form" enctype="multipart/form-data">
         <div class="input-group">
-            <input type="text" id="reply-message-input" class="form-control" placeholder="Type your message...">
+            <input type="text" id="reply-message-input" class="form-control" placeholder="Type a message or caption...">
+            <label class="btn btn-secondary mb-0" for="media-file-input">📎</label>
+            <input type="file" id="media-file-input" name="media_file" style="display: none;">
             <button type="submit" class="btn btn-primary">Send</button>
         </div>
     </form>
@@ -55,42 +84,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatContainer = document.getElementById('chat-container');
     const replyForm = document.getElementById('reply-form');
     const messageInput = document.getElementById('reply-message-input');
-    const contactWaId = "{{ contact.wa_id }}";
+    const mediaInput = document.getElementById('media-file-input');
     const csrfToken = "{{ csrf_token }}";
 
-    // Scroll to the bottom of the chat
+    // Scroll to the bottom of the chat on page load
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
     replyForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const messageText = messageInput.value.trim();
-        if (!messageText) return;
+        const file = mediaInput.files[0];
 
+        if (!messageText && !file) {
+            return; // Don't send empty messages
+        }
+
+        const formData = new FormData();
+        formData.append('to_number', "{{ contact.wa_id }}");
+        formData.append('message_text', messageText);
+        if (file) {
+            formData.append('media_file', file);
+        }
+        
         messageInput.disabled = true;
 
         try {
             const response = await fetch("{% url 'registration:send_reply_api' %}", {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken,
-                },
-                body: JSON.stringify({
-                    to_number: contactWaId,
-                    message_text: messageText,
-                }),
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData,
             });
 
             if (response.ok) {
-                // Reload the page to see the new message and history
                 window.location.reload();
             } else {
-                alert('Failed to send message.');
+                alert('Failed to send message. Please check the server logs.');
                 messageInput.disabled = false;
             }
         } catch (error) {
             console.error('Error sending reply:', error);
-            alert('An error occurred.');
+            alert('An error occurred while sending the message.');
             messageInput.disabled = false;
         }
     });
