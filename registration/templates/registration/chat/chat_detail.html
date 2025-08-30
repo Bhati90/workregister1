@@ -54,7 +54,7 @@
                     <video controls style="max-width: 100%; border-radius: 10px;"><source src="{{ message.media_file.url }}"></video>
                 {% elif message.message_type == 'audio' and message.media_file %}
                     <audio controls src="{{ message.media_file.url }}"></audio>
-                {% elif message.message_type == 'contact' %}
+                {% elif message.message_type == 'contacts' %}
                     <div class="contact-card">
                         <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
                     </div>
