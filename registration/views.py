@@ -459,57 +459,77 @@ def chat_contact_list_view(request):
 
 from types import SimpleNamespace
 
+# registration/views.py
+
+from .whats_app import upload_media_to_meta, send_whatsapp_message # Import only what's needed
+
 @login_required
 def chat_detail_view(request, wa_id):
-    """Displays a unified conversation history from the Message and WhatsAppLog models."""
+    """
+    Final version: Converts all messages to a consistent dictionary format
+    and handles all data access correctly.
+    """
     wa_id = wa_id.strip()
     contact = get_object_or_404(ChatContact, wa_id=wa_id)
-    conversation_messages = list(contact.messages.select_related('replied_to').order_by('timestamp'))
+    
+    # 1. Fetch the conversation as a list of dictionaries
+    conversation_messages = list(contact.messages.select_related('replied_to')
+                                 .order_by('timestamp').values(
+        'direction', 'text_content', 'timestamp', 'status', 
+        'media_file', # This will now be the path string, e.g., 'whatsapp_media/file.jpg'
+        'message_type', 'caption', 'replied_to__text_content'
+    ))
 
+    # 2. Get the initial registration template from the log
     try:
         search_number = wa_id[2:] if wa_id.startswith('91') else wa_id
-        initial_template_log = WhatsAppLog.objects.filter(recipient_number=search_number, status='sent').order_by('timestamp').first()
+        initial_template_log = WhatsAppLog.objects.filter(
+            recipient_number=search_number,
+            status='sent'
+        ).order_by('timestamp').first()
+
         if initial_template_log:
-            initial_message = SimpleNamespace(
-                direction='outbound',
-                text_content=f"Sent registration template: {initial_template_log.template_name}",
-                timestamp=initial_template_log.timestamp,
-                status='sent',
-                message_type='template',
-                media_file=None,
-                caption=None,
-                replied_to=None 
-            )
+            # Create a dictionary with the same keys as the .values() query
+            initial_message = {
+                'direction': 'outbound',
+                'text_content': f"Sent registration template: {initial_template_log.template_name}",
+                'timestamp': initial_template_log.timestamp,
+                'status': 'sent',
+                'media_file': None, # No media for this log entry
+                'message_type': 'template',
+                'caption': None,
+                'replied_to__text_content': None
+            }
             conversation_messages.append(initial_message)
-            conversation_messages.sort(key=lambda msg: msg.timestamp)
+            
+            # 3. Sort the combined list using dictionary key access
+            conversation_messages.sort(key=lambda msg: msg['timestamp'])
 
     except Exception as e:
         logger.error(f"Could not query WhatsAppLog: {e}")
-    return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': conversation_messages})
 
-import os
-# registration/views.py
+    return render(request, 'registration/chat/chat_detail.html', {
+        'contact': contact, 
+        'messages': conversation_messages
+    })
 
-from .whats_app import upload_media_to_meta, send_whatsapp_message, save_outgoing_message
-
-# registration/views.py
 
 @csrf_exempt
 @login_required
 def send_reply_api_view(request):
     """
-    Builds the correct payload and calls the centralized sender service.
+    Final version: Correctly saves the media file path for outgoing messages.
     """
     to_number = request.POST.get('to_number')
     message_text = request.POST.get('message_text', '').strip()
     media_file = request.FILES.get('media_file')
     replied_to_wamid = request.POST.get('replied_to_wamid')
 
-    if not message_text and not media_file:
-        return JsonResponse({'status': 'error', 'message': 'Cannot send an empty message.'}, status=400)
-
-    # --- Build the payload for the service ---
+    contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
     payload = {"messaging_product": "whatsapp", "to": to_number}
+    message_type = 'text'
+    content_to_save = message_text
+    caption_to_save = ""
 
     if replied_to_wamid:
         payload['context'] = {'message_id': replied_to_wamid}
@@ -521,16 +541,40 @@ def send_reply_api_view(request):
         
         file_type = media_file.content_type.split('/')[0]
         payload.update({"type": file_type, file_type: {"id": media_id, "caption": message_text}})
+        message_type = file_type
+        content_to_save = "" # No text_content for media messages
+        caption_to_save = message_text
     else:
+        if not message_text: # Prevent empty messages
+            return JsonResponse({'status': 'error', 'message': 'Cannot send an empty message.'}, status=400)
         payload.update({"type": "text", "text": {"body": message_text}})
 
-    # --- Correct, simplified function call ---
-    success, response_data = send_whatsapp_message(to_number, payload)
-    
+    success, response_data = send_whatsapp_message(to_number, payload) 
     if success:
+        # --- THIS IS THE FIX for saving outgoing media ---
+        message = Message(
+            contact=contact,
+            wamid=response_data['messages'][0]['id'],
+            direction='outbound',
+            message_type=message_type,
+            text_content=content_to_save,
+            caption=caption_to_save,
+            timestamp=timezone.now(),
+            raw_data=response_data,
+            status='sent'
+        )
+        if media_file:
+            # Save the file to the instance before saving the instance itself
+            message.media_file.save(media_file.name, media_file, save=True)
+        else:
+            message.save()
+            
+        contact.last_contact_at = timezone.now()
+        contact.save()
         return JsonResponse({'status': 'success', 'data': response_data})
     else:
         return JsonResponse({'status': 'error', 'data': response_data}, status=500)
+
 def success_view(request):
     return render(request, 'registration/success.html')
 

@@ -137,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const messageText = messageInput.value.trim();
         const file = mediaInput.files[0];
+        const repliedToWamid = repliedToWamidInput.value;
 
         // --- THIS IS THE MISSING FIX ---
         // If there is no text AND no file, do not submit the form.
@@ -146,7 +147,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData(replyForm);
         formData.append('to_number', "{{ contact.wa_id }}");
         formData.append('message_text', messageText); // Ensure trimmed text is what's sent
-
+         if (file) {
+            formData.append('media_file', file);
+        }
+        if (repliedToWamid) {
+            formData.append('replied_to_wamid', repliedToWamid);
+        }
         messageInput.disabled = true;
 
         try {

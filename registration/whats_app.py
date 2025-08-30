@@ -88,11 +88,18 @@ def send_whatsapp_message(to_number, payload):
 
 def save_outgoing_message(contact, wamid, message_type, text_content="", caption="", raw_data={}):
     """Saves a record of an outgoing message to the database."""
-    Message.objects.create(
-        contact=contact, wamid=wamid, direction='outbound',
-        message_type=message_type, text_content=text_content,
-        caption=caption, timestamp=timezone.now(),
-        raw_data=raw_data, status='sent'
+    Message.objects.update_or_create(
+        wamid=wamid,
+        defaults={
+            'contact': contact,
+            'direction': 'outbound',
+            'message_type': message_type,
+            'text_content': text_content,
+            'caption': caption,
+            'timestamp': timezone.now(),
+            'raw_data': raw_data,
+            'status': 'sent'
+        }
     )
     contact.last_contact_at = timezone.now()
     contact.save()

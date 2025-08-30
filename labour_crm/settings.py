@@ -157,17 +157,23 @@ TIME_ZONE = 'Asia/Kolkata'
 USE_I18N = True
 
 USE_TZ = True
-MEDIA_URL = '/media/'
+
 # MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 # Static & Media
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR/'media' # 
+
+# # Static files (CSS, JavaScript, Images)
+# # https://docs.djangoproject.com/en/5.2/howto/static-files/
+# Static & Media
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' # <--- CORRECTED TYPO HERE
-MEDIA_ROOT = BASE_DIR/'media'
+STATICFILES_DIRS = [BASE_DIR/'static']
+STATIC_ROOT = BASE_DIR/'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # PWA Settings
 PWA_APP_NAME = 'AgroIntel'
@@ -393,13 +399,18 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 #     'django.contrib.sessions',
 #     'django.contrib.messages',
 #     'django.contrib.staticfiles',
-#     # 'authentication',       # PWA support
+#     # 'authentication',
+#     #        # PWA support
+#     'corsheaders',
+#     'whitenoise.storage',  # For serving static files in production
 #     'registration',
 #     'pwa',  
 # ]
 
 # MIDDLEWARE = [
 #     'django.middleware.security.SecurityMiddleware',
+#     'whitenoise.middleware.WhiteNoiseMiddleware',
+#     'corsheaders.middleware.CorsMiddleware',
 #     'django.contrib.sessions.middleware.SessionMiddleware',
 #     'django.middleware.common.CommonMiddleware',
 #     'django.middleware.csrf.CsrfViewMiddleware',
@@ -476,14 +487,16 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 # MEDIA_URL = '/media/'
-# MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # 
+# MEDIA_ROOT = BASE_DIR/'media' # 
 
 # # Static files (CSS, JavaScript, Images)
 # # https://docs.djangoproject.com/en/5.2/howto/static-files/
 # # Static & Media
 # STATIC_URL = '/static/'
-# STATICFILES_DIRS = [BASE_DIR / 'static']
-# STATIC_ROOT = BASE_DIR / 'staticfiles'
+# STATICFILES_DIRS = [BASE_DIR/'static']
+# STATIC_ROOT = BASE_DIR/'staticfiles'
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 
 # # PWA Settings
 # PWA_APP_NAME = 'AgroIntel'
