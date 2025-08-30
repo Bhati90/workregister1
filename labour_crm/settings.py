@@ -209,9 +209,6 @@ CLOUDINARY_STORAGE = {
     # It's recommended to store this URL in an environment variable for security
 }
 
-# Set Cloudinary as the default file storage
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
 
 
 
