@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.disabled = true; // Disable input while sending
 
         try {
-            const response = await fetch("{% url 'send_reply_api' %}", {
+            const response = await fetch("{% url 'registration:send_reply_api' %}", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

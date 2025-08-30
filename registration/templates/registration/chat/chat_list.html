@@ -4,7 +4,7 @@
     <h2>WhatsApp Chats</h2>
     <div class="list-group">
         {% for contact in contacts %}
-            <a href="{% url 'chat_detail' contact.wa_id %}" class="list-group-item list-group-item-action">
+            <a href="{% url 'registration:chat_detail' contact.wa_id %}" class="list-group-item list-group-item-action">
                 <div class="d-flex w-100 justify-content-between">
                     <h5 class="mb-1">{{ contact.name|default:contact.wa_id }}</h5>
                     <small>Last contact: {{ contact.last_contact_at|timesince }} ago</small>
