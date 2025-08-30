@@ -492,25 +492,24 @@ import os
 
 from .whats_app import upload_media_to_meta, send_whatsapp_message, save_outgoing_message
 
+# registration/views.py
+
 @csrf_exempt
 @login_required
 def send_reply_api_view(request):
     """
-    A powerful sender that can send text or media and saves the outgoing message.
+    Builds the correct payload and calls the centralized sender service.
     """
     to_number = request.POST.get('to_number')
-    message_text = request.POST.get('message_text', '').strip() # Get text and remove whitespace
+    message_text = request.POST.get('message_text', '').strip()
     media_file = request.FILES.get('media_file')
     replied_to_wamid = request.POST.get('replied_to_wamid')
 
-    # --- FIX #1: Validate that the message is not empty ---
     if not message_text and not media_file:
         return JsonResponse({'status': 'error', 'message': 'Cannot send an empty message.'}, status=400)
 
-    contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
+    # --- Build the payload for the service ---
     payload = {"messaging_product": "whatsapp", "to": to_number}
-    message_type = 'text'
-    content_to_save = message_text
 
     if replied_to_wamid:
         payload['context'] = {'message_id': replied_to_wamid}
@@ -522,22 +521,16 @@ def send_reply_api_view(request):
         
         file_type = media_file.content_type.split('/')[0]
         payload.update({"type": file_type, file_type: {"id": media_id, "caption": message_text}})
-        message_type = file_type
     else:
         payload.update({"type": "text", "text": {"body": message_text}})
 
-    success, response_data = send_whatsapp_message(payload)
+    # --- Correct, simplified function call ---
+    success, response_data = send_whatsapp_message(to_number, payload)
     
     if success:
-        save_outgoing_message(
-            contact=contact, wamid=response_data['messages'][0]['id'],
-            message_type=message_type, text_content=content_to_save,
-            caption=message_text if media_file else "", raw_data=response_data
-        )
         return JsonResponse({'status': 'success', 'data': response_data})
     else:
         return JsonResponse({'status': 'error', 'data': response_data}, status=500)
-
 def success_view(request):
     return render(request, 'registration/success.html')
 

@@ -56,9 +56,34 @@ def send_whatsapp_message(to_number, payload):
     try:
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
-        return True, response.json()
+        response_data = response.json()
+        
+        # --- SAVE THE MESSAGE AFTER SENDING ---
+        contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
+        wamid = response_data['messages'][0]['id']
+        # Define message_type, content_to_save, and caption based on payload
+        message_type = payload.get('type', '')
+        content_to_save = ''
+        caption = ''
+        if message_type == 'text':
+            content_to_save = payload.get('text', {}).get('body', '')
+        elif message_type == 'template':
+            content_to_save = f"Template: {payload.get('template', {}).get('name', '')}"
+        elif message_type == 'image':
+            caption = payload.get('image', {}).get('caption', '')
+        Message.objects.create(
+            contact=contact, wamid=wamid, direction='outbound',
+            message_type=message_type, text_content=content_to_save,
+            caption=caption, timestamp=timezone.now(),
+            raw_data=response_data, status='sent'
+        )
+        contact.last_contact_at = timezone.now()
+        contact.save()
+        # ----------------------------------------
+
+        return True, response_data
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error from Meta API: {e.response.json() if e.response else str(e)}")
+        logger.error(f"Error from Meta API: {e.response.text if e.response else str(e)}")
         return False, e.response.json() if e.response else {'error': str(e)}
 
 def save_outgoing_message(contact, wamid, message_type, text_content="", caption="", raw_data={}):

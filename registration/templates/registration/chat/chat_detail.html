@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const replyBannerText = document.getElementById('reply-context-text');
     const cancelReplyBtn = document.getElementById('cancel-reply-btn');
     const csrfToken = "{{ csrf_token }}";
-
+    const mediaInput = document.getElementById('media-file-input');
 
     // Scroll to the bottom of the chat on page load
     chatContainer.scrollTop = chatContainer.scrollHeight;
