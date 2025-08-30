@@ -74,7 +74,7 @@ class Message(models.Model):
     )
     
     timestamp = models.DateTimeField(help_text="Timestamp from the WhatsApp message.")
-    
+    media_id = models.CharField(max_length=255, blank=True, null=True)
     # CHANGED: Increased max_length to store reactions like "Reacted with 👍"
     status = models.CharField(max_length=50, choices=MessageStatus.choices, blank=True, null=True)
     

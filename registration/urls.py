@@ -19,7 +19,7 @@ urlpatterns = [
     
     # This is an API endpoint for sending replies from the frontend
     path('api/chat/send-reply/', views.send_reply_api_view, name='send_reply_api'),
-    path('whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
+    path('https://workregister1-g7pf.onrender.com/whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
 
 
     # API endpoints
