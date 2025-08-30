@@ -134,9 +134,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     replyForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        const messageText = messageInput.value.trim();
+        const file = mediaInput.files[0];
+
+        // --- THIS IS THE MISSING FIX ---
+        // If there is no text AND no file, do not submit the form.
+        if (!messageText && !file) {
+            return; 
+        }
         const formData = new FormData(replyForm);
         formData.append('to_number', "{{ contact.wa_id }}");
-        
+        formData.append('message_text', messageText); // Ensure trimmed text is what's sent
+
         messageInput.disabled = true;
 
         try {
@@ -145,8 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'X-CSRFToken': csrfToken },
                 body: formData,
             });
-            if (response.ok) { window.location.reload(); }
-            else { alert('Failed to send message.'); messageInput.disabled = false; }
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed to send message. Please check the server logs.');
+                messageInput.disabled = false;
+            }
         } catch (error) {
             console.error('Error sending reply:', error);
             alert('An error occurred.');

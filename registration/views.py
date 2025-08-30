@@ -488,33 +488,29 @@ def chat_detail_view(request, wa_id):
     return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': conversation_messages})
 
 import os
+# registration/views.py
+
+from .whats_app import upload_media_to_meta, send_whatsapp_message, save_outgoing_message
 
 @csrf_exempt
 @login_required
 def send_reply_api_view(request):
-    """A powerful sender that can send text or media and saves the outgoing message."""
+    """
+    A powerful sender that can send text or media and saves the outgoing message.
+    """
     to_number = request.POST.get('to_number')
-    message_text = request.POST.get('message_text') # Can be a message or a caption
+    message_text = request.POST.get('message_text', '').strip() # Get text and remove whitespace
     media_file = request.FILES.get('media_file')
     replied_to_wamid = request.POST.get('replied_to_wamid')
-    
-    META_API_URL = f"https://graph.facebook.com/v19.0/{phone_id}/messages"
-    phone_id = "694609297073147"
-    META_ACCESS_TOKEN ="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
-    PHONE_NUMBER_ID = "694609297073147"
 
-
-    PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID')
-    url = f"{META_API_URL}/{PHONE_NUMBER_ID}/messages"
-    headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
-    payload = {"messaging_product": "whatsapp", "to": to_number}
-
+    # --- FIX #1: Validate that the message is not empty ---
+    if not message_text and not media_file:
+        return JsonResponse({'status': 'error', 'message': 'Cannot send an empty message.'}, status=400)
 
     contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
     payload = {"messaging_product": "whatsapp", "to": to_number}
     message_type = 'text'
     content_to_save = message_text
-    
 
     if replied_to_wamid:
         payload['context'] = {'message_id': replied_to_wamid}
@@ -523,13 +519,15 @@ def send_reply_api_view(request):
         media_id = upload_media_to_meta(media_file)
         if not media_id:
             return JsonResponse({'status': 'error', 'message': 'Failed to upload media'}, status=500)
+        
         file_type = media_file.content_type.split('/')[0]
         payload.update({"type": file_type, file_type: {"id": media_id, "caption": message_text}})
         message_type = file_type
     else:
         payload.update({"type": "text", "text": {"body": message_text}})
 
-    success, response_data = send_whatsapp_message(to_number, payload)
+    success, response_data = send_whatsapp_message(payload)
+    
     if success:
         save_outgoing_message(
             contact=contact, wamid=response_data['messages'][0]['id'],
@@ -539,7 +537,6 @@ def send_reply_api_view(request):
         return JsonResponse({'status': 'success', 'data': response_data})
     else:
         return JsonResponse({'status': 'error', 'data': response_data}, status=500)
-
 
 def success_view(request):
     return render(request, 'registration/success.html')
