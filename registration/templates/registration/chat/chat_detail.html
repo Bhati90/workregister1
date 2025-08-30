@@ -73,6 +73,27 @@
             <p><strong>Phone:</strong> {{ message.contact_phone}}</p>
         </div>
     </div>
+    {% elif message.message_type == 'document' and message.media_file %}
+    <div class="document-card">
+        📄 <a href="{{ message.media_file.url }}" target="_blank">
+            {{ message.text_content|default:message.caption|default:"Download Document" }}
+        </a>
+        <p><small>{{ message.media_file.name }}</small></p>
+    </div>
+    {% elif message.message_type == 'document' and message.media_file %}
+    <div class="document-card">
+        {% if ".pdf" in message.media_file.url|lower %}
+            📕
+        {% elif ".docx" in message.media_file.url|lower %}
+            📘
+        {% else %}
+            📄
+        {% endif %}
+        <a href="{{ message.media_file.url }}" target="_blank">
+            {{ message.caption|default:"View Document" }}
+        </a>
+    </div>
+
                 {% else %}
                     <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
                 {% endif %}
