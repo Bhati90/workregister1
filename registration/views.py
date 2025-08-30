@@ -384,7 +384,7 @@ import logging
 
 from .models import ChatContact, Message, WhatsAppLog
 from .whats_app import download_media_from_meta, upload_media_to_meta, send_whatsapp_message, save_outgoing_message
-
+import datetime
 logger = logging.getLogger(__name__)
 
 @csrf_exempt
@@ -406,8 +406,7 @@ def whatsapp_webhook_view(request):
                             message_type = msg.get('type')
                             defaults = {
                                 'contact': contact, 'direction': 'inbound',
-                                'timestamp': timezone.datetime.fromtimestamp(int(msg['timestamp']), tz=timezone.utc),
-                                'raw_data': msg
+                                'timestamp': datetime.datetime.fromtimestamp(int(msg['timestamp']), tz=datetime.timezone.utc)
                             }
                             if 'context' in msg and msg['context'].get('id'):
                                 replied_wamid = msg['context']['id']
