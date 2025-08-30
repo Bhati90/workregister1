@@ -481,7 +481,8 @@ def chat_detail_view(request, wa_id):
                 replied_to=None 
             )
             conversation_messages.append(initial_message)
-            conversation_messages.sort(key=lambda msg: msg['timestamp'])
+            conversation_messages.sort(key=lambda msg: msg.timestamp)
+
     except Exception as e:
         logger.error(f"Could not query WhatsAppLog: {e}")
     return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': conversation_messages})
