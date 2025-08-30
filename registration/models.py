@@ -78,7 +78,8 @@ class Message(models.Model):
     # CHANGED: Increased max_length to store reactions like "Reacted with 👍"
     status = models.CharField(max_length=50, choices=MessageStatus.choices, blank=True, null=True)
     
-    raw_data = models.JSONField(help_text="The raw, complete webhook payload from Meta for debugging.")
+    raw_data = models.JSONField(help_text="The raw, complete webhook payload from Meta for debugging.",null=True, 
+        blank=True)
 
     class Meta:
         ordering = ['timestamp']
