@@ -502,8 +502,8 @@ def chat_detail_view(request, wa_id):
 
     # Get the initial template from the log table
     try:
-        phone_number_query = Q(recipient_number=wa_id) | Q(recipient_number=wa_id.lstrip('91'))
-        initial_template_log = WhatsAppLog.objects.filter(phone_number_query, status='sent').order_by('timestamp').first()
+        search_number = wa_id[2:] if wa_id.startswith('91') else wa_id
+        initial_template_log = WhatsAppLog.objects.filter(recipient_number = search_number, status='sent').order_by('timestamp').first()
         if initial_template_log:
             initial_message = {
                 'direction': 'outbound',
