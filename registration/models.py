@@ -77,6 +77,8 @@ class Message(models.Model):
     media_id = models.CharField(max_length=255, blank=True, null=True)
     # CHANGED: Increased max_length to store reactions like "Reacted with 👍"
     status = models.CharField(max_length=50, choices=MessageStatus.choices, blank=True, null=True)
+    contact_name = models.CharField(max_length=255, null=True, blank=True)
+    contact_phone = models.CharField(max_length=50, null=True, blank=True)
     
     raw_data = models.JSONField(help_text="The raw, complete webhook payload from Meta for debugging.",null=True, 
         blank=True)
@@ -86,6 +88,8 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.direction.capitalize()} message {self.id} to/from {self.contact.wa_id}"
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
 
 class WhatsAppLog(models.Model):
     recipient_number = models.CharField(max_length=20)

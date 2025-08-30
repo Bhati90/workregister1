@@ -441,6 +441,26 @@ def whatsapp_webhook_view(request):
                                 if file_name and file_content:
                                     message_instance.media_file.save(file_name, file_content, save=True)
                                 continue
+
+                            elif message_type == 'contacts':
+                                contact_data = msg['contacts'][0]
+                                
+                                # Use the structured name and phone number from the payload
+                                defaults['contact_name'] = contact_data['name']['formatted_name']
+                                if contact_data.get('phones') and contact_data['phones'][0]:
+                                    defaults['contact_phone'] = contact_data['phones'][0].get('phone')
+
+                                # You can optionally still save the raw vCard to the text field
+                                if 'vcard' in contact_data:
+                                    defaults['text_content'] = contact_data['vcard']
+
+                            elif message_type == 'location':
+                                location_data = msg['location']
+                                defaults['latitude'] = location_data['latitude']
+                                defaults['longitude'] = location_data['longitude']
+                                # Save the location name/address to the main text field
+                                defaults['text_content'] = location_data.get('name', '') or location_data.get('address', '')
+                            
                             elif message_type == 'reaction':
                                 emoji = msg['reaction']['emoji']
                                 Message.objects.filter(wamid=msg['reaction']['message_id']).update(status=f"Reacted with {emoji}")
@@ -518,6 +538,8 @@ def send_reply_api_view(request):
         return JsonResponse({'status': 'success', 'data': response_data})
     else:
         return JsonResponse({'status': 'error', 'data': response_data}, status=500)
+
+
 def success_view(request):
     return render(request, 'registration/success.html')
 
