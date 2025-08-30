@@ -40,10 +40,10 @@ urlpatterns = [
     path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline_page'),
 ]
 
-# # Serve static and media files in development
-# if settings.DEBUG:
-#     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-#     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
+# Serve static and media files in development
 if settings.DEBUG:
+    # This line is for your CSS, JS, and project images
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    
+    # This line is for user-uploaded files like WhatsApp images
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
