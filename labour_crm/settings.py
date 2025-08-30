@@ -2,13 +2,13 @@
 from pathlib import Path
 import os
 import dj_database_url
-import cloudinary
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'replace-this-in-production')
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
+DEBUG = 'True'
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
 # Quick-start development settings - unsuitable for production
@@ -203,11 +203,6 @@ PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'regi
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = True
 
-# --- Cloudinary Storage Configuration ---
-CLOUDINARY_STORAGE = {
-    'CLOUDINARY_URL':'cloudinary://196762722111821:nKpyWbKl0UAdaqgkjI9W0HpQkR4@df8f5bxfp'
-    # It's recommended to store this URL in an environment variable for security
-}
 
 
 
