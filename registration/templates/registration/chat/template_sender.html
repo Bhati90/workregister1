@@ -30,10 +30,19 @@
 
                 <!-- Dynamic Fields -->
                 <div id="dynamic-fields" class="mt-3" style="display: none;">
-                    <div class="form-group">
+                    <!-- <div class="form-group">
                         <label for="recipient-input">Recipient Phone Number</label>
                         <input type="text" name="recipient" id="recipient-input" class="form-control" placeholder="e.g., 919876543210" required>
-                    </div>
+                    </div> -->
+                    <div class="form-group">
+    <label for="contact-select">Select Recipients</label>
+    <select id="contact-select" name="recipients[]" class="form-control" multiple required>
+        {% for c in contacts %}
+            <option value="{{ c.wa_id }}" data-name="{{ c.name }}">{{ c.name|default:c.wa_id }}</option>
+        {% endfor %}
+    </select>
+    <small class="form-text text-muted">Hold CTRL (Windows) or CMD (Mac) to select multiple.</small>
+</div>
 
                     <!-- Header Image -->
                     <div id="header-image-container" class="form-group" style="display: none;">
@@ -187,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiResponsePre = document.getElementById('api-response-pre');
 
     let currentTemplate = null;
+    let originalTemplateText = ""; 
     const sendUrl = senderForm.dataset.sendUrl;
     const csrfToken = senderForm.dataset.csrf;
 
@@ -212,6 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dynamicFields.style.display = 'block';
 
         const bodyComponent = currentTemplate.components.find(c => c.type === 'BODY');
+        originalTemplateText = bodyComponent?.text || "";
         const paramCount = (bodyComponent?.text?.match(/\{\{/g) || []).length;
         for (let i = 1; i <= paramCount; i++) {
             const group = document.createElement('div');
@@ -244,9 +255,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    document.getElementById("contact-select").addEventListener("change", function() {
+    const selectedOptions = [...this.selectedOptions];
+    const names = selectedOptions.map(opt => opt.dataset.name);
+
+    let preview = originalTemplateText;
+    if (names.length > 0) {
+        preview = preview.replace(/\$name/g, names[0]);
+    }
+    document.getElementById("preview-text").innerText = preview;
+    });
+
     senderForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = new FormData(senderForm);
+         const recipients = [...document.getElementById("contact-select").selectedOptions]
+                        .map(opt => opt.value);
+    formData.delete("recipients[]");  // clear any old
+    recipients.forEach(r => formData.append("recipients[]", r));
         const sendButton = senderForm.querySelector('.send-button');
         sendButton.disabled = true;
         sendButton.textContent = 'Sending...';

@@ -57,11 +57,15 @@ class Message(models.Model):
     wamid = models.CharField(max_length=255, unique=True, help_text="The unique WhatsApp Message ID from Meta.")
     direction = models.CharField(max_length=10, choices=MessageDirection.choices)
     message_type = models.CharField(max_length=20, choices=MessageType.choices, default=MessageType.UNKNOWN)
-    
+    is_view_once = models.BooleanField(
+    default=False,
+    help_text="True if this message is a one-time view media."
+    )
+
     # --- Content fields ---
     text_content = models.TextField(blank=True, null=True, help_text="Content for text messages or placeholders for media.")
     caption = models.TextField(blank=True, null=True, help_text="Caption for media messages.")
-    media_file = models.FileField(upload_to='whatsapp_media/', blank=True, null=True, help_text="Locally saved media file.")
+    media_file = models.FileField(upload_to='whatsapp_media/', blank=True, null=True,max_length=500, help_text="Locally saved media file.")
     
     # --- New field to handle replies ---
     replied_to = models.ForeignKey(
@@ -72,6 +76,14 @@ class Message(models.Model):
         related_name='replies',
         help_text="The message this message is a reply to."
     )
+
+    reaction = models.CharField(
+    max_length=50,
+    blank=True,
+    null=True,
+    help_text="Reaction emoji (e.g. 👍, ❤️)."
+   )
+
     
     timestamp = models.DateTimeField(help_text="Timestamp from the WhatsApp message.")
     media_id = models.CharField(max_length=255, blank=True, null=True)

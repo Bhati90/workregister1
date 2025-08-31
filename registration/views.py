@@ -403,6 +403,33 @@ from .models import ChatContact, Message, WhatsAppLog
 
 logger = logging.getLogger(__name__)
 
+
+
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+import os, requests, logging
+from dotenv import load_dotenv
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+# ... your other views ...
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+import os, requests, logging, json
+from dotenv import load_dotenv
+from .whats_app import upload_media_to_meta, send_whatsapp_message, save_outgoing_message
+from .models import ChatContact
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+# ... your other views ...
+
+
 @csrf_exempt
 def whatsapp_webhook_view(request):
     """Handles all incoming WhatsApp events."""
@@ -475,31 +502,6 @@ def whatsapp_webhook_view(request):
             logger.error(f"Error in webhook: {e}", exc_info=True)
         return JsonResponse({"status": "success"}, status=200)
 
-
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-import os, requests, logging
-from dotenv import load_dotenv
-
-load_dotenv()
-logger = logging.getLogger(__name__)
-
-# ... your other views ...
-
-from django.shortcuts import render
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import login_required
-import os, requests, logging, json
-from dotenv import load_dotenv
-from .whats_app import upload_media_to_meta, send_whatsapp_message, save_outgoing_message
-from .models import ChatContact
-
-load_dotenv()
-logger = logging.getLogger(__name__)
-
-# ... your other views ...
-
 @login_required
 def template_sender_view(request):
     """
@@ -507,6 +509,7 @@ def template_sender_view(request):
     """
     templates_data = []
     error = None
+    contacts = ChatContact.objects.all()
     try:
         META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
         
@@ -522,57 +525,98 @@ def template_sender_view(request):
         logger.error(f"Failed to fetch templates: {e}")
         error = "Could not load templates from Meta API. Please check your credentials."
 
-    context = {'templates': templates_data, 'error': error}
-    return render(request, 'registration/chat/template_sender.html', context)
+    
+    return render(request, 'registration/chat/template_sender.html', {
+        "templates": templates_data,
+        "contacts": contacts,
+        "error": error,
+    })
 
 @csrf_exempt
 @login_required
 def send_template_api_view(request):
     """
-    API endpoint to send a composed template message.
+    API endpoint to send a composed template message to one or many recipients.
     """
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
 
     try:
-        to_number = request.POST.get('recipient')
+        recipients = request.POST.getlist('recipients[]')  # list of wa_ids
         template_name = request.POST.get('template_name')
         params = request.POST.getlist('params[]')
         media_file = request.FILES.get('header_image')
 
-        payload = {
-            "messaging_product": "whatsapp", "to": to_number, "type": "template",
-            "template": {"name": template_name, "language": {"code": "en"}}
-        }
-        
-        components = []
-        # Handle header image
-        if media_file:
-            media_id = upload_media_to_meta(media_file)
-            if not media_id:
-                return JsonResponse({'status': 'error', 'message': 'Failed to upload media'}, status=500)
-            components.append({"type": "header", "parameters": [{"type": "image", "image": {"id": media_id}}]})
+        results = []
 
-        # Handle body parameters
-        if params:
-            parameters_list = [{"type": "text", "text": p} for p in params]
-            components.append({"type": "body", "parameters": parameters_list})
-        
-        if components:
-            payload['template']['components'] = components
-        
-        success, response_data = send_whatsapp_message(payload)
+        for wa_id in recipients:
+            try:
+                contact = ChatContact.objects.get(wa_id=wa_id)
 
-        if success:
-            contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
-            save_outgoing_message(
-                contact=contact, wamid=response_data['messages'][0]['id'],
-                message_type='template', text_content=f"Sent template: {template_name}",
-                raw_data=response_data
-            )
-            return JsonResponse({'status': 'success', 'data': response_data})
-        else:
-            return JsonResponse({'status': 'error', 'data': response_data}, status=500)
+                # Personalize params: replace $name with actual contact name
+                personalized_params = []
+                for p in params:
+                    if "$name" in p:
+                        personalized_params.append(p.replace("$name", contact.name or ""))
+                    else:
+                        personalized_params.append(p)
+
+                payload = {
+                    "messaging_product": "whatsapp",
+                    "to": wa_id,
+                    "type": "template",
+                    "template": {
+                        "name": template_name,
+                        "language": {"code": "en"}
+                    }
+                }
+
+                components = []
+                # Handle header image
+                if media_file:
+                    media_id = upload_media_to_meta(media_file)
+                    if not media_id:
+                        results.append({
+                            "wa_id": wa_id,
+                            "status": "error",
+                            "error": "Failed to upload media"
+                        })
+                        continue
+                    components.append({
+                        "type": "header",
+                        "parameters": [{"type": "image", "image": {"id": media_id}}]
+                    })
+
+                # Handle body parameters
+                if personalized_params:
+                    parameters_list = [{"type": "text", "text": p} for p in personalized_params]
+                    components.append({"type": "body", "parameters": parameters_list})
+
+                if components:
+                    payload['template']['components'] = components
+
+                success, response_data = send_whatsapp_message(payload)
+
+                if success:
+                    # Save outgoing message
+                    save_outgoing_message(
+                        contact=contact,
+                        wamid=response_data['messages'][0]['id'],
+                        message_type='template',
+                        text_content=f"Sent template: {template_name}",
+                        raw_data=response_data
+                    )
+                    results.append({"wa_id": wa_id, "status": "success", "response": response_data})
+                else:
+                    results.append({"wa_id": wa_id, "status": "error", "response": response_data})
+
+            except ChatContact.DoesNotExist:
+                results.append({"wa_id": wa_id, "status": "error", "error": "Contact not found"})
+            except Exception as e:
+                logger.error(f"Error sending to {wa_id}: {e}", exc_info=True)
+                results.append({"wa_id": wa_id, "status": "error", "error": str(e)})
+
+        return JsonResponse({"results": results})
 
     except Exception as e:
         logger.error(f"Error in send_template_api_view: {e}", exc_info=True)
@@ -618,13 +662,34 @@ def send_reply_api_view(request):
     payload = {"messaging_product": "whatsapp", "to": to_number}
     if replied_to_wamid:
         payload['context'] = {'message_id': replied_to_wamid}
+    
+    message_api_type = 'text'
 
     if media_file:
         media_id = upload_media_to_meta(media_file)
         if not media_id:
             return JsonResponse({'status': 'error', 'message': 'Failed to upload media'}, status=500)
-        file_type = media_file.content_type.split('/')[0]
-        payload.update({"type": file_type, file_type: {"id": media_id, "caption": message_text}})
+        
+        
+        content_type = media_file.content_type
+        if content_type.startswith('image/'):
+            message_api_type = 'image'
+        elif content_type.startswith('video/'):
+            message_api_type = 'video'
+        elif content_type.startswith('audio/'):
+            message_api_type = 'audio'
+        else:
+            # Default to 'document' for PDFs, DOCX, etc.
+            message_api_type = 'document'
+        
+        payload['type'] = message_api_type
+        payload[message_api_type] = {'id': media_id}
+
+        # --- FIX: Only add caption if message_text is not empty ---
+        if message_text:
+            payload[message_api_type]['caption'] = message_text
+        if message_api_type == 'document':
+            payload[message_api_type]['filename'] = media_file.name
     else:
         payload.update({"type": "text", "text": {"body": message_text}})
 
@@ -633,10 +698,12 @@ def send_reply_api_view(request):
         save_outgoing_message(
             contact=get_object_or_404(ChatContact, wa_id=to_number),
             wamid=response_data['messages'][0]['id'],
-            message_type=payload.get('type'),
+            message_type=message_api_type,
             text_content=message_text if not media_file else "",
             caption=message_text if media_file else "",
-            raw_data=response_data
+            raw_data=response_data,
+            replied_to_wamid=replied_to_wamid,
+            media_file=media_file
         )
         return JsonResponse({'status': 'success', 'data': response_data})
     else:

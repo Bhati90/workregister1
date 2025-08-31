@@ -25,6 +25,18 @@
         display: none; padding: 8px; background: #f0f0f0;
         border-left: 3px solid #007bff; margin-bottom: 5px; border-radius: 4px;
     }
+    .reaction-emoji {
+    position: absolute;
+    bottom: -10px;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 50%;
+    padding: 1px 6px;
+    font-size: 0.8rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.outbound .reaction-emoji { right: 20px; }
+.inbound .reaction-emoji { left: 20px; }
     #reply-context-banner p { margin: 0; font-size: 0.9em; font-style: italic; }
     #cancel-reply-btn { margin-left: 10px; cursor: pointer; font-weight: bold; }
 
@@ -42,11 +54,43 @@
                 <button class="reply-btn" data-wamid="{{ message.wamid }}" data-text="{{ message.text_content|truncatechars:30 }}">↪</button>
                 
                 {% if message.replied_to %}
-                <div class="replied-to-block">
-                    <strong>{{ message.replied_to.contact.name|default:message.replied_to.contact.wa_id }}</strong>
-                    <p>{{ message.replied_to.text_content|truncatechars:50 }}</p>
-                </div>
-                {% endif %}
+<div class="replied-to-block">
+    <strong>{{ message.replied_to.contact.name|default:message.replied_to.contact.wa_id }}</strong>
+    
+    <p>
+        {% with replied_msg=message.replied_to %}
+            {% if replied_msg.message_type == 'text' %}
+                {{ replied_msg.text_content|truncatechars:50 }}
+
+            {% elif replied_msg.message_type == 'image' %}
+                📷 Image
+                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
+
+            {% elif replied_msg.message_type == 'video' %}
+                📹 Video
+                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
+
+            {% elif replied_msg.message_type == 'document' %}
+                📄 Document
+                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
+
+            {% elif replied_msg.message_type == 'audio' %}
+                🎵 Audio
+            
+            {% elif replied_msg.message_type == 'location' %}
+                📍 Location
+                {% if replied_msg.text_content %}<br><small>{{ replied_msg.text_content|truncatechars:40 }}</small>{% endif %}
+            
+            {% elif replied_msg.message_type == 'contacts' %}
+                👤 Contact: {{ replied_msg.contact_name|truncatechars:40 }}
+
+            {% else %}
+                {{ replied_msg.text_content|truncatechars:50 }}
+            {% endif %}
+        {% endwith %}
+    </p>
+</div>
+{% endif %}
 
                 {% if message.message_type == 'image' and message.media_file %}
                     <img src="{{ message.media_file.url }}" alt="Image" style="max-width: 100%; border-radius: 10px;">
@@ -116,6 +160,9 @@
                         {% endif %}
                     {% endif %}
                 </div>
+                {% if message.status|slice:":8" == 'Reacted' %}
+        <div class="reaction-emoji">{{ message.status|slice:"13:" }}</div>
+    {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -125,6 +172,11 @@
         <span id="reply-context-text"></span>
         <span id="cancel-reply-btn">✖</span>
     </div>
+
+    <div id="media-preview-container" class="mb-2" style="display: none; position: relative; max-width: 200px;">
+    <img id="media-preview-image" src="" alt="Image Preview" class="img-fluid rounded">
+    <button id="cancel-media-preview" type="button" class="btn-close" style="position: absolute; top: 5px; right: 5px; background-color: rgba(255,255,255,0.7);"></button>
+</div>
 
     <form id="reply-form" enctype="multipart/form-data">
         <input type="hidden" id="replied-to-wamid" name="replied_to_wamid">
@@ -148,10 +200,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelReplyBtn = document.getElementById('cancel-reply-btn');
     const csrfToken = "{{ csrf_token }}";
     const mediaInput = document.getElementById('media-file-input');
+    const previewContainer = document.getElementById('media-preview-container');
+    const previewImage = document.getElementById('media-preview-image');
+    const cancelPreviewBtn = document.getElementById('cancel-media-preview');
 
     // Scroll to the bottom of the chat on page load
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
+    cancelPreviewBtn.addEventListener('click', () => {
+        mediaInput.value = ''; // This clears the selected file
+        previewImage.src = '';
+        previewContainer.style.display = 'none';
+    });
+    mediaInput.addEventListener('change', () => {
+        const file = mediaInput.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewContainer.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
     document.querySelectorAll('.reply-btn').forEach(button => {
         button.addEventListener('click', () => {
             const wamid = button.dataset.wamid;

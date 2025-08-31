@@ -80,8 +80,15 @@ def upload_media_to_meta(file):
     try:
         url = f"{META_API_URL}/{PHONE_NUMBER_ID}/media"
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
-        files = {'file': (file.name, file.read(), file.content_type), 'messaging_product': (None, 'whatsapp')}
-        response = requests.post(url, headers=headers, files=files)
+        file.seek(0)
+
+        files = {
+            'file': (file.name, file, file.content_type),
+        }
+        data = {
+            'messaging_product': 'whatsapp',
+        }
+        response = requests.post(url, headers=headers, files=files, data=data)
         response.raise_for_status()
         return response.json().get('id')
     except Exception as e:
@@ -99,15 +106,30 @@ def send_whatsapp_message(payload):
         logger.error(f"Error from Meta API: {e.response.text if e.response else str(e)}")
         return False, e.response.json() if e.response else {'error': str(e)}
 
-def save_outgoing_message(contact, wamid, message_type, text_content="", caption="", raw_data={}):
-    Message.objects.update_or_create(
-        wamid=wamid,
-        defaults={
-            'contact': contact, 'direction': 'outbound', 'message_type': message_type,
-            'text_content': text_content, 'caption': caption, 'timestamp': timezone.now(),
-            'raw_data': raw_data, 'status': 'sent'
-        }
-    )
+def save_outgoing_message(contact, wamid, message_type, text_content="", caption="", raw_data={}, replied_to_wamid=None,media_file = None):
+    defaults = {
+        'contact': contact,
+        'direction': 'outbound',
+        'message_type': message_type,
+        'text_content': text_content,
+        'caption': caption,
+        'timestamp': timezone.now(),
+        'raw_data': raw_data,
+        'status': 'sent'
+    }
+    if replied_to_wamid:
+        try:
+            defaults['replied_to'] = Message.objects.get(wamid=replied_to_wamid)
+        except Message.DoesNotExist:
+            pass
+    
+    message, created = Message.objects.update_or_create(wamid=wamid, defaults=defaults)
+
+    if media_file and not message.media_file:
+        # We use the wamid to create a unique file name
+        file_name = f"outbound/{contact.wa_id}/{wamid}_{media_file.name}"
+        message.media_file.save(file_name, media_file, save=True)
+
     contact.last_contact_at = timezone.now()
     contact.save()
     """
