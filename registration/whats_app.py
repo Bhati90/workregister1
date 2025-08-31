@@ -14,19 +14,22 @@ PHONE_NUMBER_ID = "694609297073147"
 
 # registration/services.py
 logger = logging.getLogger(__name__)
-def send_whatsapp_template(to_number, template_name, image_url, components):
+def send_whatsapp_template(to_number, template_name, components):
     """
     Sends a WhatsApp template message using the Meta Graph API.
-    """
-   
-    if not all([META_ACCESS_TOKEN, PHONE_NUMBER_ID]):
+    """ 
+    access_token ="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+
+    phone_id = "694609297073147"
+    
+    if not all([access_token, phone_id]):
         logger.error("WhatsApp API credentials are not set.")
         return False, {"error": "Server not configured for messages."}
 
-    api_url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
+    api_url = f"https://graph.facebook.com/v19.0/{phone_id}/messages"
     
     headers = {
-        "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+        "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
     
@@ -36,7 +39,7 @@ def send_whatsapp_template(to_number, template_name, image_url, components):
         "type": "template",
         "template": {
             "name": template_name,
-            "language": {"code": "en_US"},
+            "language": {"code": "en"},
             "components": components,
         },
     }
@@ -53,7 +56,6 @@ def send_whatsapp_template(to_number, template_name, image_url, components):
         logger.error(f"Failed to send WhatsApp template to {to_number}: {e}")
         error_details = e.response.json() if e.response else str(e)
         return False, {"error": error_details}
-    
 
 def download_media_from_meta(media_id):
     try:
