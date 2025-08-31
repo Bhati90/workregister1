@@ -13,8 +13,9 @@ urlpatterns = [
      
     
      path('chat/', views.chat_contact_list_view, name='chat_contact_list'),
-    
-    # This page will show the detailed conversation for a specific contact
+    path('template-sender/', views.template_sender_view, name='template_sender'),
+    path('api/send-template/', views.send_template_api_view, name='send_template_api'),
+#This page will show the detailed conversation for a specific contact
     path('chat/<str:wa_id>/', views.chat_detail_view, name='chat_detail'),
     
     # This is an API endpoint for sending replies from the frontend

@@ -166,6 +166,7 @@ def get_json_data(data, key):
 
 # from .whats_app import send_whatsapp_template
 from .models import WhatsAppLog
+from .whats_app import send_whatsapp_template
 @csrf_exempt
 @require_POST
 def submit_registration_api(request):
@@ -474,6 +475,109 @@ def whatsapp_webhook_view(request):
         except Exception as e:
             logger.error(f"Error in webhook: {e}", exc_info=True)
         return JsonResponse({"status": "success"}, status=200)
+
+
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+import os, requests, logging
+from dotenv import load_dotenv
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+# ... your other views ...
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+import os, requests, logging, json
+from dotenv import load_dotenv
+from .whats_app import upload_media_to_meta, send_whatsapp_message, save_outgoing_message
+from .models import ChatContact
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+# ... your other views ...
+
+@login_required
+def template_sender_view(request):
+    """
+    Fetches templates from the Meta API and renders the sender tool page.
+    """
+    templates_data = []
+    error = None
+    try:
+        META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+        
+        WABA_ID="1477047197063313"
+        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        # Filter for only approved templates
+        all_templates = response.json().get('data', [])
+        templates_data = [t for t in all_templates if t.get('status') == 'APPROVED']
+    except Exception as e:
+        logger.error(f"Failed to fetch templates: {e}")
+        error = "Could not load templates from Meta API. Please check your credentials."
+
+    context = {'templates': templates_data, 'error': error}
+    return render(request, 'registration/chat/template_sender.html', context)
+
+@csrf_exempt
+@login_required
+def send_template_api_view(request):
+    """
+    API endpoint to send a composed template message.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+    try:
+        to_number = request.POST.get('recipient')
+        template_name = request.POST.get('template_name')
+        params = request.POST.getlist('params[]')
+        media_file = request.FILES.get('header_image')
+
+        payload = {
+            "messaging_product": "whatsapp", "to": to_number, "type": "template",
+            "template": {"name": template_name, "language": {"code": "en"}}
+        }
+        
+        components = []
+        # Handle header image
+        if media_file:
+            media_id = upload_media_to_meta(media_file)
+            if not media_id:
+                return JsonResponse({'status': 'error', 'message': 'Failed to upload media'}, status=500)
+            components.append({"type": "header", "parameters": [{"type": "image", "image": {"id": media_id}}]})
+
+        # Handle body parameters
+        if params:
+            parameters_list = [{"type": "text", "text": p} for p in params]
+            components.append({"type": "body", "parameters": parameters_list})
+        
+        if components:
+            payload['template']['components'] = components
+        
+        success, response_data = send_whatsapp_message(payload)
+
+        if success:
+            contact, _ = ChatContact.objects.get_or_create(wa_id=to_number)
+            save_outgoing_message(
+                contact=contact, wamid=response_data['messages'][0]['id'],
+                message_type='template', text_content=f"Sent template: {template_name}",
+                raw_data=response_data
+            )
+            return JsonResponse({'status': 'success', 'data': response_data})
+        else:
+            return JsonResponse({'status': 'error', 'data': response_data}, status=500)
+
+    except Exception as e:
+        logger.error(f"Error in send_template_api_view: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 @login_required
 def chat_contact_list_view(request):
