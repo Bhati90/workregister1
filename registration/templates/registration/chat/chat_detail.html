@@ -39,7 +39,19 @@
 .inbound .reaction-emoji { left: 20px; }
     #reply-context-banner p { margin: 0; font-size: 0.9em; font-style: italic; }
     #cancel-reply-btn { margin-left: 10px; cursor: pointer; font-weight: bold; }
+.highlight {
+    /* This will create a pulsing blue glow effect */
+    animation: highlight-animation 1.5s ease-out;
+}
 
+@keyframes highlight-animation {
+    0%, 100% {
+        box-shadow: none;
+    }
+    25%, 75% {
+        box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.4);
+    }
+}
 </style>
 {% endblock %}
 
@@ -50,11 +62,11 @@
     <div class="chat-container my-3" id="chat-container">
         <div class="chat-wrapper" id="chat-wrapper">
             {% for message in messages %}
-            <div class="chat-bubble {{ message.direction }}">
+            <div class="chat-bubble {{ message.direction }}" id = "{{ message.wamid }}">
                 <button class="reply-btn" data-wamid="{{ message.wamid }}" data-text="{{ message.text_content|truncatechars:30 }}">↪</button>
                 
                 {% if message.replied_to %}
-<div class="replied-to-block">
+<a href="#{{ message.replied_to.wamid }}" class="replied-to-block scroll-to-reply" data-scroll-to-wamid="{{ message.replied_to.wamid }}">
     <strong>{{ message.replied_to.contact.name|default:message.replied_to.contact.wa_id }}</strong>
     
     <p>
@@ -89,16 +101,19 @@
             {% endif %}
         {% endwith %}
     </p>
-</div>
+</a>
 {% endif %}
 
-                {% if message.message_type == 'image' and message.media_file %}
-                    <img src="{{ message.media_file.url }}" alt="Image" style="max-width: 100%; border-radius: 10px;">
+                {% if message.media_file %}
+    {% if message.message_type == 'image' or message.message_type == 'sticker' %}
+        <img src="{{ message.media_file.url }}" alt="Media" style="max-width: 100%; border-radius: 10px;">
+    {% endif %}
+
                 {% elif message.message_type == 'video' and message.media_file %}
                     <video controls style="max-width: 100%; border-radius: 10px;"><source src="{{ message.media_file.url }}"></video>
                 {% elif message.message_type == 'audio' and message.media_file %}
                     <audio controls src="{{ message.media_file.url }}"></audio>
-               
+                
                 {% elif message.message_type == 'location' and message.latitude and message.longitude %}
     <div class="location-card">
         <a href="https://www.google.com/maps/search/?api=1&query={{ message.latitude }},{{ message.longitude }}" target="_blank" rel="noopener noreferrer">
@@ -207,6 +222,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // Scroll to the bottom of the chat on page load
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
+
+      document.querySelectorAll('.scroll-to-reply').forEach(link => {
+        link.addEventListener('click', (event) => {
+            // Stop the default instant jump
+            event.preventDefault(); 
+
+            const targetWamid = link.dataset.scrollToWamid;
+            const targetElement = document.getElementById(targetWamid);
+
+            if (targetElement) {
+                // Smoothly scroll the target message into the middle of the screen
+                targetElement.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                });
+
+                // Add the temporary highlight effect
+                targetElement.classList.add('highlight');
+
+                // Remove the highlight effect after the animation is done (1.5 seconds)
+                setTimeout(() => {
+                    targetElement.classList.remove('highlight');
+                }, 1500);
+            }
+        });
+    });
+
+    
     cancelPreviewBtn.addEventListener('click', () => {
         mediaInput.value = ''; // This clears the selected file
         previewImage.src = '';
