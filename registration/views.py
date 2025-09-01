@@ -430,6 +430,7 @@ logger = logging.getLogger(__name__)
 # ... your other views ...
 
 
+
 @csrf_exempt
 def whatsapp_webhook_view(request):
     """Handles all incoming WhatsApp events."""
@@ -441,80 +442,60 @@ def whatsapp_webhook_view(request):
                 for change in entry.get('changes', []):
                     value = change.get('value', {})
                     if 'messages' in value:
-                        # registration/views.py -> inside whatsapp_webhook_view
-
-                        # Replace your entire "for msg in..." loop with this
                         for msg in value.get('messages', []):
                             contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
                             contact.last_contact_at = timezone.now()
                             contact.save()
 
                             message_type = msg.get('type')
-
-                            # --- Step 1: Handle special cases that DON'T create a new message ---
-                            if message_type == 'reaction':
-                                reaction_data = msg['reaction']
-                                target_wamid = reaction_data['message_id']
-                                emoji = reaction_data.get('emoji')
-
-                                try:
-                                    message_to_update = Message.objects.get(wamid=target_wamid)
-                                    if emoji:
-                                        message_to_update.status = f"Reacted with {emoji}"
-                                    else:
-                                        message_to_update.status = 'read'
-                                    message_to_update.save()
-                                except Message.DoesNotExist:
-                                    logger.warning(f"Received reaction for a message not found in DB: {target_wamid}")
-                                
-                                continue # Stop processing for this reaction
-
-                            # --- Step 2: Prepare data for ALL other message types that CREATE a new message ---
                             defaults = {
-                                'contact': contact,
-                                'direction': 'inbound',
-                                'message_type': message_type,
+                                'contact': contact, 'direction': 'inbound', 'message_type': message_type,
                                 'timestamp': datetime.datetime.fromtimestamp(int(msg['timestamp']), tz=datetime.timezone.utc),
                                 'raw_data': msg
                             }
-
                             if 'context' in msg and msg['context'].get('id'):
                                 try:
                                     defaults['replied_to'] = Message.objects.get(wamid=msg['context']['id'])
-                                except Message.DoesNotExist:
-                                    pass
+                                except Message.DoesNotExist: pass
                             
-                            # --- Add details based on message type ---
                             if message_type == 'text':
                                 defaults['text_content'] = msg['text']['body']
-                            
-                            elif message_type in ['image', 'video', 'audio', 'document', 'sticker']:
+                            elif message_type in ['image', 'video', 'audio', 'document','sticker']:
                                 media_info = msg[message_type]
-                                defaults['media_id'] = media_info.get('id')
+                                defaults['media_id'] = media_info.get['id']
                                 defaults['caption'] = media_info.get('caption', '')
+                                message_instance, _ = Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
+                                file_name, file_content = download_media_from_meta(media_info['id'])
+                                if file_name and file_content:
+                                    message_instance.media_file.save(file_name, file_content, save=True)
+                                continue
 
                             elif message_type == 'contacts':
                                 contact_data = msg['contacts'][0]
+                                
+                                # Use the structured name and phone number from the payload
                                 defaults['contact_name'] = contact_data['name']['formatted_name']
                                 if contact_data.get('phones') and contact_data['phones'][0]:
                                     defaults['contact_phone'] = contact_data['phones'][0].get('phone')
+
+                                # You can optionally still save the raw vCard to the text field
+                                if 'vcard' in contact_data:
+                                    defaults['text_content'] = contact_data['vcard']
 
                             elif message_type == 'location':
                                 location_data = msg['location']
                                 defaults['latitude'] = location_data['latitude']
                                 defaults['longitude'] = location_data['longitude']
+                                # Save the location name/address to the main text field
                                 defaults['text_content'] = location_data.get('name', '') or location_data.get('address', '')
-
-                            elif message_type == 'unsupported':
-                                defaults['text_content'] = "🚫 Unsupported message received (e.g., view once media, poll)."
-
-                            # --- Step 3: Create the message object ONCE ---
-                            message_instance, created = Message.objects.update_or_create(
-                                wamid=msg['id'], 
-                                defaults=defaults
-                            )
-
-                            # --- Step 4: Now, download and attach media if necessary ---
+                            
+                            elif message_type == 'reaction':
+                                emoji = msg['reaction']['emoji']
+                                Message.objects.filter(wamid=msg['reaction']['message_id']).update(status=f"Reacted with {emoji}")
+                                continue
+                            
+                            Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
+                            
                             if message_type in ['image', 'video', 'audio', 'document', 'sticker']:
                                 media_info = msg[message_type]
                                 media_id = media_info.get('id')
