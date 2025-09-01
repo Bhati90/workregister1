@@ -478,7 +478,41 @@ def whatsapp_webhook_view(request):
                                 except Message.DoesNotExist: pass
                             
                             if message_type == 'text':
-                                defaults['text_content'] = msg['text']['body']
+                                incoming_text = msg['text']['body']
+                                defaults['text_content'] = incoming_text
+                                command = incoming_text.strip()
+                                    
+                                automated_response_text = None
+                                    
+                                    # Check if the command matches your button's text
+                                if command == "क्लिक करा":
+                                        automated_response_text = (
+                                            "धन्यवाद! आमच्या टीममधील सदस्य लवकरच तुमच्याशी संपर्क साधतील.\n\n"
+                                            "Thank you for your interest! A member of our team will contact you shortly."
+                                        )
+                                    
+                                    # You can add more button commands here
+                                    # elif command == "Other Button Text":
+                                    #     automated_response_text = "Here is the information for the other button."
+
+                                    # If a response was triggered, send it back
+                                if automated_response_text:
+                                        payload = {
+                                            "messaging_product": "whatsapp",
+                                            "to": msg['from'], # Reply to the user
+                                            "text": {"body": automated_response_text}
+                                        }
+                                        success, response_data = send_whatsapp_message(payload)
+                                        
+                                        if success:
+                                            # Save our automated reply to the database
+                                            save_outgoing_message(
+                                                contact=contact,
+                                                wamid=response_data['messages'][0]['id'],
+                                                message_type='text',
+                                                text_content=automated_response_text
+                                            )
+
                             elif message_type in ['image', 'video', 'audio', 'document','sticker']:
                                 media_info = msg[message_type]
                                 defaults['media_id'] = media_info.get('id')
@@ -521,7 +555,8 @@ def whatsapp_webhook_view(request):
                                 emoji = msg['reaction']['emoji']
                                 Message.objects.filter(wamid=msg['reaction']['message_id']).update(status=f"Reacted with {emoji}")
                                 continue
-                            
+                            elif message_type == 'unsupported':
+                                defaults['text_content'] = "🚫 Unsupported message received"
                             Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
                             
                             if message_type in ['image', 'video', 'audio', 'document', 'sticker']:
@@ -531,6 +566,9 @@ def whatsapp_webhook_view(request):
                                     file_name, file_content = download_media_from_meta(media_id)
                                     if file_name and file_content:
                                         message_instance.media_file.save(file_name, file_content, save=True)
+
+
+                            
                     elif 'statuses' in value:
                         for status_data in value.get('statuses', []):
                             Message.objects.filter(wamid=status_data['id']).update(status=status_data['status'])
@@ -657,6 +695,45 @@ def send_template_api_view(request):
     except Exception as e:
         logger.error(f"Error in send_template_api_view: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+# registration/views.py
+import requests # Make sure this is imported
+
+@csrf_exempt
+@login_required
+def create_template_api_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+    try:
+        # Get the JSON payload constructed by the frontend
+        template_data = json.loads(request.body)
+        
+        # These should be stored securely, e.g., in settings or environment variables
+        meta_access_token = "EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+        
+        waba_id="1477047197063313"
+        
+        url = f"https://graph.facebook.com/v19.0/{waba_id}/message_templates"
+        headers = {
+            "Authorization": f"Bearer {meta_access_token}",
+            "Content-Type": "application/json",
+        }
+
+        # Forward the request to the Meta API
+        response = requests.post(url, json=template_data, headers=headers)
+        
+        # Return Meta's response directly to the frontend
+        return JsonResponse(response.json(), status=response.status_code)
+
+    except Exception as e:
+        logger.error(f"Error creating template: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@login_required
+def template_builder_view(request):
+    return render(request, 'registration/chat/template_builder.html')
 
 @login_required
 def chat_contact_list_view(request):
@@ -1009,63 +1086,7 @@ def mark_notification_read_and_redirect_view(request, notification_id):
 
     return redirect('registration:leader_dashboard')
 
-# @login_required
-# def leader_new_requests_view(request):
-#     """Displays new job requests sent to the leader."""
-#     all_notifications = Notification.objects.filter(user=request.user)
-#     unread_count = all_notifications.filter(is_read=False).count()
-    
-#     assigned_jobs = Job.objects.filter(
-#         sent_to_leaders=request.user, 
-#         status='waiting_for_response'
-#     ).order_by('-created_at')
 
-#     context = {
-#         'assigned_jobs': assigned_jobs,
-#         'notifications': all_notifications.order_by('-created_at')[:5],
-#         'unread_count': unread_count,
-#     }
-#     return render(request, 'registration/leader/leader_new_requests.html', context)
-
-# @login_required
-# def leader_confirmations_view(request):
-#     """Displays jobs approved by admin, awaiting leader's final confirmation."""
-#     all_notifications = Notification.objects.filter(user=request.user)
-#     unread_count = all_notifications.filter(is_read=False).count()
-
-#     jobs_awaiting_confirmation = Job.objects.filter(
-#         finalized_leader=request.user, 
-#         status='awaiting_leader_confirmation'
-#     ).order_by('-updated_at')
-
-#     context = {
-#         'jobs_awaiting_confirmation': jobs_awaiting_confirmation,
-#         'notifications': all_notifications.order_by('-created_at')[:5],
-#         'unread_count': unread_count,
-#     }
-#     return render(request, 'registration/leader/leader_confirmations.html', context)
-
-
-# @login_required
-# def leader_ongoing_jobs_view(request):
-#     """Displays jobs that the leader has confirmed and are in progress."""
-#     all_notifications = Notification.objects.filter(user=request.user)
-#     unread_count = all_notifications.filter(is_read=False).count()
-
-#     ongoing_jobs = Job.objects.filter(
-#         finalized_leader=request.user, 
-#         status='ongoing'
-#     ).order_by('-updated_at')
-
-#     context = {
-#         'ongoing_jobs': ongoing_jobs,
-#         'notifications': all_notifications.order_by('-created_at')[:5],
-#         'unread_count': unread_count,
-#     }
-#     return render(request, 'registration/leader/leader_ongoing_jobs.html', context)
-
-
-# registration/views.py
 
 @login_required
 def leader_new_requests_view(request):

@@ -22,7 +22,11 @@ urlpatterns = [
     path('api/chat/send-reply/', views.send_reply_api_view, name='send_reply_api'),
     path('whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
     path('api/chat/send-reaction/', views.send_reaction_api_view, name='send_reaction_api'),
+    path('api/create-template/', views.create_template_api_view, name='create_template_api'),
 
+
+    
+    path('template-builder/', views.template_builder_view, name='template_builder'),
     # API endpoints
     # path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
     path('api/location-status/', views.location_status_api, name='location_status_api'),
