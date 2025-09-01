@@ -122,6 +122,7 @@ DATABASES = {
     ),
     
 }
+
 DATABASES['default']['OPTIONS'] = {
     'client_encoding': 'UTF8',
 }

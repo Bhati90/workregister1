@@ -62,107 +62,92 @@
     <div class="chat-container my-3" id="chat-container">
         <div class="chat-wrapper" id="chat-wrapper">
             {% for message in messages %}
-            <div class="chat-bubble {{ message.direction }}" id = "{{ message.wamid }}">
-                <button class="reply-btn" data-wamid="{{ message.wamid }}" data-text="{{ message.text_content|truncatechars:30 }}">↪</button>
+            <div class="chat-bubble {{ message.direction }}" id="{{ message.wamid }}">
+                <button class="reply-btn" data-wamid="{{ message.wamid }}" data-text="{{ message.text_content|default:message.caption|default:'Media'|truncatechars:30 }}">↪</button>
                 
                 {% if message.replied_to %}
-<a href="#{{ message.replied_to.wamid }}" class="replied-to-block scroll-to-reply" data-scroll-to-wamid="{{ message.replied_to.wamid }}">
-    <strong>{{ message.replied_to.contact.name|default:message.replied_to.contact.wa_id }}</strong>
-    
-    <p>
-        {% with replied_msg=message.replied_to %}
-            {% if replied_msg.message_type == 'text' %}
-                {{ replied_msg.text_content|truncatechars:50 }}
+                <a href="#{{ message.replied_to.wamid }}" class="replied-to-block scroll-to-reply" data-scroll-to-wamid="{{ message.replied_to.wamid }}">
+                    <strong>{{ message.replied_to.contact.name|default:message.replied_to.contact.wa_id }}</strong>
+                    <p>
+                        {% with replied_msg=message.replied_to %}
+                            {% if replied_msg.message_type == 'text' %}
+                                {{ replied_msg.text_content|truncatechars:50 }}
+                            {% elif replied_msg.message_type == 'image' or replied_msg.message_type == 'sticker' %}
+                                📷 Image
+                                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
+                            {% elif replied_msg.message_type == 'video' %}
+                                📹 Video
+                                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
+                            {% elif replied_msg.message_type == 'document' %}
+                                📄 Document
+                                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
+                            {% elif replied_msg.message_type == 'audio' %}
+                                🎵 Audio
+                            {% elif replied_msg.message_type == 'location' %}
+                                📍 Location
+                                {% if replied_msg.text_content %}<br><small>{{ replied_msg.text_content|truncatechars:40 }}</small>{% endif %}
+                            {% elif replied_msg.message_type == 'contacts' %}
+                                👤 Contact: {{ replied_msg.contact_name|truncatechars:40 }}
+                            {% else %}
+                                {{ replied_msg.text_content|truncatechars:50 }}
+                            {% endif %}
+                        {% endwith %}
+                    </p>
+                </a>
+                {% endif %}
 
-            {% elif replied_msg.message_type == 'image' %}
-                📷 Image
-                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
-
-            {% elif replied_msg.message_type == 'video' %}
-                📹 Video
-                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
-
-            {% elif replied_msg.message_type == 'document' %}
-                📄 Document
-                {% if replied_msg.caption %}<br><small>{{ replied_msg.caption|truncatechars:40 }}</small>{% endif %}
-
-            {% elif replied_msg.message_type == 'audio' %}
-                🎵 Audio
-            
-            {% elif replied_msg.message_type == 'location' %}
-                📍 Location
-                {% if replied_msg.text_content %}<br><small>{{ replied_msg.text_content|truncatechars:40 }}</small>{% endif %}
-            
-            {% elif replied_msg.message_type == 'contacts' %}
-                👤 Contact: {{ replied_msg.contact_name|truncatechars:40 }}
-
-            {% else %}
-                {{ replied_msg.text_content|truncatechars:50 }}
-            {% endif %}
-        {% endwith %}
-    </p>
-</a>
-{% endif %}
-
-                {% if message.media_file %}
-    {% if message.message_type == 'image' or message.message_type == 'sticker' %}
-    {% if message.media_file %}
-        <img src="{{ message.media_file.url }}" alt="Media" style="max-width: 100%; border-radius: 10px;">
-    {% endif %}
-
-{% elif message.message_type == 'video' %}
-    {% if message.media_file %}
-        <video controls style="max-width: 100%; border-radius: 10px;">
-            <source src="{{ message.media_file.url }}">
-            Your browser does not support the video tag.
-        </video>
-    {% endif %}
-
-{% elif message.message_type == 'audio' %}
-    {% if message.media_file %}
-        <audio controls src="{{ message.media_file.url }}"></audio>
-    {% endif %}
-
-{% elif message.message_type == 'location' %}
-    <div class="location-card">
-        <a href="http://www.google.com/maps/place/{{ message.latitude }},{{ message.longitude }}" target="_blank" rel="noopener noreferrer">
-            <p class="mb-1">📍 Location Shared</p>
-            {% if message.text_content %}<small>{{ message.text_content }}</small>{% endif %}
-            <span class="view-map-link">View on Google Maps →</span>
-        </a>
-    </div>
-
-{% elif message.message_type == 'contacts' %}
-    {% if message.contact_name %}
-    <div class="contact-card">
-        <div class="contact-header">👤 Contact</div>
-        <div class="contact-body">
-            <p><strong>Name:</strong> {{ message.contact_name }}</p>
-            <p><strong>Phone:</strong> {{ message.contact_phone }}</p>
-        </div>
-    </div>
-    {% endif %}
-
-{% elif message.message_type == 'document' %}
-    {% if message.media_file %}
-    <div class="document-card" style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 1.8em;">
-        {% if ".pdf" in message.media_file.name|lower %}📕
-        {% elif ".doc" in message.media_file.name|lower %}📘
-        {% else %}📄
-        {% endif %}
-        </span>
-        <a href="{{ message.media_file.url }}" target="_blank">
-            {{ message.caption|default:message.media_file.name|truncatechars:40 }}
-        </a>
-    </div>
-    {% endif %}
-
-
+                {# Main Message Content Display Block #}
+                {% if message.message_type == 'image' or message.message_type == 'sticker' %}
+                    {% if message.media_file %}
+                        <img src="{{ message.media_file.url }}" alt="Media" style="max-width: 100%; border-radius: 10px;">
+                    {% endif %}
+                {% elif message.message_type == 'video' %}
+                    {% if message.media_file %}
+                        <video controls style="max-width: 100%; border-radius: 10px;">
+                            <source src="{{ message.media_file.url }}">
+                            Your browser does not support the video tag.
+                        </video>
+                    {% endif %}
+                {% elif message.message_type == 'audio' %}
+                    {% if message.media_file %}
+                        <audio controls src="{{ message.media_file.url }}"></audio>
+                    {% endif %}
+                {% elif message.message_type == 'location' %}
+                    <div class="location-card">
+                        <a href="https://maps.google.com/?q={{ message.latitude }},{{ message.longitude }}" target="_blank" rel="noopener noreferrer">
+                            <p class="mb-1">📍 Location Shared</p>
+                            {% if message.text_content %}<small>{{ message.text_content }}</small>{% endif %}
+                            <span class="view-map-link">View on Google Maps →</span>
+                        </a>
+                    </div>
+                {% elif message.message_type == 'contacts' %}
+                    {% if message.contact_name %}
+                    <div class="contact-card">
+                        <div class="contact-header">👤 Contact</div>
+                        <div class="contact-body">
+                            <p><strong>Name:</strong> {{ message.contact_name }}</p>
+                            <p><strong>Phone:</strong> {{ message.contact_phone }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% elif message.message_type == 'document' %}
+                    {% if message.media_file %}
+                    <div class="document-card" style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.8em;">
+                        {% if ".pdf" in message.media_file.name|lower %}📕
+                        {% elif ".doc" in message.media_file.name|lower %}📘
+                        {% else %}📄
+                        {% endif %}
+                        </span>
+                        <a href="{{ message.media_file.url }}" target="_blank">
+                            {{ message.caption|default:message.media_file.name|truncatechars:40 }}
+                        </a>
+                    </div>
+                    {% endif %}
                 {% else %}
                     <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
                 {% endif %}
-                
+
                 {% if message.caption %}
                     <p class="caption">{{ message.caption }}</p>
                 {% endif %}
@@ -172,8 +157,6 @@
                     {% if message.direction == 'outbound' %}
                         {% if message.status == 'read' %}
                             <span class="status-read">✓✓</span>
-                        {% elif message.status|slice:":8" == 'Reacted' %}
-                            <span class="status-read">{{ message.status|slice:"13:" }}</span>
                         {% elif message.status == 'delivered' %}
                             <span>✓✓</span>
                         {% else %}
@@ -181,9 +164,10 @@
                         {% endif %}
                     {% endif %}
                 </div>
+                
                 {% if message.status|slice:":8" == 'Reacted' %}
-        <div class="reaction-emoji">{{ message.status|slice:"13:" }}</div>
-    {% endif %}
+                    <div class="reaction-emoji">{{ message.status|slice:"13:" }}</div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
