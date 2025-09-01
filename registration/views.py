@@ -457,8 +457,10 @@ def whatsapp_webhook_view(request):
                                 try:
                                     message_to_update = Message.objects.get(wamid=target_wamid)
                                     if emoji:
-                                        message_to_update.status = f"Reacted with {emoji}"
+                                        message_to_update.reaction = emoji   # store emoji in reaction field
+                                        message_to_update.status = 'reacted'
                                     else:
+                                        message_to_update.reaction = None 
                                         message_to_update.status = 'read' # Reaction was removed
                                     message_to_update.save()
                                 except Message.DoesNotExist:
