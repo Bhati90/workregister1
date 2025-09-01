@@ -165,9 +165,10 @@
                     {% endif %}
                 </div>
                 
-                {% if message.status|slice:":8" == 'Reacted' %}
-                    <div class="reaction-emoji">{{ message.status|slice:"13:" }}</div>
-                {% endif %}
+                {% if message.reaction %}
+    <div class="reaction-emoji">{{ message.reaction }}</div>
+{% endif %}
+
             </div>
             {% endfor %}
         </div>
