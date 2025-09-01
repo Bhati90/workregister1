@@ -106,52 +106,58 @@
 
                 {% if message.media_file %}
     {% if message.message_type == 'image' or message.message_type == 'sticker' %}
+    {% if message.media_file %}
         <img src="{{ message.media_file.url }}" alt="Media" style="max-width: 100%; border-radius: 10px;">
     {% endif %}
 
-                {% elif message.message_type == 'video' and message.media_file %}
-                    <video controls style="max-width: 100%; border-radius: 10px;"><source src="{{ message.media_file.url }}"></video>
-                {% elif message.message_type == 'audio' and message.media_file %}
-                    <audio controls src="{{ message.media_file.url }}"></audio>
-                
-                {% elif message.message_type == 'location' and message.latitude and message.longitude %}
+{% elif message.message_type == 'video' %}
+    {% if message.media_file %}
+        <video controls style="max-width: 100%; border-radius: 10px;">
+            <source src="{{ message.media_file.url }}">
+            Your browser does not support the video tag.
+        </video>
+    {% endif %}
+
+{% elif message.message_type == 'audio' %}
+    {% if message.media_file %}
+        <audio controls src="{{ message.media_file.url }}"></audio>
+    {% endif %}
+
+{% elif message.message_type == 'location' %}
     <div class="location-card">
-        <a href="https://www.google.com/maps/search/?api=1&query={{ message.latitude }},{{ message.longitude }}" target="_blank" rel="noopener noreferrer">
+        <a href="http://www.google.com/maps/place/{{ message.latitude }},{{ message.longitude }}" target="_blank" rel="noopener noreferrer">
             <p class="mb-1">📍 Location Shared</p>
-            {% if message.text_content %}
-                <small>{{ message.text_content }}</small> {# Optional: For named locations #}
-            {% endif %}
+            {% if message.text_content %}<small>{{ message.text_content }}</small>{% endif %}
             <span class="view-map-link">View on Google Maps →</span>
         </a>
     </div>
-    {% elif message.message_type == 'contacts' and message.contact_name and message.contact_id %}
+
+{% elif message.message_type == 'contacts' %}
+    {% if message.contact_name %}
     <div class="contact-card">
         <div class="contact-header">👤 Contact</div>
         <div class="contact-body">
             <p><strong>Name:</strong> {{ message.contact_name }}</p>
-            <p><strong>Phone:</strong> {{ message.contact_phone}}</p>
+            <p><strong>Phone:</strong> {{ message.contact_phone }}</p>
         </div>
     </div>
-    {% elif message.message_type == 'document' and message.media_file %}
-    <div class="document-card">
-        📄 <a href="{{ message.media_file.url }}" target="_blank">
-            {{ message.text_content|default:message.caption|default:"Download Document" }}
-        </a>
-        <p><small>{{ message.media_file.name }}</small></p>
-    </div>
-    {% elif message.message_type == 'document' and message.media_file %}
-    <div class="document-card">
-        {% if ".pdf" in message.media_file.url|lower %}
-            📕
-        {% elif ".docx" in message.media_file.url|lower %}
-            📘
-        {% else %}
-            📄
+    {% endif %}
+
+{% elif message.message_type == 'document' %}
+    {% if message.media_file %}
+    <div class="document-card" style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.8em;">
+        {% if ".pdf" in message.media_file.name|lower %}📕
+        {% elif ".doc" in message.media_file.name|lower %}📘
+        {% else %}📄
         {% endif %}
+        </span>
         <a href="{{ message.media_file.url }}" target="_blank">
-            {{ message.caption|default:"View Document" }}
+            {{ message.caption|default:message.media_file.name|truncatechars:40 }}
         </a>
     </div>
+    {% endif %}
+
 
                 {% else %}
                     <p class="mb-1">{{ message.text_content|linebreaksbr }}</p>
