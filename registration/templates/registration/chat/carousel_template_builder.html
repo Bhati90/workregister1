@@ -1,0 +1,241 @@
+{% extends 'registration/job/base.html' %}
+
+{% block extra_head %}
+<style>
+    .builder-container { display: flex; flex-wrap: wrap; gap: 30px; }
+    .builder-panel { flex: 2; min-width: 400px; }
+    .preview-panel { flex: 1; min-width: 320px; }
+    .component-box { border: 1px solid #eee; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+    .card-editor { border: 2px dashed #ccc; border-radius: 10px; padding: 20px; margin-top: 15px; position: relative; }
+    .remove-card-btn { position: absolute; top: 10px; right: 10px; }
+    .phone-preview { width: 320px; height: 580px; background: #111; border-radius: 40px; padding: 15px; margin: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .phone-screen { background: #ece5dd; height: 100%; border-radius: 25px; padding: 10px; display: flex; flex-direction: column; font-family: sans-serif; position: relative; }
+    .carousel-preview-card { display: none; }
+    .carousel-preview-card.active { display: block; }
+    .preview-header-image { width: 100%; border-radius: 12px 12px 0 0; }
+    .preview-header-image img { width: 100%; border-radius: 12px 12px 0 0; }
+    .preview-body-wrapper { background: #fff; padding: 10px 12px; max-width: 100%; font-size: 14px; line-height: 1.4; word-break: break-word; white-space: pre-wrap; }
+    .preview-body-wrapper p { margin: 0; }
+    .preview-buttons-container { padding: 5px; }
+    .preview-button { background: #f8f8f8; color: #007bff; text-align: center; padding: 10px; border-radius: 8px; margin-top: 5px; font-size: 14px; cursor: pointer; border-top: 1px solid #ddd; }
+    .carousel-nav { position: absolute; bottom: 10px; width: 90%; display: flex; justify-content: space-between; left: 5%; }
+    #api-response-pre { background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Carousel Template Builder</h2>
+    <div class="builder-container">
+        <div class="builder-panel">
+            <form id="template-form">
+                <div class="component-box">
+                    <h4>1. Template Information</h4>
+                    <div class="form-group"><label>Template Name</label><input type="text" id="template-name" class="form-control" placeholder="lowercase_and_underscores"></div>
+                    <div class="form-group"><label>Category</label><select id="template-category" class="form-control"><option value="MARKETING">Marketing</option><option value="UTILITY">Utility</option></select></div>
+                    <div class="form-group"><label>Language</label><input type="text" id="template-language" class="form-control" value="en_US"></div>
+                </div>
+
+                <div class="component-box">
+                    <h4>2. Carousel Cards (Max 10)</h4>
+                    <div id="cards-container">
+                        </div>
+                    <button type="button" id="add-card-btn" class="btn btn-success mt-2">Add Card</button>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg mt-3">Create Template</button>
+            </form>
+        </div>
+
+        <div class="preview-panel">
+            <h4>Live Preview</h4>
+            <div class="phone-preview">
+                <div class="phone-screen" id="phone-screen-preview">
+                    <div class="carousel-nav">
+                        <button type="button" id="prev-card-btn" class="btn btn-light btn-sm">&lt; Prev</button>
+                        <span id="card-indicator">Card 1 / 1</span>
+                        <button type="button" id="next-card-btn" class="btn btn-light btn-sm">Next &gt;</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="response-container" class="mt-4" style="display:none;">
+        <h4>API Response</h4>
+        <pre id="api-response-pre"></pre>
+    </div>
+</div>
+
+<template id="card-template">
+    <div class="card-editor">
+        <button type="button" class="btn-close remove-card-btn" aria-label="Close"></button>
+        <h5 class="card-title">Card</h5>
+        <div class="form-group"><label>Header Image URL (Example)</label><input type="text" class="form-control card-header-image" placeholder="https://example.com/image.png"></div>
+        <div class="form-group"><label>Body Text</label><textarea class="form-control card-body" rows="4"></textarea></div>
+        <div class="form-group"><label>Button 1 (Quick Reply)</label><input type="text" class="form-control card-button" placeholder="Button Text"></div>
+    </div>
+</template>
+{% endblock %}
+
+
+{% block extra_script4 %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- ELEMENTS ---
+    const form = document.getElementById('template-form');
+    const cardsContainer = document.getElementById('cards-container');
+    const addCardBtn = document.getElementById('add-card-btn');
+    const cardTemplate = document.getElementById('card-template');
+    const phoneScreen = document.getElementById('phone-screen-preview');
+    const prevBtn = document.getElementById('prev-card-btn');
+    const nextBtn = document.getElementById('next-card-btn');
+    const cardIndicator = document.getElementById('card-indicator');
+
+    let currentPreviewIndex = 0;
+
+    // --- CARD MANAGEMENT ---
+    function addCard() {
+        if (cardsContainer.children.length >= 10) {
+            alert("You can add a maximum of 10 cards.");
+            return;
+        }
+        const cardClone = cardTemplate.content.cloneNode(true);
+        const cardEditor = cardClone.querySelector('.card-editor');
+        cardsContainer.appendChild(cardClone);
+        updateCardTitles();
+        updatePreview();
+
+        cardEditor.querySelector('.remove-card-btn').addEventListener('click', () => {
+            cardEditor.remove();
+            updateCardTitles();
+            updatePreview();
+        });
+        cardEditor.querySelectorAll('input, textarea').forEach(input => {
+            input.addEventListener('input', updatePreview);
+        });
+    }
+
+    function updateCardTitles() {
+        cardsContainer.querySelectorAll('.card-editor').forEach((card, index) => {
+            card.querySelector('.card-title').textContent = `Card ${index + 1}`;
+        });
+    }
+
+    // --- PREVIEW MANAGEMENT ---
+    function updatePreview() {
+        const cardEditors = cardsContainer.querySelectorAll('.card-editor');
+        phoneScreen.querySelectorAll('.carousel-preview-card').forEach(p => p.remove());
+
+        cardEditors.forEach((editor, index) => {
+            const previewCard = document.createElement('div');
+            previewCard.className = 'carousel-preview-card';
+            previewCard.dataset.index = index;
+
+            const headerUrl = editor.querySelector('.card-header-image').value;
+            const bodyText = editor.querySelector('.card-body').value;
+            const buttonText = editor.querySelector('.card-button').value;
+
+            let innerHTML = '';
+            if (headerUrl) {
+                innerHTML += `<div class="preview-header-image"><img src="${headerUrl}" alt="preview"></div>`;
+            }
+            innerHTML += `<div class="preview-body-wrapper"><p>${bodyText.replace(/\n/g, '<br>')}</p></div>`;
+            if (buttonText) {
+                innerHTML += `<div class="preview-buttons-container"><div class="preview-button">${buttonText}</div></div>`;
+            }
+            previewCard.innerHTML = innerHTML;
+            phoneScreen.appendChild(previewCard);
+        });
+        showPreviewCard(currentPreviewIndex);
+    }
+
+    function showPreviewCard(index) {
+        const previews = phoneScreen.querySelectorAll('.carousel-preview-card');
+        if (previews.length === 0) {
+            cardIndicator.textContent = 'No Cards';
+            return;
+        }
+        
+        currentPreviewIndex = Math.max(0, Math.min(index, previews.length - 1));
+
+        previews.forEach((p, i) => {
+            p.classList.toggle('active', i === currentPreviewIndex);
+        });
+        
+        cardIndicator.textContent = `Card ${currentPreviewIndex + 1} / ${previews.length}`;
+        prevBtn.disabled = currentPreviewIndex === 0;
+        nextBtn.disabled = currentPreviewIndex === previews.length - 1;
+    }
+    
+    prevBtn.addEventListener('click', () => showPreviewCard(currentPreviewIndex - 1));
+    nextBtn.addEventListener('click', () => showPreviewCard(currentPreviewIndex + 1));
+
+    addCardBtn.addEventListener('click', addCard);
+    // --- FORM SUBMISSION ---
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // --- Build the JSON Payload ---
+        const payload = {
+            name: document.getElementById('template-name').value,
+            language: document.getElementById('template-language').value,
+            category: document.getElementById('template-category').value,
+            allow_category_change: true,
+            components: []
+        };
+
+        const carouselButtonComponent = {
+            type: 'BUTTONS',
+            buttons: [{
+                type: 'CAROUSEL',
+                cards: []
+            }]
+        };
+
+        cardsContainer.querySelectorAll('.card-editor').forEach((editor, index) => {
+            const card = {
+                card_index: index,
+                components: []
+            };
+            // Header
+            const headerUrl = editor.querySelector('.card-header-image').value;
+            if(headerUrl) card.components.push({ type: 'HEADER', format: 'IMAGE', example: { header_handle: [headerUrl] }});
+            // Body
+            const bodyText = editor.querySelector('.card-body').value;
+            if(bodyText) card.components.push({ type: 'BODY', text: bodyText });
+            // Buttons
+            const buttonText = editor.querySelector('.card-button').value;
+            if(buttonText) card.components.push({ type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: buttonText }] });
+            
+            carouselButtonComponent.buttons[0].cards.push(card);
+        });
+
+        payload.components.push(carouselButtonComponent);
+
+        // --- Send to API ---
+        const responseContainer = document.getElementById('response-container');
+        const apiResponsePre = document.getElementById('api-response-pre');
+        
+        try {
+            const response = await fetch("{% url 'registration:create_template_api' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            apiResponsePre.textContent = JSON.stringify(result, null, 2);
+            responseContainer.style.display = 'block';
+
+        } catch (error) {
+            apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
+            responseContainer.style.display = 'block';
+        }
+    });
+
+    // --- INITIALIZE ---
+    addCard();
+});
+</script>
+{% endblock %}

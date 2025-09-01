@@ -18,7 +18,9 @@ urlpatterns = [
     path('api/send-template/', views.send_template_api_view, name='send_template_api'),
 #This page will show the detailed conversation for a specific contact
     path('chat/<str:wa_id>/', views.chat_detail_view, name='chat_detail'),
-    
+    path('carousel-builder/', views.carousel_template_builder_view, name='carousel_template_builder'),
+
+
     # This is an API endpoint for sending replies from the frontend
     path('api/chat/send-reply/', views.send_reply_api_view, name='send_reply_api'),
     path('whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),

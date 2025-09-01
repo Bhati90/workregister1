@@ -724,6 +724,11 @@ def carousel_sender_view(request):
 # registration/views.py
 import requests # Make sure this is imported
 
+# registration/views.py
+@login_required
+def carousel_template_builder_view(request):
+    return render(request, 'registration/chat/carousel_template_builder.html')
+
 @csrf_exempt
 @login_required
 def create_template_api_view(request):
