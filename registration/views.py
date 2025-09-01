@@ -470,48 +470,32 @@ def whatsapp_webhook_view(request):
                             defaults = {
                                 'contact': contact, 'direction': 'inbound', 'message_type': message_type,
                                 'timestamp': datetime.datetime.fromtimestamp(int(msg['timestamp']), tz=datetime.timezone.utc),
-                                'raw_data': msg
+                                'raw_data': msg,'reaction': None, # Default reaction to None
+                                   'status': 'delivered'
                             }
                             if 'context' in msg and msg['context'].get('id'):
                                 try:
                                     defaults['replied_to'] = Message.objects.get(wamid=msg['context']['id'])
                                 except Message.DoesNotExist: pass
                             
+                            
+                            incoming_command = None 
                             if message_type == 'text':
                                 incoming_text = msg['text']['body']
-                                defaults['text_content'] = incoming_text
-                                command = incoming_text.strip()
-                                    
-                                automated_response_text = None
-                                    
+                                defaults['text_content'] = incoming_command
+                                
+                            elif message_type == 'button':
+                                incoming_command = msg['button']['text']
+                                defaults['text_content'] = incoming_command    
                                     # Check if the command matches your button's text
-                                if command == "क्लिक करा":
-                                        automated_response_text = (
-                                            "धन्यवाद! आमच्या टीममधील सदस्य लवकरच तुमच्याशी संपर्क साधतील.\n\n"
-                                            "Thank you for your interest! A member of our team will contact you shortly."
-                                        )
+                                
                                     
                                     # You can add more button commands here
                                     # elif command == "Other Button Text":
                                     #     automated_response_text = "Here is the information for the other button."
 
                                     # If a response was triggered, send it back
-                                if automated_response_text:
-                                        payload = {
-                                            "messaging_product": "whatsapp",
-                                            "to": msg['from'], # Reply to the user
-                                            "text": {"body": automated_response_text}
-                                        }
-                                        success, response_data = send_whatsapp_message(payload)
-                                        
-                                        if success:
-                                            # Save our automated reply to the database
-                                            save_outgoing_message(
-                                                contact=contact,
-                                                wamid=response_data['messages'][0]['id'],
-                                                message_type='text',
-                                                text_content=automated_response_text
-                                            )
+                                
 
                             elif message_type in ['image', 'video', 'audio', 'document','sticker']:
                                 media_info = msg[message_type]
@@ -567,8 +551,32 @@ def whatsapp_webhook_view(request):
                                     if file_name and file_content:
                                         message_instance.media_file.save(file_name, file_content, save=True)
 
-
                             
+                            if incoming_command:
+                                command = incoming_command.strip()
+                                automated_response_text = None
+
+                                if command == "क्लिक करा":
+                                    automated_response_text = "धन्यवाद! आमच्या टीममधील सदस्य लवकरच तुमच्याशी संपर्क साधतील."
+                                
+                                # Add more commands here
+                                # elif command.lower() == "show products":
+                                #     automated_response_text = "Here is a link to our products..."
+
+                                if automated_response_text:
+                                    payload = {
+                                        "messaging_product": "whatsapp",
+                                        "to": msg['from'],
+                                        "text": {"body": automated_response_text}
+                                    }
+                                    success, response_data = send_whatsapp_message(payload)
+                                    if success:
+                                        save_outgoing_message(
+                                            contact=contact,
+                                            wamid=response_data['messages'][0]['id'],
+                                            message_type='text',
+                                            text_content=automated_response_text
+                                        )
                     elif 'statuses' in value:
                         for status_data in value.get('statuses', []):
                             Message.objects.filter(wamid=status_data['id']).update(status=status_data['status'])
