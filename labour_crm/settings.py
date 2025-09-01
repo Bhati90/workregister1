@@ -119,7 +119,10 @@ DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL'),
         conn_max_age=600,
-    )
+    ),
+    'OPTIONS': {
+            'client_encoding': 'UTF8',
+        },
 }
 # --- TEMPORARY DEBUG PRINT ---
 print("\n--- DEBUG: DATABASES CONFIG ---")
@@ -443,7 +446,10 @@ CORS_ALLOW_ALL_ORIGINS = True
 #         'PASSWORD': 'new_password',
 #         'HOST': 'localhost',
 #         'PORT': '5432',
-#     }
+#     },
+#     'OPTIONS': {
+#             'client_encoding': 'UTF8',
+#         },
 # }
 
 # # Password validation

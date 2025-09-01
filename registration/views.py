@@ -448,6 +448,23 @@ def whatsapp_webhook_view(request):
                             contact.save()
 
                             message_type = msg.get('type')
+
+                            if message_type == 'reaction':
+                                reaction_data = msg['reaction']
+                                target_wamid = reaction_data['message_id']
+                                emoji = reaction_data.get('emoji') # Use .get() to handle reaction removals
+
+                                try:
+                                    message_to_update = Message.objects.get(wamid=target_wamid)
+                                    if emoji:
+                                        message_to_update.status = f"Reacted with {emoji}"
+                                    else:
+                                        message_to_update.status = 'read' # Reaction was removed
+                                    message_to_update.save()
+                                except Message.DoesNotExist:
+                                    logger.warning(f"Received reaction for a message not found in DB: {target_wamid}")
+                                
+                                continue 
                             defaults = {
                                 'contact': contact, 'direction': 'inbound', 'message_type': message_type,
                                 'timestamp': datetime.datetime.fromtimestamp(int(msg['timestamp']), tz=datetime.timezone.utc),
@@ -462,7 +479,7 @@ def whatsapp_webhook_view(request):
                                 defaults['text_content'] = msg['text']['body']
                             elif message_type in ['image', 'video', 'audio', 'document','sticker']:
                                 media_info = msg[message_type]
-                                defaults['media_id'] = media_info.get['id']
+                                defaults['media_id'] = media_info.get('id')
                                 defaults['caption'] = media_info.get('caption', '')
                                 message_instance, _ = Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
                                 file_name, file_content = download_media_from_meta(media_info['id'])
