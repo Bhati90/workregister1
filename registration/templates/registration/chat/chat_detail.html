@@ -112,6 +112,17 @@
 #media-preview-container {
     transition: all 0.2s ease-out;
 }
+.reply-area-wrapper {
+    position: relative;
+    margin-top: 10px;
+}
+emoji-picker {
+    position: absolute;
+    bottom: 55px; /* Sits just above the input bar */
+    right: 10px;
+    display: none; /* This is controlled by your JavaScript */
+    z-index: 100; /* Ensures it appears on top of other content */
+}
 </style>
 {% endblock %}
 
@@ -160,6 +171,21 @@
                 {% endif %}
 
                 {# Main Message Content Display Block #}
+                {% if message.is_view_once %}
+  <p><strong>View Once Media:</strong></p>
+  {% if message.media_file %}
+    {% if message.message_type == 'image' %}
+      <img src="{{ message.media_file.url }}" alt="View once image">
+    {% elif message.message_type == 'video' %}
+      <video controls>
+        <source src="{{ message.media_file.url }}" type="video/mp4">
+      </video>
+    {% endif %}
+  {% else %}
+    <p>⚠️ This media was view-once and is no longer available.</p>
+  {% endif %}
+{% endif %}
+
                 {% if message.message_type == 'image' or message.message_type == 'sticker' %}
                     {% if message.media_file %}
                         <img src="{{ message.media_file.url }}" alt="Media" style="max-width: 100%; border-radius: 10px;">
@@ -256,7 +282,7 @@
     <span class="reaction-option">😢</span>
     <span class="reaction-option">🙏</span>
 </div>
-
+<div class="reply-area-wrapper">
     <form id="reply-form" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" id="replied-to-wamid" name="replied_to_wamid">
@@ -269,7 +295,9 @@
             <button type="submit" class="btn btn-primary">Send</button>
         </div>
     </form>
-    <emoji-picker class="light" style="position: absolute; bottom: 60px; right: 20px; display: none;"></emoji-picker>
+
+    <emoji-picker class="light"></emoji-picker>
+</div>
 </div>
 
 <script>

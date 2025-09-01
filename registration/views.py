@@ -483,8 +483,17 @@ def whatsapp_webhook_view(request):
                                 media_info = msg[message_type]
                                 defaults['media_id'] = media_info.get('id')
                                 defaults['caption'] = media_info.get('caption', '')
+                                if message_type == "image" and media_info.get("view_once"):
+                                    defaults['is_view_once'] = True   # make sure your Message model has this field
+                                else:
+                                    defaults['is_view_once'] = False
                                 message_instance, _ = Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
                                 file_name, file_content = download_media_from_meta(media_info['id'])
+                                if message_type == "image" and media_info.get("view_once"):
+                                    file_name, file_content = download_media_from_meta(media_info['id'])
+                                    if file_name and file_content:
+                                        message_instance.media_file.save(file_name, file_content, save=True)
+                                    continue
                                 if file_name and file_content:
                                     message_instance.media_file.save(file_name, file_content, save=True)
                                 continue
