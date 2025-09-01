@@ -11,7 +11,8 @@ urlpatterns = [
     path('registration/', views.MultiStepRegistrationView.as_view(), name='registration'),
     path('success/', views.success_view, name='success_page'),
      
-    
+    path('api/chat/send-carousel/', views.send_carousel_api_view, name='send_carousel_api'),
+
      path('chat/', views.chat_contact_list_view, name='chat_contact_list'),
     path('template-sender/', views.template_sender_view, name='template_sender'),
     path('api/send-template/', views.send_template_api_view, name='send_template_api'),
@@ -23,7 +24,7 @@ urlpatterns = [
     path('whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
     path('api/chat/send-reaction/', views.send_reaction_api_view, name='send_reaction_api'),
     path('api/create-template/', views.create_template_api_view, name='create_template_api'),
-
+    path('carousel-sender/', views.carousel_sender_view, name='carousel_sender'),
 
     
     path('template-builder/', views.template_builder_view, name='template_builder'),

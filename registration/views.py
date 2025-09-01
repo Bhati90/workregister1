@@ -535,6 +535,17 @@ def whatsapp_webhook_view(request):
                                 # Save the location name/address to the main text field
                                 defaults['text_content'] = location_data.get('name', '') or location_data.get('address', '')
                             
+
+                            elif message_type == 'interactive':
+                                interactive_data = msg['interactive']
+                                if interactive_data['type'] == 'list_reply':
+                                    incoming_command = interactive_data['list_reply']['id']
+                                    # Save the user-friendly title as the text content
+                                    defaults['text_content'] = interactive_data['list_reply']['title']
+                                elif interactive_data['type'] == 'button_reply':
+                                    incoming_command = interactive_data['button_reply']['id']
+                                    defaults['text_content'] = interactive_data['button_reply']['title']
+
                             elif message_type == 'reaction':
                                 emoji = msg['reaction']['emoji']
                                 Message.objects.filter(wamid=msg['reaction']['message_id']).update(status=f"Reacted with {emoji}")
@@ -553,29 +564,30 @@ def whatsapp_webhook_view(request):
 
                             
                             if incoming_command:
-                                command = incoming_command.strip()
+                                command = incoming_command.strip().lower() # Use lower() for ID matching
                                 automated_response_text = None
 
-                                if command == "क्लिक करा":
+                                # Check for list/carousel reply IDs
+                                if command == "job_interest_pruning":
+                                    automated_response_text = "Thank you for your interest in Pruning. Our team will contact you with details."
+                                
+                                elif command == "job_interest_harvesting":
+                                    automated_response_text = "Thank you for your interest in Harvesting. Our team will contact you with details."
+                                
+                                # Check for button reply text
+                                elif command == "क्लिक करा":
                                     automated_response_text = "धन्यवाद! आमच्या टीममधील सदस्य लवकरच तुमच्याशी संपर्क साधतील."
                                 
-                                # Add more commands here
-                                # elif command.lower() == "show products":
-                                #     automated_response_text = "Here is a link to our products..."
-
                                 if automated_response_text:
                                     payload = {
-                                        "messaging_product": "whatsapp",
-                                        "to": msg['from'],
+                                        "messaging_product": "whatsapp", "to": msg['from'],
                                         "text": {"body": automated_response_text}
                                     }
                                     success, response_data = send_whatsapp_message(payload)
                                     if success:
                                         save_outgoing_message(
-                                            contact=contact,
-                                            wamid=response_data['messages'][0]['id'],
-                                            message_type='text',
-                                            text_content=automated_response_text
+                                            contact=contact, wamid=response_data['messages'][0]['id'],
+                                            message_type='text', text_content=automated_response_text
                                         )
                     elif 'statuses' in value:
                         for status_data in value.get('statuses', []):
@@ -705,6 +717,10 @@ def send_template_api_view(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
+@login_required
+def carousel_sender_view(request):
+    return render(request, 'registration/chat/carousel_sender.html')
+
 # registration/views.py
 import requests # Make sure this is imported
 
@@ -737,6 +753,111 @@ def create_template_api_view(request):
 
     except Exception as e:
         logger.error(f"Error creating template: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+# registration/views.py
+import json # Make sure this is imported
+
+
+# registration/views.py
+
+@csrf_exempt
+@login_required
+def send_carousel_api_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        to_number = data.get('to_number')
+        carousel_type = data.get('carousel_type')
+
+        if not all([to_number, carousel_type]):
+            return JsonResponse({'status': 'error', 'message': 'Missing to_number or carousel_type'}, status=400)
+
+        interactive_content = None
+
+        if carousel_type == 'labour_jobs':
+            interactive_content = {
+                "type": "list",
+                # --- ADD THIS HEADER ---
+                "header": {
+                    "type": "text",
+                    "text": "Available Jobs"
+                },
+                "body": {
+                    "text": "Please select the type of job you are interested in from the list below."
+                },
+                "footer": {
+                    "text": "Sahyadri Farms Labour Connect"
+                },
+                "action": {
+                    "button": "View Jobs",
+                    "sections": [
+                        {
+                            "title": "Skilled Work",
+                            "rows": [
+                                { "id": "job_interest_pruning", "title": "द्राक्ष छाटणी (Pruning)" },
+                                { "id": "job_interest_harvesting", "title": "काढणी (Harvesting)" }
+                            ]
+                        }
+                    ]
+                }
+            }
+        elif carousel_type == 'farmer_services':
+            interactive_content = {
+                "type": "list",
+                # --- ADD THIS HEADER ---
+                "header": {
+                    "type": "text",
+                    "text": "Farmer Services"
+                },
+                "body": {
+                    "text": "Choose a service you require for your farm."
+                },
+                "footer": {
+                    "text": "Sahyadri Farms"
+                },
+                "action": {
+                    "button": "View Services",
+                    "sections": [
+                        {
+                            "title": "Available Services",
+                            "rows": [
+                                { "id": "service_request_labour", "title": "मजूर पुरवठा (Labour Supply)" },
+                                { "id": "service_request_transport", "title": "वाहतूक सेवा (Transport)" }
+                            ]
+                        }
+                    ]
+                }
+            }
+
+        if not interactive_content:
+            return JsonResponse({'status': 'error', 'message': 'Invalid carousel_type'}, status=400)
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to_number,
+            "type": "interactive",
+            "interactive": interactive_content
+        }
+
+        success, response_data = send_whatsapp_message(payload)
+
+        if success:
+            save_outgoing_message(
+                contact=get_object_or_404(ChatContact, wa_id=to_number),
+                wamid=response_data['messages'][0]['id'],
+                message_type='interactive',
+                text_content=f"Sent list menu: {carousel_type}"
+            )
+            return JsonResponse({'status': 'success', 'data': response_data})
+        else:
+            return JsonResponse({'status': 'error', 'data': response_data}, status=500)
+
+    except Exception as e:
+        logger.error(f"Error sending list interactive: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 @login_required

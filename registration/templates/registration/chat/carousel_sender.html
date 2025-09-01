@@ -1,0 +1,90 @@
+{% extends 'registration/job/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h2 class="card-title">Carousel Message Sender</h2>
+            <p class="card-text">Use this tool to send a test carousel message to a specific number.</p>
+            
+            <form id="carousel-form" class="mt-4">
+                {% csrf_token %}
+                <div class="form-group mb-3">
+                    <label for="to-number" class="form-label"><b>Recipient Phone Number</b> (with country code)</label>
+                    <input type="text" id="to-number" class="form-control" placeholder="e.g., 919876543210" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="carousel-type" class="form-label"><b>Select Carousel Type</b></label>
+                    <select id="carousel-type" class="form-control" required>
+                        <option value="" disabled selected>-- Choose a carousel to send --</option>
+                        <option value="labour_jobs">Job Listings (For Labourers)</option>
+                        <option value="farmer_services">Service Catalog (For Farmers)</option>
+                        </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mt-3">Send Test Carousel</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="response-container" class="mt-4" style="display:none;">
+        <h4>API Response</h4>
+        <pre id="api-response-pre" style="background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('carousel-form');
+    const responseContainer = document.getElementById('response-container');
+    const apiResponsePre = document.getElementById('api-response-pre');
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const toNumber = document.getElementById('to-number').value;
+        const carouselType = document.getElementById('carousel-type').value;
+        const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+        const sendButton = form.querySelector('button[type=submit]');
+
+        if (!toNumber || !carouselType) {
+            alert('Please fill out all fields.');
+            return;
+        }
+
+        sendButton.disabled = true;
+        sendButton.textContent = 'Sending...';
+        responseContainer.style.display = 'none';
+
+        try {
+            const response = await fetch("{% url 'registration:send_carousel_api' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    to_number: toNumber,
+                    carousel_type: carouselType
+                })
+            });
+
+            const result = await response.json();
+            
+            apiResponsePre.textContent = JSON.stringify(result, null, 2);
+            responseContainer.style.display = 'block';
+
+        } catch (error) {
+            apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
+            responseContainer.style.display = 'block';
+        } finally {
+            sendButton.disabled = false;
+            sendButton.textContent = 'Send Test Carousel';
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -94,7 +94,7 @@ def upload_media_to_meta(file):
     except Exception as e:
         logger.error(f"Failed to upload media: {e}")
         return None
-
+import json
 def send_whatsapp_message(payload):
     url = f"{META_API_URL}/{PHONE_NUMBER_ID}/messages"
     headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
@@ -103,9 +103,17 @@ def send_whatsapp_message(payload):
         response.raise_for_status()
         return True, response.json()
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error from Meta API: {e.response.text if e.response else str(e)}")
-        return False, e.response.json() if e.response else {'error': str(e)}
-
+        error_details = "No response from server."
+        if e.response is not None:
+            try:
+                error_details = e.response.json() # Try to get the detailed JSON error
+            except json.JSONDecodeError:
+                error_details = e.response.text # Fallback to raw text if not JSON
+        
+        # This new log will show the specific reason for the failure
+        logger.error(f"Error from Meta API. Status: {e.response.status_code if e.response else 'N/A'}. Details: {error_details}")
+        
+        return False, error_details
 def save_outgoing_message(contact, wamid, message_type, text_content="", caption="", raw_data={}, replied_to_wamid=None,media_file = None):
     defaults = {
         'contact': contact,
