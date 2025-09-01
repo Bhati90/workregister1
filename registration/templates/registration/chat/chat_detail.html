@@ -44,6 +44,16 @@
     animation: highlight-animation 1.5s ease-out;
 }
 
+.react-btn {
+    position: absolute; top: 5px; right: 35px; /* Positioned next to reply-btn */
+    background: rgba(0,0,0,0.1); border: none; border-radius: 50%;
+    width: 24px; height: 24px; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+}
+.chat-bubble:hover .react-btn { display: flex; }
+.reaction-option { cursor: pointer; padding: 5px; font-size: 1.2em; }
+.reaction-option:hover { background-color: #f0f0f0; border-radius: 50%; }
+
 @keyframes highlight-animation {
     0%, 100% {
         box-shadow: none;
@@ -51,6 +61,56 @@
     25%, 75% {
         box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.4);
     }
+}
+
+/* --- NEW / UPDATED STYLES FOR WHATSAPP-LIKE PREVIEW --- */
+#media-preview-container {
+    display: none; /* Managed by JS */
+    position: relative;
+    width: 150px; /* Fixed width for the preview area */
+    height: 150px; /* Fixed height for the preview area */
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden; /* Important to clip the image within the container */
+    background-color: #f8f8f8;/* Use flexbox to center content */
+    align-items: center; /* Center vertically */
+    justify-content: center; /* Center horizontally */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+#media-preview-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain; /* Ensures the entire image is visible, like WhatsApp */
+    border-radius: 6px; /* Slightly smaller border-radius than container */
+}
+
+#cancel-media-preview {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.6); /* Darker background for visibility */
+    color: white; /* White 'x' */
+    font-size: 1.1em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none; /* No border for the button */
+    padding: 0; /* Remove default padding */
+    line-height: 1; /* Adjust line height for better 'x' centering */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    z-index: 10; /* Ensure it's above the image */
+}
+
+/* Optional: Add a smooth transition for the preview */
+#media-preview-container {
+    transition: all 0.2s ease-out;
 }
 </style>
 {% endblock %}
@@ -64,7 +124,10 @@
             {% for message in messages %}
             <div class="chat-bubble {{ message.direction }}" id="{{ message.wamid }}">
                 <button class="reply-btn" data-wamid="{{ message.wamid }}" data-text="{{ message.text_content|default:message.caption|default:'Media'|truncatechars:30 }}">↪</button>
-                
+            
+        <button class="reply-btn" data-wamid="{{ message.wamid }}" data-text="{{ message.text_content|default:message.caption|default:'Media'|truncatechars:30 }}">↪</button>
+        <button class="react-btn" data-wamid="{{ message.wamid }}">😊</button>
+    
                 {% if message.replied_to %}
                 <a href="#{{ message.replied_to.wamid }}" class="replied-to-block scroll-to-reply" data-scroll-to-wamid="{{ message.replied_to.wamid }}">
                     <strong>{{ message.replied_to.contact.name|default:message.replied_to.contact.wa_id }}</strong>
@@ -179,20 +242,34 @@
         <span id="cancel-reply-btn">✖</span>
     </div>
 
-    <div id="media-preview-container" class="mb-2" style="display: none; position: relative; max-width: 200px;">
-    <img id="media-preview-image" src="" alt="Image Preview" class="img-fluid rounded">
-    <button id="cancel-media-preview" type="button" class="btn-close" style="position: absolute; top: 5px; right: 5px; background-color: rgba(255,255,255,0.7);"></button>
+    <div id="media-preview-container" class="mb-2">
+    <img id="media-preview-image" src="" alt="Image Preview">
+    <button id="cancel-media-preview" type="button">✖</button> 
+</div>
+
+
+   <div id="reaction-panel" style="display: none; position: absolute; background: white; border: 1px solid #ccc; border-radius: 15px; padding: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    <span class="reaction-option">👍</span>
+    <span class="reaction-option">❤️</span>
+    <span class="reaction-option">😂</span>
+    <span class="reaction-option">😮</span>
+    <span class="reaction-option">😢</span>
+    <span class="reaction-option">🙏</span>
 </div>
 
     <form id="reply-form" enctype="multipart/form-data">
+        {% csrf_token %}
         <input type="hidden" id="replied-to-wamid" name="replied_to_wamid">
         <div class="input-group">
+            <button type="button" id="emoji-btn" class="btn btn-secondary">😊</button>
+
             <input type="text" id="reply-message-input" class="form-control" placeholder="Type a message...">
             <label class="btn btn-secondary mb-0" for="media-file-input">📎</label>
             <input type="file" id="media-file-input" name="media_file" style="display: none;">
             <button type="submit" class="btn btn-primary">Send</button>
         </div>
     </form>
+    <emoji-picker class="light" style="position: absolute; bottom: 60px; right: 20px; display: none;"></emoji-picker>
 </div>
 
 <script>
@@ -209,8 +286,100 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewContainer = document.getElementById('media-preview-container');
     const previewImage = document.getElementById('media-preview-image');
     const cancelPreviewBtn = document.getElementById('cancel-media-preview');
-
+    
+    const emojiBtn = document.getElementById('emoji-btn');
+    const emojiPicker = document.querySelector('emoji-picker');
     // Scroll to the bottom of the chat on page load
+      
+
+    const reactionPanel = document.getElementById('reaction-panel');
+
+    document.querySelectorAll('.react-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const targetBubble = e.target.closest('.chat-bubble');
+            const rect = targetBubble.getBoundingClientRect();
+            
+
+             const topPosition = rect.top + window.scrollY - 45; // 45px to appear just above the bubble
+        const leftPosition = rect.left + window.scrollX;
+
+
+            // Position and show the panel
+                    reactionPanel.style.top = `${topPosition}px`;
+        reactionPanel.style.left = `${leftPosition}px`;
+        reactionPanel.style.display = 'flex'; // Use flex for better alignment of emojis
+        reactionPanel.style.gap = '5px';
+
+            
+            // Store the wamid of the message we are reacting to
+            reactionPanel.dataset.wamid = button.dataset.wamid;
+        });
+    });
+
+    reactionPanel.querySelectorAll('.reaction-option').forEach(option => {
+        option.addEventListener('click', async (e) => {
+            const emoji = e.target.textContent;
+            const messageId = reactionPanel.dataset.wamid;
+            reactionPanel.style.display = 'none'; // Hide panel after selection
+
+            try {
+                const response = await fetch("{% url 'registration:send_reaction_api' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': "{{ csrf_token }}"
+                    },
+                    body: JSON.stringify({
+                        to_number: "{{ contact.wa_id }}",
+                        message_id: messageId,
+                        emoji: emoji
+                    })
+                });
+
+                if (response.ok) {
+                // Find the message bubble that was reacted to
+                const targetBubble = document.getElementById(messageId);
+                if (targetBubble) {
+                    // Check if a reaction emoji already exists on this bubble
+                    let reactionDiv = targetBubble.querySelector('.reaction-emoji');
+
+                    if (!reactionDiv) {
+                        // If it doesn't exist, create a new one
+                        reactionDiv = document.createElement('div');
+                        reactionDiv.className = 'reaction-emoji'; // Use className for simplicity
+                        targetBubble.appendChild(reactionDiv);
+                    }
+                    
+                    // Set or update the emoji content
+                    reactionDiv.textContent = emoji;
+                }
+            } else {
+                alert('Failed to send reaction.');
+            }
+                // NOTE: A successful reaction will show up after a page reload,
+                // or when we implement real-time updates via WebSockets.
+            } catch (error) {
+                console.error("Reaction error:", error);
+                alert('An error occurred while sending the reaction.');
+            }
+        });
+    });
+
+    // Hide reaction panel if clicking elsewhere
+    document.body.addEventListener('click', (e) => {
+        if (!reactionPanel.contains(e.target) && !e.target.classList.contains('react-btn')) {
+            reactionPanel.style.display = 'none';
+        }
+    });
+
+
+    emojiBtn.addEventListener('click', () => {
+        emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
+    });
+
+    emojiPicker.addEventListener('emoji-click', event => {
+        messageInput.value += event.detail.unicode;
+    });
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
 
@@ -252,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 previewImage.src = e.target.result;
-                previewContainer.style.display = 'block';
+                previewContainer.style.display = 'flex';
             };
             reader.readAsDataURL(file);
         }

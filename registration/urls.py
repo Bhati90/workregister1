@@ -21,12 +21,15 @@ urlpatterns = [
     # This is an API endpoint for sending replies from the frontend
     path('api/chat/send-reply/', views.send_reply_api_view, name='send_reply_api'),
     path('whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
-
+    path('api/chat/send-reaction/', views.send_reaction_api_view, name='send_reaction_api'),
 
     # API endpoints
     # path('api/check-mobile-number/', views.check_mobile_number_api, name='check_mobile_number_api'),
     path('api/location-status/', views.location_status_api, name='location_status_api'),
     path('api/submit-registration/', views.submit_registration_api, name='submit_registration_api'),
+    
+    
+    
     # path("dashboard/login/", views.dashboard_login, name="dashboard_login"),
     # Authentication
     path('login/', views.login_view, name='login'),

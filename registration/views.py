@@ -675,6 +675,61 @@ def chat_detail_view(request, wa_id):
         logger.error(f"Could not query WhatsAppLog: {e}")
     return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': conversation_messages})
 
+# registration/views.py
+import json # Make sure json is imported at the top
+
+@csrf_exempt
+@login_required
+def send_reaction_api_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid HTTP method'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        to_number = data.get('to_number')
+        message_id = data.get('message_id') # wamid of the message to react to
+        emoji = data.get('emoji')
+
+        if not all([to_number, message_id, emoji]):
+            return JsonResponse({'status': 'error', 'message': 'Missing parameters'}, status=400)
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to_number,
+            "type": "reaction",
+            "reaction": {
+                "message_id": message_id,
+                "emoji": emoji
+            }
+        }
+
+        success, response_data = send_whatsapp_message(payload)
+
+        if success:
+            try:
+                message_to_update = Message.objects.get(wamid=message_id)
+                if emoji:
+                    # USE NEW LOGIC
+                    message_to_update.reaction = emoji
+                    message_to_update.status = 'reacted'
+                else:
+                    # Handle removing a reaction
+                    message_to_update.reaction = None
+                    message_to_update.status = 'read'
+                message_to_update.save()
+            except Message.DoesNotExist:
+                logger.warning(f"Sent reaction to {message_id}, but couldn't find message in DB to update.")
+        
+            return JsonResponse({'status': 'success', 'data': response_data})
+        else:
+            return JsonResponse({'status': 'error', 'data': response_data}, status=500)
+
+    except Exception as e:
+        logger.error(f"Error in send_reaction_api_view: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
 @csrf_exempt
 @login_required
 def send_reply_api_view(request):
