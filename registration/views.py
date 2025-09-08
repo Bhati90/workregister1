@@ -1177,7 +1177,7 @@ def send_reply_api_view(request):
 # ... add these imports at the top
 from .models import Flow
 import json
-
+from django.http import HttpResponse
 # ...
 
 
@@ -1205,7 +1205,9 @@ def get_whatsapp_templates_api(request):
                             buttons.append(btn.get('text'))
                 templates_data.append({'id': t.get('name'), 'name': t.get('name'), 'buttons': buttons})
         
-        return JsonResponse(templates_data, safe=False)
+        json_response = json.dumps(templates_data, ensure_ascii=False)
+        return HttpResponse(json_response, content_type="application/json; charset=utf-8")
+
     except Exception as e:
         logger.error(f"Failed to fetch templates for API: {e}")
         return JsonResponse({"error": "Could not load templates."}, status=500)
