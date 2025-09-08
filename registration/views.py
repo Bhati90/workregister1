@@ -434,22 +434,33 @@ logger = logging.getLogger(__name__)
 
 # registration/views.py
 
+# registration/views.py
+
 # ... (keep all your existing imports and other views) ...
 from .models import Flow, Message, ChatContact # Make sure these are imported
 import logging
 import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# UPDATED WEBHOOK VIEW: With detailed logging
+# UPDATED WEBHOOK VIEW: With additional entry-point logging
 # ==============================================================================
 @csrf_exempt
 def whatsapp_webhook_view(request):
     """Handles all incoming WhatsApp events, prioritizing dynamic flows."""
+    # ** NEW LOG 1: Check if the view is being hit at all **
+    logger.info("====== WEBHOOK URL HAS BEEN HIT ======")
+    
     if request.method == 'POST':
+        # ** NEW LOG 2: Check if the request body is being read **
+        logger.info("====== Webhook is a POST request. Attempting to read body. ======")
+        
         data = json.loads(request.body)
-        logger.info(f"====== INCOMING WEBHOOK ======\n{json.dumps(data, indent=2)}")
+        logger.info(f"====== INCOMING WEBHOOK BODY ======\n{json.dumps(data, indent=2)}")
         try:
             for entry in data.get('entry', []):
                 for change in entry.get('changes', []):
