@@ -27,9 +27,9 @@ urlpatterns = [
      path('api/send-standard-template/', views.send_standard_template_api_view, name='send_standard_template_api'),
     path('api/send-carousel-template/', views.send_carousel_template_api_view, name='send_carousel_template_api'),
 
-    path('template-schedule/', views.template_sch_view, name='template_schedule'),
+    # path('template-schedule/', views.template_sch_view, name='template_schedule'),
 
-    path('api/schedule-template/', views.schedule_template_api_view, name='schedule_template_api'),
+    # path('api/schedule-template/', views.schedule_template_api_view, name='schedule_template_api'),
 
     #This page will show the detailed conversation for a specific contact
     path('chat/<str:wa_id>/', views.chat_detail_view, name='chat_detail'),
