@@ -901,49 +901,49 @@ from datetime import datetime
 from django.core.files.storage import default_storage
 from .tasks import send_scheduled_template_campaign
 
-@csrf_exempt
-@login_required
-def schedule_template_api_view(request):
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+# @csrf_exempt
+# @login_required
+# def schedule_template_api_view(request):
+#     if request.method != 'POST':
+#         return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
     
-    try:
-        recipients = request.POST.getlist('recipients[]')
-        template_name = request.POST.get('template_name')
-        params = request.POST.getlist('params[]')
-        scheduled_time_str = request.POST.get('scheduled_time')
-        media_file = request.FILES.get('header_image')
+#     try:
+#         recipients = request.POST.getlist('recipients[]')
+#         template_name = request.POST.get('template_name')
+#         params = request.POST.getlist('params[]')
+#         scheduled_time_str = request.POST.get('scheduled_time')
+#         media_file = request.FILES.get('header_image')
 
-        if not all([recipients, template_name, scheduled_time_str]):
-            return JsonResponse({'status': 'error', 'message': 'Missing required fields.'}, status=400)
+#         if not all([recipients, template_name, scheduled_time_str]):
+#             return JsonResponse({'status': 'error', 'message': 'Missing required fields.'}, status=400)
 
-        # Convert the string from the form into a datetime object
-        naive_dt = datetime.fromisoformat(scheduled_time_str)
+#         # Convert the string from the form into a datetime object
+#         naive_dt = datetime.fromisoformat(scheduled_time_str)
 
-        # 2. Make the datetime object "aware" of your project's local timezone (e.g., IST)
-        aware_dt = timezone.make_aware(naive_dt, timezone.get_current_timezone())
+#         # 2. Make the datetime object "aware" of your project's local timezone (e.g., IST)
+#         aware_dt = timezone.make_aware(naive_dt, timezone.get_current_timezone())
         
-        media_file_path = None
-        if media_file:
-            # We must save the file first, as we can't pass the file object to Celery.
-            # We pass the file's path instead.
-            media_file_path = default_storage.save(f"temp/{media_file.name}", media_file)
+#         media_file_path = None
+#         if media_file:
+#             # We must save the file first, as we can't pass the file object to Celery.
+#             # We pass the file's path instead.
+#             media_file_path = default_storage.save(f"temp/{media_file.name}", media_file)
 
-        # Create the Celery task with a scheduled time (eta)
-        send_scheduled_template_campaign.apply_async(
-            args=[recipients, template_name, params, media_file_path],
-            eta=aware_dt
-        )
+#         # Create the Celery task with a scheduled time (eta)
+#         send_scheduled_template_campaign.apply_async(
+#             args=[recipients, template_name, params, media_file_path],
+#             eta=aware_dt
+#         )
         
-        return JsonResponse({
-            'status': 'success',
-            'message': f'Campaign for template "{template_name}" has been scheduled for {scheduled_time_str}.'
-        })
-    except Exception as e:
-        logger.error(f"Error scheduling campaign: {e}", exc_info=True)
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-# registration/views.py
-import json # Make sure this is imported
+#         return JsonResponse({
+#             'status': 'success',
+#             'message': f'Campaign for template "{template_name}" has been scheduled for {scheduled_time_str}.'
+#         })
+#     except Exception as e:
+#         logger.error(f"Error scheduling campaign: {e}", exc_info=True)
+#         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+# # registration/views.py
+# import json # Make sure this is imported
 
 
 # registration/views.py
