@@ -139,7 +139,7 @@ const FlowBuilder = () => {
 
         try {
             const csrftoken = getCookie('csrftoken');
-            const response = await fetch('http://127.0.0.1:8000/register/api/save-flow/', {
+            const response = await fetch('https://workregister1-g7pf.onrender.com/register/api/save-flow/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -165,7 +165,7 @@ const FlowBuilder = () => {
   useEffect(() => {
     async function fetchTemplates() {
       try {
-        const response = await fetch('http://127.0.0.1:8000/register/api/get-whatsapp-templates/'); // Your new Django API endpoint
+        const response = await fetch('https://workregister1-g7pf.onrender.com/register/api/get-whatsapp-templates/'); // Your new Django API endpoint
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
