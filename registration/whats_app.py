@@ -5,6 +5,7 @@ from django.utils import timezone
 from .models import ChatContact, Message
 from django.core.files.base import ContentFile
 from dotenv import load_dotenv
+import mimetypes
 
 API_VERSION = 'v19.0'
 META_API_URL = f"https://graph.facebook.com/{API_VERSION}"
@@ -14,6 +15,34 @@ PHONE_NUMBER_ID = "694609297073147"
 
 # registration/services.py
 logger = logging.getLogger(__name__)
+
+
+# services.py or whats_app.py
+# (Make sure requests, logger, etc. are imported)
+
+def upload_media_for_template_handle(file_object):
+    """
+    Uploads a file to Meta's template asset endpoint and returns a handle.
+    """
+    try:
+        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_template_assets"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        file_object.seek(0)
+        
+        files = {'file': (file_object.name, file_object, file_object.content_type)}
+        data = {'messaging_product': 'whatsapp'}
+        
+        response = requests.post(url, headers=headers, files=files, data=data)
+        response.raise_for_status()
+        
+        # The response contains a 'handle' key
+        return response.json().get('handle')
+
+    except Exception as e:
+        logger.error(f"Failed to upload media for handle: {e}", exc_info=True)
+        return None
+    
+    
 def send_whatsapp_template(to_number, template_name, components):
     """
     Sends a WhatsApp template message using the Meta Graph API.
@@ -39,7 +68,7 @@ def send_whatsapp_template(to_number, template_name, components):
         "type": "template",
         "template": {
             "name": template_name,
-            "language": {"code": "en"},
+            "language": {"code": "en_US"},
             "components": components,
         },
     }
@@ -76,14 +105,34 @@ def download_media_from_meta(media_id):
         logger.error(f"Failed to download media {media_id}: {e}")
         return None, None
 
-def upload_media_to_meta(file):
+import mimetypes # <-- Add this import at the top of your file
+import os      # <-- Also add this import
+
+def upload_media_to_meta(file_object):
+    """
+    Uploads a file object to the Meta API and returns the media ID.
+    Works with both UploadedFile and standard File objects.
+    """
     try:
         url = f"{META_API_URL}/{PHONE_NUMBER_ID}/media"
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
-        file.seek(0)
+        
+        # Ensure the file pointer is at the beginning
+        file_object.seek(0)
+
+        # --- THIS IS THE FIX ---
+        # Get the filename from the file object's name attribute
+        file_name = os.path.basename(file_object.name)
+        
+        # Guess the content type from the filename
+        content_type, _ = mimetypes.guess_type(file_name)
+        if content_type is None:
+            # Provide a fallback for unknown file types
+            content_type = 'application/octet-stream'
+        # --- END OF FIX ---
 
         files = {
-            'file': (file.name, file, file.content_type),
+            'file': (file_name, file_object, content_type),
         }
         data = {
             'messaging_product': 'whatsapp',
@@ -91,9 +140,11 @@ def upload_media_to_meta(file):
         response = requests.post(url, headers=headers, files=files, data=data)
         response.raise_for_status()
         return response.json().get('id')
+        
     except Exception as e:
-        logger.error(f"Failed to upload media: {e}")
+        logger.error(f"Failed to upload media: {e}", exc_info=True)
         return None
+
 import json
 def send_whatsapp_message(payload):
     url = f"{META_API_URL}/{PHONE_NUMBER_ID}/messages"

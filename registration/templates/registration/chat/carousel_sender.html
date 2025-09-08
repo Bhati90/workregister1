@@ -1,90 +1,160 @@
 {% extends 'registration/job/base.html' %}
 
+{% block extra_head %}
+<style>
+    .template-sender-container { display: flex; flex-wrap: wrap; gap: 30px; }
+    .sender-panel { flex: 2; min-width: 400px; }
+    .preview-panel { flex: 1; min-width: 320px; }
+    .form-group { margin-bottom: 1rem; }
+    .send-button { width: 100%; padding: 12px; margin-top: 20px; font-size: 1.1em; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .phone-preview { width: 320px; height: 580px; background: #111; border-radius: 40px; padding: 15px; margin: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .phone-screen { background: #ece5dd; height: 100%; border-radius: 25px; padding: 10px; display: flex; flex-direction: column; font-family: sans-serif; overflow-y: auto; }
+    .preview-header-image { width: 100%; border-radius: 12px; margin-bottom: 8px; }
+    .preview-body { background: #fff; padding: 10px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); max-width: 90%; font-size: 14px; line-height: 1.4; word-break: break-word; white-space: pre-wrap; }
+    .preview-body p, .preview-footer p { margin: 0; }
+    .preview-footer { font-size: 12px; color: #888; padding: 8px 12px; max-width: 90%;}
+    .preview-button { background: #f8f8f8; color: #007bff; text-align: center; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 14px; }
+    #api-response-pre { background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; }
+</style>
+{% endblock %}
+
+
+
 {% block content %}
 <div class="container mt-4">
     <div class="card">
         <div class="card-body">
-            <h2 class="card-title">Carousel Message Sender</h2>
-            <p class="card-text">Use this tool to send a test carousel message to a specific number.</p>
-            
-            <form id="carousel-form" class="mt-4">
+            <h2 class="card-title">Carousel Template Sender</h2>
+            {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+            {% elif not templates %}
+                <div class="alert alert-warning">No approved Carousel templates found.</div>
+            {% else %}
+            <form id="sender-form" enctype="multipart/form-data">
                 {% csrf_token %}
-                <div class="form-group mb-3">
-                    <label for="to-number" class="form-label"><b>Recipient Phone Number</b> (with country code)</label>
-                    <input type="text" id="to-number" class="form-control" placeholder="e.g., 919876543210" required>
+                <input type="hidden" name="template_name" id="hidden-template-name">
+
+                <div class="form-group">
+                    <label for="template-select"><b>1. Select Carousel Template</b></label>
+                    <select id="template-select" class="form-control">
+                        <option value="" disabled selected>-- Choose a template --</option>
+                        {% for t in templates %}<option value="{{ t.name }}">{{ t.name }}</option>{% endfor %}
+                    </select>
                 </div>
 
-                <div class="form-group mb-3">
-                    <label for="carousel-type" class="form-label"><b>Select Carousel Type</b></label>
-                    <select id="carousel-type" class="form-control" required>
-                        <option value="" disabled selected>-- Choose a carousel to send --</option>
-                        <option value="labour_jobs">Job Listings (For Labourers)</option>
-                        <option value="farmer_services">Service Catalog (For Farmers)</option>
+                <div id="dynamic-fields" class="mt-3" style="display: none;">
+                    <div class="form-group">
+                        <label for="contact-select"><b>2. Select Recipients</b></label>
+                        <select id="contact-select" name="recipients[]" class="form-control" multiple required>
+                            {% for c in contacts %}<option value="{{ c.wa_id }}">{{ c.name|default:c.wa_id }}</option>{% endfor %}
                         </select>
+                    </div>
+                    <div id="params-container"></div>
+                    <button type="submit" class="send-button">Send Carousel Campaign</button>
                 </div>
-
-                <button type="submit" class="btn btn-primary w-100 mt-3">Send Test Carousel</button>
             </form>
+            {% endif %}
         </div>
     </div>
 
     <div id="response-container" class="mt-4" style="display:none;">
-        <h4>API Response</h4>
-        <pre id="api-response-pre" style="background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+        <h4>API Response</h4><pre id="api-response-pre"></pre>
     </div>
 </div>
 {% endblock %}
 
+
 {% block extra_script %}
+{{ templates|json_script:"templates-data" }}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('carousel-form');
-    const responseContainer = document.getElementById('response-container');
-    const apiResponsePre = document.getElementById('api-response-pre');
+    const sendCarouselApiUrl = "{% url 'registration:send_carousel_template_api' %}";
+    const csrfToken = "{{ csrf_token }}";
 
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
+    {% verbatim %}
+    document.addEventListener('DOMContentLoaded', () => {
+        const templatesData = JSON.parse(document.getElementById('templates-data').textContent);
+        const senderForm = document.getElementById('sender-form');
+        const templateSelect = document.getElementById('template-select');
+        const dynamicFields = document.getElementById('dynamic-fields');
+        const paramsContainer = document.getElementById('params-container');
+        
+        let currentTemplate = null;
 
-        const toNumber = document.getElementById('to-number').value;
-        const carouselType = document.getElementById('carousel-type').value;
-        const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
-        const sendButton = form.querySelector('button[type=submit]');
+        templateSelect.addEventListener('change', (e) => {
+            currentTemplate = templatesData.find(t => t.name === e.target.value);
+            if (!currentTemplate) return;
 
-        if (!toNumber || !carouselType) {
-            alert('Please fill out all fields.');
-            return;
-        }
+            senderForm.querySelector('#hidden-template-name').value = currentTemplate.name;
+            dynamicFields.style.display = 'block';
+            paramsContainer.innerHTML = '<h5><b>3. Fill in Parameters</b></h5>';
 
-        sendButton.disabled = true;
-        sendButton.textContent = 'Sending...';
-        responseContainer.style.display = 'none';
-
-        try {
-            const response = await fetch("{% url 'registration:send_carousel_api' %}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify({
-                    to_number: toNumber,
-                    carousel_type: carouselType
-                })
-            });
-
-            const result = await response.json();
+            // Find main body parameters
+            const mainBody = currentTemplate.components.find(c => c.type === 'BODY');
+            if (mainBody && mainBody.text.includes('{{')) {
+                const paramCount = (mainBody.text.match(/\{\{/g) || []).length;
+                for (let i = 1; i <= paramCount; i++) {
+                    paramsContainer.innerHTML += `
+                        <div class="form-group">
+                            <label>Main Body Param {{${i}}}</label>
+                            <input type="text" name="main_body_params[]" class="form-control" required>
+                        </div>`;
+                }
+            }
             
-            apiResponsePre.textContent = JSON.stringify(result, null, 2);
-            responseContainer.style.display = 'block';
+            // Find CAROUSEL component and generate fields for each card
+            const carousel = currentTemplate.components.find(c => c.type === 'CAROUSEL');
+            if (carousel && carousel.cards) {
+                paramsContainer.innerHTML += `<h5>Carousel Cards</h5>`;
+                carousel.cards.forEach((card, index) => {
+                    paramsContainer.innerHTML += `<hr><h6>Card ${index + 1}</h6>`;
+                    
+                    // Header Image input for the card
+                    if (card.components.some(c => c.type === 'HEADER')) {
+                        paramsContainer.innerHTML += `
+                            <div class="form-group">
+                                <label>Card ${index + 1}: Header Image</label>
+                                <input type="file" name="card_header_files[]" class="form-control" accept="image/png, image/jpeg" required>
+                            </div>`;
+                    }
 
-        } catch (error) {
-            apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
-            responseContainer.style.display = 'block';
-        } finally {
-            sendButton.disabled = false;
-            sendButton.textContent = 'Send Test Carousel';
-        }
+                    // URL Button parameter input for the card
+                    const urlButton = card.components.find(c => c.type === 'BUTTONS')?.buttons.find(b => b.type === 'URL' && b.url.includes('{{'));
+                    if (urlButton) {
+                        paramsContainer.innerHTML += `
+                            <div class="form-group">
+                                <label>Card ${index + 1}: URL Button Param (path after domain)</label>
+                                <input type="text" name="card_button_params[]" class="form-control" placeholder="e.g., product-123" required>
+                            </div>`;
+                    }
+                });
+            }
+        });
+
+        senderForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(senderForm);
+            const sendButton = senderForm.querySelector('.send-button');
+            const responseContainer = document.getElementById('response-container');
+            const apiResponsePre = document.getElementById('api-response-pre');
+            
+            sendButton.disabled = true;
+            sendButton.textContent = 'Sending...';
+
+            try {
+                const response = await fetch(sendCarouselApiUrl, {
+                    method: 'POST', body: formData, headers: { 'X-CSRFToken': csrfToken }
+                });
+                const result = await response.json();
+                apiResponsePre.textContent = JSON.stringify(result, null, 2);
+                responseContainer.style.display = 'block';
+            } catch (error) {
+                apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
+            } finally {
+                sendButton.disabled = false;
+                sendButton.textContent = 'Send Carousel Campaign';
+            }
+        });
     });
-});
+    {% endverbatim %}
 </script>
 {% endblock %}

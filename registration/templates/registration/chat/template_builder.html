@@ -1,97 +1,52 @@
 {% extends 'registration/job/base.html' %}
 
-{%block extra_head%}
+{% block extra_head %}
 <style>
-    .builder-container { display: flex; gap: 30px; }
-.builder-panel { flex: 2; }
-.preview-panel { flex: 1; }
-.component-box { border: 1px solid #eee; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
-.phone-preview { width: 320px; height: 580px; background: #111; border-radius: 40px; padding: 15px; margin: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-.phone-screen { background: #ece5dd; height: 100%; border-radius: 25px; padding: 10px; display: flex; flex-direction: column; overflow-y: auto; font-family: sans-serif; }
-.preview-header-image { width: 100%; border-radius: 12px; margin-bottom: 8px; }
-.preview-header-image img { width: 100%; border-radius: 12px; }
-.preview-header-text { font-weight: bold; font-size: 1.1em; padding: 8px 12px; margin-bottom: 5px; }
-.preview-body { background: #fff; padding: 10px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); max-width: 90%; font-size: 14px; line-height: 1.4; word-break: break-word; white-space: pre-wrap; }
-.preview-body p { margin: 0; }
-.preview-footer-text { font-size: 12px; color: #888; padding: 8px 12px; }
-.preview-buttons-container { margin-top: auto; padding-top: 10px; }
-.preview-button { background: #f8f8f8; color: #007bff; text-align: center; padding: 10px; border-radius: 8px; margin-top: 5px; font-size: 14px; cursor: pointer; }
-#api-response-pre { background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; }
+    .builder-container { display: flex; flex-wrap: wrap; gap: 30px; }
+    .builder-panel { flex: 2; min-width: 400px; }
+    .preview-panel { flex: 1; min-width: 320px; }
+    .component-box { border: 1px solid #eee; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+    .card-editor { border: 2px dashed #ccc; border-radius: 10px; padding: 20px; margin-top: 15px; position: relative; }
+    .remove-card-btn { position: absolute; top: 10px; right: 10px; }
+    .phone-preview { width: 320px; height: 580px; background: #111; border-radius: 40px; padding: 15px; margin: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .phone-screen { background: #ece5dd; height: 100%; border-radius: 25px; padding: 10px; display: flex; flex-direction: column; font-family: sans-serif; position: relative; }
+    .carousel-preview-card { display: none; }
+    .carousel-preview-card.active { display: block; }
+    .main-body-preview p { margin: 0; white-space: pre-wrap; word-wrap: break-word; padding: 0 12px 10px; }
+    .preview-header-image img { width: 100%; border-radius: 12px 12px 0 0; }
+    .preview-body-wrapper { background: #fff; padding: 10px 12px; font-size: 14px; line-height: 1.4; word-break: break-word; white-space: pre-wrap; }
+    .preview-body-wrapper p { margin: 0; }
+    .preview-button { background: #f8f8f8; color: #007bff; text-align: center; padding: 10px; border-radius: 8px; margin-top: 5px; font-size: 14px; border-top: 1px solid #ddd; }
+    .carousel-nav { position: absolute; bottom: 10px; width: 90%; display: flex; justify-content: space-between; left: 5%; }
+    #api-response-pre { background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; }
 </style>
 {% endblock %}
 
 
-
 {% block content %}
 <div class="container mt-4">
-    <h2>WhatsApp Template Builder</h2>
+    <h2>Carousel Template Builder</h2>
     <div class="builder-container">
         <div class="builder-panel">
             <form id="template-form">
-                <h4>1. Template Information</h4>
-                <div class="form-group">
-                    <label>Template Name</label>
-                    <input type="text" id="template-name" class="form-control" placeholder="e.g., order_confirmation_beta (lowercase, no spaces)">
-                </div>
-                <div class="form-group">
-                    <label>Category</label>
-                    <select id="template-category" class="form-control">
-                        <option value="MARKETING">Marketing</option>
-                        <option value="UTILITY">Utility</option>
-                        <option value="AUTHENTICATION">Authentication</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Language</label>
-                    <input type="text" id="template-language" class="form-control" value="en_US" placeholder="e.g., en_US, hi">
-                </div>
-                <hr>
-
-                <h4>2. Template Components</h4>
+                {% csrf_token %}
                 <div class="component-box">
-                    <h5>Header (Optional)</h5>
-                    <select id="header-type" class="form-control">
-                        <option value="NONE">None</option>
-                        <option value="TEXT">Text</option>
-                        <option value="IMAGE">Image</option>
-                        <option value="VIDEO">Video</option>
-                        <option value="DOCUMENT">Document</option>
-                    </select>
-                    <div id="header-text-group" class="form-group mt-2" style="display: none;">
-                        <label>Header Text (You can use 1 variable, e.g., {{1}})</label>
-                        <input type="text" id="header-text" class="form-control">
-                    </div>
-                    <div id="header-media-group" class="form-group mt-2" style="display: none;">
-                        <label>Example Media URL (Must be a public URL)</label>
-                        <input type="text" id="header-media-url" class="form-control" placeholder="https://example.com/image.png">
-                        <small>For template creation, you need an example. This URL won't be used in the final message.</small>
-                    </div>
+                    <h4>1. Template Information</h4>
+                    <div class="form-group"><label>Template Name</label><input type="text" id="template-name" class="form-control" placeholder="lowercase_and_underscores" required></div>
+                    <div class="form-group"><label>Category</label><select id="template-category" class="form-control"><option value="MARKETING">Marketing</option><option value="UTILITY">Utility</option></select></div>
+                    <div class="form-group"><label>Language</label><input type="text" id="template-language" class="form-control" value="en_US" required></div>
                 </div>
 
                 <div class="component-box">
-                    <h5>Body</h5>
-                    <textarea id="body-text" class="form-control" rows="8" placeholder="Enter your message here..."></textarea>
-                    <button type="button" id="add-param-btn" class="btn btn-secondary btn-sm mt-2">Add Parameter {{n}}</button>
+                    <h4>Body Text (Appears above carousel)</h4>
+                    <textarea id="template-body-text" class="form-control" rows="3" placeholder="This text is required."></textarea>
                 </div>
-
+                
                 <div class="component-box">
-                    <h5>Footer (Optional)</h5>
-                    <input type="text" id="footer-text" class="form-control" placeholder="e.g., Your Company Name">
+                    <h4>2. Carousel Cards (Min 2, Max 10)</h4>
+                    <div id="cards-container"></div>
+                    <button type="button" id="add-card-btn" class="btn btn-success mt-2">Add Card</button>
                 </div>
-
-                <div class="component-box">
-                    <h5>Buttons (Optional)</h5>
-                    <select id="button-type" class="form-control">
-                        <option value="NONE">None</option>
-                        <option value="QUICK_REPLY">Quick Reply</option>
-                    </select>
-                    <div id="quick-reply-buttons" class="mt-2" style="display: none;">
-                        <input type="text" class="form-control mb-1 quick-reply-input" placeholder="Button 1 Text">
-                        <input type="text" class="form-control mb-1 quick-reply-input" placeholder="Button 2 Text (Optional)">
-                        <input type="text" class="form-control mb-1 quick-reply-input" placeholder="Button 3 Text (Optional)">
-                    </div>
-                </div>
-                <hr>
 
                 <button type="submit" class="btn btn-primary btn-lg mt-3">Create Template</button>
             </form>
@@ -100,186 +55,180 @@
         <div class="preview-panel">
             <h4>Live Preview</h4>
             <div class="phone-preview">
-                <div class="phone-screen">
-                    <div id="preview-header-image" class="preview-header-image" style="display: none;">
-                        <img src="" alt="Header Preview">
-                    </div>
-                    <div id="preview-header-text" class="preview-header-text" style="display: none;"></div>
-                    <div class="preview-body">
-                        <p id="preview-body-text"></p>
-                    </div>
-                    <div id="preview-footer-text" class="preview-footer-text"></div>
-                    <div id="preview-buttons" class="preview-buttons-container"></div>
-                </div>
+                <div class="phone-screen" id="phone-screen-preview"></div>
             </div>
         </div>
     </div>
 
     <div id="response-container" class="mt-4" style="display:none;">
-        <h4>API Response</h4>
-        <pre id="api-response-pre"></pre>
+        <h4>API Response</h4><pre id="api-response-pre"></pre>
     </div>
 </div>
+
+<template id="card-template">
+    <div class="card-editor">
+        <button type="button" class="btn-close remove-card-btn" aria-label="Close"></button>
+        <h5 class="card-title">Card</h5>
+        <div class="form-group">
+            <label>Header Image Handle ID</label>
+            <input type="text" class="form-control card-header-handle" placeholder="Paste pre-approved media handle ID" required>
+        </div>
+        <div class="form-group"><label>Card Body Text</label><textarea class="form-control card-body" rows="3"></textarea></div>
+        <div class="form-group"><label>Button (Quick Reply)</label><input type="text" class="form-control card-button" placeholder="Button Text"></div>
+    </div>
+</template>
 {% endblock %}
 
 
 {% block extra_script %}
-
 <script>
-    {% verbatim %}
-document.addEventListener('DOMContentLoaded', () => {
-    // --- Element Selectors ---
-    const form = document.getElementById('template-form');
-    const inputs = form.querySelectorAll('input, select, textarea');
-    const preview = {
-        headerImage: document.getElementById('preview-header-image'),
-        headerImageImg: document.getElementById('preview-header-image').querySelector('img'),
-        headerText: document.getElementById('preview-header-text'),
-        bodyText: document.getElementById('preview-body-text'),
-        footerText: document.getElementById('preview-footer-text'),
-        buttons: document.getElementById('preview-buttons'),
-    };
-    const headerType = document.getElementById('header-type');
-    const addParamBtn = document.getElementById('add-param-btn');
-    let paramCount = 1;
+    // const createTemplateUrl = "{% url 'registration:create_template_api' %}";
+    const csrfToken = "{{ csrf_token }}";
 
-    // --- Main Update Function ---
-    function updateAll() {
-        const bodyTextEl = document.getElementById('body-text');
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('template-form');
+        const cardsContainer = document.getElementById('cards-container');
+        const addCardBtn = document.getElementById('add-card-btn');
+        const cardTemplate = document.getElementById('card-template');
+        const phoneScreen = document.getElementById('phone-screen-preview');
         
-        // Update Body Preview
-        let bodyPreview = bodyTextEl.value.replace(/\{\{(\d+)\}\}/g, `[param$1]`);
-        preview.bodyText.textContent = bodyPreview;
+        let currentPreviewIndex = 0;
 
-        // Update Header Preview
-        const headerTypeValue = document.getElementById('header-type').value;
-        const headerTextValue = document.getElementById('header-text').value;
-        const headerMediaUrlValue = document.getElementById('header-media-url').value;
-        preview.headerText.style.display = 'none';
-        preview.headerImage.style.display = 'none';
-        if (headerTypeValue === 'TEXT') {
-            preview.headerText.textContent = headerTextValue.replace('{{1}}', '[param1]');
-            preview.headerText.style.display = 'block';
-        } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerTypeValue)) {
-            if (headerMediaUrlValue) {
-                preview.headerImageImg.src = headerMediaUrlValue;
-                preview.headerImage.style.display = 'block';
-            }
+        function addCard() {
+            if (cardsContainer.children.length >= 10) return;
+            const cardClone = cardTemplate.content.cloneNode(true);
+            cardsContainer.appendChild(cardClone);
+            updateUI();
+            cardsContainer.querySelector('.card-editor:last-child .remove-card-btn').addEventListener('click', (e) => {
+                e.target.closest('.card-editor').remove();
+                updateUI();
+            });
+            cardsContainer.querySelectorAll('input, textarea').forEach(input => input.addEventListener('input', updateUI));
         }
 
-        // Update Footer Preview
-        preview.footerText.textContent = document.getElementById('footer-text').value;
+        function updateUI() {
+            cardsContainer.querySelectorAll('.card-editor').forEach((card, index) => {
+                card.querySelector('.card-title').textContent = `Card ${index + 1}`;
+            });
+            updatePreview();
+        }
 
-        // Update Buttons Preview
-        preview.buttons.innerHTML = '';
-        const buttonType = document.getElementById('button-type').value;
-        if (buttonType === 'QUICK_REPLY') {
-            document.querySelectorAll('.quick-reply-input').forEach(input => {
-                if (input.value) {
-                    const btnDiv = document.createElement('div');
-                    btnDiv.className = 'preview-button';
-                    btnDiv.textContent = input.value;
-                    preview.buttons.appendChild(btnDiv);
+        function updatePreview() {
+            const mainBodyText = document.getElementById('template-body-text').value;
+            const cardEditors = cardsContainer.querySelectorAll('.card-editor');
+            phoneScreen.innerHTML = '';
+
+            if (mainBodyText) {
+                const mainBodyPreview = document.createElement('div');
+                mainBodyPreview.className = 'main-body-preview';
+                mainBodyPreview.innerHTML = `<p>${mainBodyText.replace(/\n/g, '<br>')}</p>`;
+                phoneScreen.appendChild(mainBodyPreview);
+            }
+
+            const staticImageUrl = "https://i.imgur.com/your-placeholder.jpg"; // Placeholder for preview
+
+            cardEditors.forEach((editor, index) => {
+                const previewCard = document.createElement('div');
+                previewCard.className = 'carousel-preview-card';
+                previewCard.dataset.index = index;
+                
+                const bodyText = editor.querySelector('.card-body').value;
+                const buttonText = editor.querySelector('.card-button').value;
+                
+                let innerHTML = `<div class="preview-header-image"><img src="${staticImageUrl}" alt="Header Preview"></div>`;
+                innerHTML += `<div class="preview-body-wrapper"><p>${bodyText.replace(/\n/g, '<br>')}</p></div>`;
+                if (buttonText) {
+                    innerHTML += `<div class="preview-buttons-container"><div class="preview-button">${buttonText}</div></div>`;
                 }
+                previewCard.innerHTML = innerHTML;
+                phoneScreen.appendChild(previewCard);
             });
+            
+            phoneScreen.insertAdjacentHTML('beforeend', `<div class="carousel-nav"><button type="button" id="prev-card-btn" class="btn btn-light btn-sm">&lt; Prev</button><span id="card-indicator"></span><button type="button" id="next-card-btn" class="btn btn-light btn-sm">Next &gt;</button></div>`);
+            phoneScreen.querySelector('#prev-card-btn').addEventListener('click', () => showPreviewCard(currentPreviewIndex - 1));
+            phoneScreen.querySelector('#next-card-btn').addEventListener('click', () => showPreviewCard(currentPreviewIndex + 1));
+            
+            showPreviewCard(currentPreviewIndex);
         }
-    }
 
-    // --- Event Listeners ---
-    inputs.forEach(input => input.addEventListener('input', updateAll));
+        function showPreviewCard(index) {
+            const previews = phoneScreen.querySelectorAll('.carousel-preview-card');
+            const indicator = phoneScreen.querySelector('#card-indicator');
+            const prevButton = phoneScreen.querySelector('#prev-card-btn');
+            const nextButton = phoneScreen.querySelector('#next-card-btn');
 
-    headerType.addEventListener('change', () => {
-        const headerTypeValue = headerType.value;
-        document.getElementById('header-text-group').style.display = headerTypeValue === 'TEXT' ? 'block' : 'none';
-        document.getElementById('header-media-group').style.display = ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerTypeValue) ? 'block' : 'none';
-        updateAll();
-    });
+            if (previews.length === 0) { indicator.textContent = 'No Cards'; return; }
+            currentPreviewIndex = Math.max(0, Math.min(index, previews.length - 1));
+            previews.forEach((p, i) => p.classList.toggle('active', i === currentPreviewIndex));
+            indicator.textContent = `Card ${currentPreviewIndex + 1} / ${previews.length}`;
+            prevButton.disabled = currentPreviewIndex === 0;
+            nextButton.disabled = currentPreviewIndex === previews.length - 1;
+        }
 
-    document.getElementById('button-type').addEventListener('change', (e) => {
-        document.getElementById('quick-reply-buttons').style.display = e.target.value === 'QUICK_REPLY' ? 'block' : 'none';
-        updateAll();
-    });
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const payload = {
+                name: document.getElementById('template-name').value.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+                language: document.getElementById('template-language').value,
+                category: document.getElementById('template-category').value,
+                allow_category_change: true,
+                components: []
+            };
 
-    addParamBtn.addEventListener('click', () => {
-        const bodyTextEl = document.getElementById('body-text');
-        const currentParamCount = (bodyTextEl.value.match(/\{\{/g) || []).length;
-        bodyTextEl.value += `{{${currentParamCount + 1}}}`;
-        updateAll();
-    });
-
-    // --- Form Submission ---
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        // 1. Construct the JSON payload from form inputs
-        const payload = {
-            name: document.getElementById('template-name').value,
-            language: document.getElementById('template-language').value,
-            category: document.getElementById('template-category').value,
-            components: []
-        };
-
-        // Header Component
-        const headerTypeValue = document.getElementById('header-type').value;
-        if (headerTypeValue !== 'NONE') {
-            const headerComponent = { type: 'HEADER', format: headerTypeValue };
-            if (headerTypeValue === 'TEXT') {
-                headerComponent.text = document.getElementById('header-text').value;
-            } else {
-                headerComponent.example = { header_handle: [document.getElementById('header-media-url').value] };
+            const mainBodyText = document.getElementById('template-body-text').value;
+            if (mainBodyText) {
+                payload.components.push({ type: 'BODY', text: mainBodyText });
             }
-            payload.components.push(headerComponent);
-        }
 
-        // Body Component
-        const bodyTextValue = document.getElementById('body-text').value;
-        if (bodyTextValue) {
-            payload.components.push({ type: 'BODY', text: bodyTextValue });
-        }
-
-        // Footer Component
-        const footerTextValue = document.getElementById('footer-text').value;
-        if (footerTextValue) {
-            payload.components.push({ type: 'FOOTER', text: footerTextValue });
-        }
-
-        // Buttons Component
-        const buttonType = document.getElementById('button-type').value;
-        if (buttonType !== 'NONE') {
-            const buttons = [];
-            document.querySelectorAll('.quick-reply-input').forEach(input => {
-                if (input.value) {
-                    buttons.push({ type: 'QUICK_REPLY', text: input.value });
+            const carouselComponent = { type: 'CAROUSEL', cards: [] };
+            
+            cardsContainer.querySelectorAll('.card-editor').forEach((editor) => {
+                const card = { components: [] };
+                const headerHandle = editor.querySelector('.card-header-handle').value.trim();
+                const bodyText = editor.querySelector('.card-body').value;
+                const buttonText = editor.querySelector('.card-button').value;
+                
+                // Add header with its own example handle
+                if (headerHandle) {
+                    card.components.push({
+                        type: 'HEADER',
+                        format: 'IMAGE',
+                        example: { header_handle: [headerHandle] }
+                    });
                 }
+                
+                if (bodyText) card.components.push({ type: 'BODY', text: bodyText });
+                
+                if(buttonText) {
+                    card.components.push({ type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: buttonText }] });
+                }
+                carouselComponent.cards.push(card);
             });
-            if (buttons.length > 0) {
-                payload.components.push({ type: 'BUTTONS', buttons: buttons });
+
+            if (carouselComponent.cards.length > 0) {
+                payload.components.push(carouselComponent);
             }
-        }
-        
-        // 2. Send to backend proxy
-        const responseContainer = document.getElementById('response-container');
-        const apiResponsePre = document.getElementById('api-response-pre');
-        
-        try {
-            const response = await fetch("{% url 'registration:create_template_api' %}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify(payload)
-            });
-            const result = await response.json();
-            apiResponsePre.textContent = JSON.stringify(result, null, 2);
-            responseContainer.style.display = 'block';
+            
+            const responseContainer = document.getElementById('response-container');
+            const apiResponsePre = document.getElementById('api-response-pre');
+            try {
+                const response = await fetch(createTemplateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                apiResponsePre.textContent = JSON.stringify(result, null, 2);
+                responseContainer.style.display = 'block';
+            } catch (error) {
+                apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
+            }
+        });
 
-        } catch (error) {
-            apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
-            responseContainer.style.display = 'block';
-        }
+        addCardBtn.addEventListener('click', addCard);
+        addCard(); // Start with one card
+        addCard(); // Start with two cards
     });
-
-    // Initial call to set up the preview
-    updateAll();
-});
-{% endverbatim %}
 </script>
 {% endblock %}

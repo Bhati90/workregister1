@@ -11,14 +11,30 @@ urlpatterns = [
     path('registration/', views.MultiStepRegistrationView.as_view(), name='registration'),
     path('success/', views.success_view, name='success_page'),
      
+
+    path('api/upload-template-media/', views.upload_template_media_api_view, name='upload_template_media_api'),
+    
+    path('api/get-whatsapp-templates/', views.get_whatsapp_templates_api, name='get_whatsapp_templates_api'),
+    path('api/save-flow/', views.save_flow_api, name='save_flow_api'),
+    
+
+
     path('api/chat/send-carousel/', views.send_carousel_api_view, name='send_carousel_api'),
 
      path('chat/', views.chat_contact_list_view, name='chat_contact_list'),
     path('template-sender/', views.template_sender_view, name='template_sender'),
-    path('api/send-template/', views.send_template_api_view, name='send_template_api'),
-#This page will show the detailed conversation for a specific contact
+    # path('api/send-template/', views.send_template_api_view, name='send_template_api'),
+     path('api/send-standard-template/', views.send_standard_template_api_view, name='send_standard_template_api'),
+    path('api/send-carousel-template/', views.send_carousel_template_api_view, name='send_carousel_template_api'),
+
+    path('template-schedule/', views.template_sch_view, name='template_schedule'),
+
+    path('api/schedule-template/', views.schedule_template_api_view, name='schedule_template_api'),
+
+    #This page will show the detailed conversation for a specific contact
     path('chat/<str:wa_id>/', views.chat_detail_view, name='chat_detail'),
     path('carousel-builder/', views.carousel_template_builder_view, name='carousel_template_builder'),
+    path('template-builder/', views.standard_template_builder_view, name='standard_template_builder'),
 
 
     # This is an API endpoint for sending replies from the frontend

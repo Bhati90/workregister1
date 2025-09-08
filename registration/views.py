@@ -431,9 +431,8 @@ logger = logging.getLogger(__name__)
 
 
 
-@csrf_exempt
 def whatsapp_webhook_view(request):
-    """Handles all incoming WhatsApp events."""
+    """Handles all incoming WhatsApp events, prioritizing dynamic flows."""
     if request.method == 'POST':
         data = json.loads(request.body)
         logger.info(f"Webhook received: {json.dumps(data, indent=2)}")
@@ -449,157 +448,185 @@ def whatsapp_webhook_view(request):
 
                             message_type = msg.get('type')
 
+                            # --- Handle Reactions and exit early ---
                             if message_type == 'reaction':
-                                reaction_data = msg['reaction']
-                                target_wamid = reaction_data['message_id']
-                                emoji = reaction_data.get('emoji') # Use .get() to handle reaction removals
-
-                                try:
-                                    message_to_update = Message.objects.get(wamid=target_wamid)
-                                    if emoji:
-                                        message_to_update.reaction = emoji   # store emoji in reaction field
-                                        message_to_update.status = 'reacted'
-                                    else:
-                                        message_to_update.reaction = None 
-                                        message_to_update.status = 'read' # Reaction was removed
-                                    message_to_update.save()
-                                except Message.DoesNotExist:
-                                    logger.warning(f"Received reaction for a message not found in DB: {target_wamid}")
-                                
+                                # Your existing reaction logic...
                                 continue 
+
+                            # --- 1. Prepare and Save the Incoming Message ---
                             defaults = {
                                 'contact': contact, 'direction': 'inbound', 'message_type': message_type,
                                 'timestamp': datetime.datetime.fromtimestamp(int(msg['timestamp']), tz=datetime.timezone.utc),
-                                'raw_data': msg,'reaction': None, # Default reaction to None
-                                   'status': 'delivered'
+                                'raw_data': msg, 'status': 'delivered'
                             }
                             if 'context' in msg and msg['context'].get('id'):
                                 try:
                                     defaults['replied_to'] = Message.objects.get(wamid=msg['context']['id'])
                                 except Message.DoesNotExist: pass
                             
+                            incoming_command = None
                             
-                            incoming_command = None 
                             if message_type == 'text':
-                                incoming_text = msg['text']['body']
-                                defaults['text_content'] = incoming_command
-                                
+                                defaults['text_content'] = msg['text']['body']
+                                incoming_command = msg['text']['body']
                             elif message_type == 'button':
+                                defaults['text_content'] = msg['button']['text']
                                 incoming_command = msg['button']['text']
-                                defaults['text_content'] = incoming_command    
-                                    # Check if the command matches your button's text
-                                
-                                    
-                                    # You can add more button commands here
-                                    # elif command == "Other Button Text":
-                                    #     automated_response_text = "Here is the information for the other button."
-
-                                    # If a response was triggered, send it back
-                                
-
+                            elif message_type == 'interactive':
+                                interactive_data = msg['interactive']
+                                if interactive_data['type'] == 'list_reply':
+                                    defaults['text_content'] = interactive_data['list_reply']['title']
+                                    incoming_command = interactive_data['list_reply']['id']
+                                elif interactive_data['type'] == 'button_reply':
+                                    defaults['text_content'] = interactive_data['button_reply']['title']
+                                    incoming_command = interactive_data['button_reply']['title'] # Use title for flows
                             elif message_type in ['image', 'video', 'audio', 'document','sticker']:
                                 media_info = msg[message_type]
                                 defaults['media_id'] = media_info.get('id')
                                 defaults['caption'] = media_info.get('caption', '')
-                                if message_type == "image" and media_info.get("view_once"):
-                                    defaults['is_view_once'] = True   # make sure your Message model has this field
-                                else:
-                                    defaults['is_view_once'] = False
-                                message_instance, _ = Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
-                                file_name, file_content = download_media_from_meta(media_info['id'])
-                                if message_type == "image" and media_info.get("view_once"):
-                                    file_name, file_content = download_media_from_meta(media_info['id'])
-                                    if file_name and file_content:
-                                        message_instance.media_file.save(file_name, file_content, save=True)
-                                    continue
-                                if file_name and file_content:
-                                    message_instance.media_file.save(file_name, file_content, save=True)
-                                continue
-
-                            elif message_type == 'contacts':
-                                contact_data = msg['contacts'][0]
-                                
-                                # Use the structured name and phone number from the payload
-                                defaults['contact_name'] = contact_data['name']['formatted_name']
-                                if contact_data.get('phones') and contact_data['phones'][0]:
-                                    defaults['contact_phone'] = contact_data['phones'][0].get('phone')
-
-                                # You can optionally still save the raw vCard to the text field
-                                if 'vcard' in contact_data:
-                                    defaults['text_content'] = contact_data['vcard']
-
-                            elif message_type == 'location':
-                                location_data = msg['location']
-                                defaults['latitude'] = location_data['latitude']
-                                defaults['longitude'] = location_data['longitude']
-                                # Save the location name/address to the main text field
-                                defaults['text_content'] = location_data.get('name', '') or location_data.get('address', '')
+                            # Add your other message types like 'location', 'contacts' here...
                             
+                            message_instance, _ = Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
 
-                            elif message_type == 'interactive':
-                                interactive_data = msg['interactive']
-                                if interactive_data['type'] == 'list_reply':
-                                    incoming_command = interactive_data['list_reply']['id']
-                                    # Save the user-friendly title as the text content
-                                    defaults['text_content'] = interactive_data['list_reply']['title']
-                                elif interactive_data['type'] == 'button_reply':
-                                    incoming_command = interactive_data['button_reply']['id']
-                                    defaults['text_content'] = interactive_data['button_reply']['title']
+                            # --- 2. Attempt to Execute the Flow Engine ---
+                            flow_handled = False
+                            replied_to_wamid = msg.get('context', {}).get('id')
+                            if incoming_command and replied_to_wamid:
+                                flow_handled = try_execute_flow_step(contact, incoming_command, replied_to_wamid)
 
-                            elif message_type == 'reaction':
-                                emoji = msg['reaction']['emoji']
-                                Message.objects.filter(wamid=msg['reaction']['message_id']).update(status=f"Reacted with {emoji}")
-                                continue
-                            elif message_type == 'unsupported':
-                                defaults['text_content'] = "🚫 Unsupported message received"
-                            Message.objects.update_or_create(wamid=msg['id'], defaults=defaults)
-                            
-                            if message_type in ['image', 'video', 'audio', 'document', 'sticker']:
-                                media_info = msg[message_type]
-                                media_id = media_info.get('id')
-                                if media_id:
-                                    file_name, file_content = download_media_from_meta(media_id)
-                                    if file_name and file_content:
-                                        message_instance.media_file.save(file_name, file_content, save=True)
-
-                            
-                            if incoming_command:
-                                command = incoming_command.strip().lower() # Use lower() for ID matching
+                            # --- 3. If flow wasn't handled, Fall Back to Hardcoded Logic ---
+                            if not flow_handled and incoming_command:
+                                command = incoming_command.strip().lower()
                                 automated_response_text = None
 
-                                # Check for list/carousel reply IDs
+                                # Your original hardcoded commands
                                 if command == "job_interest_pruning":
                                     automated_response_text = "Thank you for your interest in Pruning. Our team will contact you with details."
-                                
                                 elif command == "job_interest_harvesting":
                                     automated_response_text = "Thank you for your interest in Harvesting. Our team will contact you with details."
-                                
-                                # Check for button reply text
                                 elif command == "क्लिक करा":
                                     automated_response_text = "धन्यवाद! आमच्या टीममधील सदस्य लवकरच तुमच्याशी संपर्क साधतील."
                                 
                                 if automated_response_text:
-                                    payload = {
-                                        "messaging_product": "whatsapp", "to": msg['from'],
-                                        "text": {"body": automated_response_text}
-                                    }
+                                    payload = {"messaging_product": "whatsapp", "to": msg['from'], "text": {"body": automated_response_text}}
                                     success, response_data = send_whatsapp_message(payload)
                                     if success:
                                         save_outgoing_message(
                                             contact=contact, wamid=response_data['messages'][0]['id'],
                                             message_type='text', text_content=automated_response_text
                                         )
+                            
+                            # --- 4. Handle Media Downloads ---
+                            if message_type in ['image', 'video', 'audio', 'document', 'sticker']:
+                                media_id = msg.get(message_type, {}).get('id')
+                                if media_id:
+                                    file_name, file_content = download_media_from_meta(media_id)
+                                    if file_name and file_content:
+                                        message_instance.media_file.save(file_name, file_content, save=True)
+
                     elif 'statuses' in value:
+                        # Your logic for handling statuses
                         for status_data in value.get('statuses', []):
                             Message.objects.filter(wamid=status_data['id']).update(status=status_data['status'])
         except Exception as e:
             logger.error(f"Error in webhook: {e}", exc_info=True)
         return JsonResponse({"status": "success"}, status=200)
 
+
+def try_execute_flow_step(contact, user_input, replied_to_wamid):
+    """
+    Tries to find and execute a step from a saved flow.
+    Returns True if the flow was handled, False otherwise.
+    """
+    try:
+        # 1. Find the outgoing template message the user replied to
+        original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
+        
+        # 2. Extract the template name from the message content
+        #    You MUST ensure your `save_outgoing_message` for templates saves a message like this.
+        if "Sent template: " not in original_message.text_content:
+            return False
+        template_name = original_message.text_content.replace("Sent template: ", "").strip()
+        
+        # 3. Load the corresponding flow from the DB
+        flow = Flow.objects.get(template_name=template_name)
+        flow_data = flow.flow_data
+        nodes = flow_data.get('nodes', [])
+        edges = flow_data.get('edges', [])
+        
+        # 4. Find the template node that started this interaction
+        template_node = next((n for n in nodes if n.get('type') == 'template'), None)
+        if not template_node:
+            return False
+
+        # 5. Find the edge that matches the user's button click
+        next_edge = next((e for e in edges if e.get('source') == template_node['id'] and e.get('sourceHandle') == user_input), None)
+        
+        if not next_edge:
+            logger.info(f"Flow found for '{template_name}', but no edge for input '{user_input}'. Will fall back to old logic.")
+            return False
+
+        # 6. Find the target node to execute
+        target_node_id = next_edge.get('target')
+        target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
+
+        if not target_node or target_node.get('type') != 'message':
+            return False
+            
+        # 7. Construct and send the message from the target node's data
+        node_data = target_node.get('data', {})
+        message_text = node_data.get('text')
+        image_url = node_data.get('imageUrl') # Assuming you might add image support later
+        
+        payload = { "messaging_product": "whatsapp", "to": contact.wa_id }
+        
+        # NOTE: This part can be expanded to create complex messages with images, buttons, etc.
+        # based on the `node_data` fields you defined in your React MessageNode.
+        if message_text:
+             payload.update({"type": "text", "text": {"body": message_text}})
+        else:
+            return False # Can't send an empty message
+
+        success, response_data = send_whatsapp_message(payload)
+        
+        if success:
+            save_outgoing_message(
+                contact=contact,
+                wamid=response_data['messages'][0]['id'],
+                message_type='text',
+                text_content=message_text
+            )
+            logger.info(f"Successfully executed flow step for user {contact.wa_id}")
+            return True # IMPORTANT: Signal that the flow was handled
+            
+    except Message.DoesNotExist:
+        logger.info(f"User replied to a message not tracked as an outbound template, or wamid did not match.")
+        return False
+    except Flow.DoesNotExist:
+        logger.info(f"User replied to template '{template_name}', but no flow is saved for it.")
+        return False
+    except Exception as e:
+        logger.error(f"Critical error in flow engine: {e}", exc_info=True)
+        return False
+    
+    return False
+# registration/views.py
+import json
+import logging
+import requests
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .models import ChatContact
+from .whats_app import upload_media_to_meta, send_whatsapp_message, save_outgoing_message
+
+logger = logging.getLogger(__name__)
+
 @login_required
 def template_sender_view(request):
     """
-    Fetches templates from the Meta API and renders the sender tool page.
+    Fetches ALL approved templates from the Meta API and renders the sender tool page.
     """
     templates_data = []
     error = None
@@ -608,119 +635,199 @@ def template_sender_view(request):
         META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
         
         WABA_ID="1477047197063313"
-        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
+        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status,category,language"
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
         response = requests.get(url, headers=headers)
         response.raise_for_status()
-        # Filter for only approved templates
+
         all_templates = response.json().get('data', [])
         templates_data = [t for t in all_templates if t.get('status') == 'APPROVED']
     except Exception as e:
         logger.error(f"Failed to fetch templates: {e}")
         error = "Could not load templates from Meta API. Please check your credentials."
-
     
     return render(request, 'registration/chat/template_sender.html', {
         "templates": templates_data,
         "contacts": contacts,
         "error": error,
     })
+# registration/views.py
+# registration/views.py
 
+# registration/views.py
+# registration/views.py
+
+# registration/views.py
+
+# VIEW 1: For sending STANDARD templates
 @csrf_exempt
 @login_required
-def send_template_api_view(request):
-    """
-    API endpoint to send a composed template message to one or many recipients.
-    """
+def send_standard_template_api_view(request):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
-
+    
     try:
-        recipients = request.POST.getlist('recipients[]')  # list of wa_ids
+        recipients = request.POST.getlist('recipients[]')
+        if not recipients:
+            return JsonResponse({'status': 'error', 'message': 'No recipients selected.'}, status=400)
+        
         template_name = request.POST.get('template_name')
-        params = request.POST.getlist('params[]')
-        media_file = request.FILES.get('header_image')
+        body_params = request.POST.getlist('body_params[]')
+        header_file = request.FILES.get('header_image')
+        
+        header_media_id = None
+        if header_file:
+            header_media_id = upload_media_to_meta(header_file)
+            if not header_media_id:
+                return JsonResponse({'status': 'error', 'message': 'Failed to upload header media'}, status=500)
 
         results = []
-
         for wa_id in recipients:
-            try:
-                contact = ChatContact.objects.get(wa_id=wa_id)
-
-                # Personalize params: replace $name with actual contact name
-                personalized_params = []
-                for p in params:
-                    if "$name" in p:
-                        personalized_params.append(p.replace("$name", contact.name or ""))
-                    else:
-                        personalized_params.append(p)
-
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "to": wa_id,
-                    "type": "template",
-                    "template": {
-                        "name": template_name,
-                        "language": {"code": "en"}
-                    }
-                }
-
-                components = []
-                # Handle header image
-                if media_file:
-                    media_id = upload_media_to_meta(media_file)
-                    if not media_id:
-                        results.append({
-                            "wa_id": wa_id,
-                            "status": "error",
-                            "error": "Failed to upload media"
-                        })
-                        continue
-                    components.append({
-                        "type": "header",
-                        "parameters": [{"type": "image", "image": {"id": media_id}}]
-                    })
-
-                # Handle body parameters
-                if personalized_params:
-                    parameters_list = [{"type": "text", "text": p} for p in personalized_params]
-                    components.append({"type": "body", "parameters": parameters_list})
-
-                if components:
-                    payload['template']['components'] = components
-
-                success, response_data = send_whatsapp_message(payload)
-
-                if success:
-                    # Save outgoing message
-                    save_outgoing_message(
-                        contact=contact,
-                        wamid=response_data['messages'][0]['id'],
-                        message_type='template',
-                        text_content=f"Sent template: {template_name}",
-                        raw_data=response_data
-                    )
-                    results.append({"wa_id": wa_id, "status": "success", "response": response_data})
-                else:
-                    results.append({"wa_id": wa_id, "status": "error", "response": response_data})
-
-            except ChatContact.DoesNotExist:
-                results.append({"wa_id": wa_id, "status": "error", "error": "Contact not found"})
-            except Exception as e:
-                logger.error(f"Error sending to {wa_id}: {e}", exc_info=True)
-                results.append({"wa_id": wa_id, "status": "error", "error": str(e)})
-
+            contact = get_object_or_404(ChatContact, wa_id=wa_id)
+            payload = {
+                "messaging_product": "whatsapp", "to": wa_id, "type": "template",
+                "template": {"name": template_name, "language": {"code": "en"}, "components": []}
+            }
+            
+            if header_media_id:
+                payload['template']['components'].append({"type": "header", "parameters": [{"type": "image", "image": {"id": header_media_id}}]})
+            if body_params:
+                payload['template']['components'].append({"type": "body", "parameters": [{"type": "text", "text": p} for p in body_params]})
+            
+            success, response_data = send_whatsapp_message(payload)
+            if success:
+                save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type='template', text_content=f"Sent template: {template_name}")
+                results.append({"wa_id": wa_id, "status": "success"})
+            else:
+                results.append({"wa_id": wa_id, "status": "error", "response": response_data})
         return JsonResponse({"results": results})
-
     except Exception as e:
-        logger.error(f"Error in send_template_api_view: {e}", exc_info=True)
+        logger.error(f"Error in send_standard_template_api_view: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
+# VIEW 2: Specifically for sending CAROUSEL templates
+# registration/views.py
+
+@csrf_exempt
+@login_required
+def send_carousel_template_api_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+        
+    try:
+        recipients = request.POST.getlist('recipients[]')
+        template_name = request.POST.get('template_name')
+        
+        # Get parameters for the main body above the carousel
+        main_body_params = request.POST.getlist('main_body_params[]')
+        
+        # Get parameters for EACH CARD
+        card_header_files = request.FILES.getlist('card_header_files[]')
+        card_button_params = request.POST.getlist('card_button_params[]')
+        
+        results = []
+
+        # 1. Upload all header images for the cards first to get their media IDs
+        card_media_ids = []
+        for file in card_header_files:
+            media_id = upload_media_to_meta(file)
+            if not media_id:
+                return JsonResponse({'status': 'error', 'message': 'Failed to upload card header image.'}, status=500)
+            card_media_ids.append(media_id)
+
+        for wa_id in recipients:
+            contact = get_object_or_404(ChatContact, wa_id=wa_id)
+            payload = {
+                "messaging_product": "whatsapp", "to": wa_id, "type": "template",
+                "template": {"name": template_name, "language": {"code": "en"}, "components": []}
+            }
+            
+            # 2. Add top-level BODY component with its parameters
+            if main_body_params:
+                payload['template']['components'].append({
+                    "type": "body",
+                    "parameters": [{"type": "text", "text": p} for p in main_body_params]
+                })
+            
+            # 3. Build and add the CAROUSEL component with its parameters
+            if card_media_ids:
+                carousel_component = {"type": "carousel", "cards": []}
+                
+                for i in range(len(card_media_ids)):
+                    card = {
+                        "card_index": i,
+                        "components": [
+                            {
+                                "type": "header",
+                                "parameters": [{"type": "image", "image": {"id": card_media_ids[i]}}]
+                            },
+                            {
+                                "type": "button",
+                                "sub_type": "url",
+                                "index": "1", # Assumes the URL button is the second button
+                                "parameters": [{"type": "text", "text": card_button_params[i] if i < len(card_button_params) else ""}]
+                            }
+                        ]
+                    }
+                    carousel_component['cards'].append(card)
+                payload['template']['components'].append(carousel_component)
+
+            success, response_data = send_whatsapp_message(payload)
+            
+            if success:
+                save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type='template', text_content=f"Sent template: {template_name}")
+                results.append({"wa_id": wa_id, "status": "success"})
+            else:
+                results.append({"wa_id": wa_id, "status": "error", "response": response_data})
+                
+        return JsonResponse({"results": results})
+        
+    except Exception as e:
+        logger.error(f"Error in send_carousel_template_api_view: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+
+# registration/views.py
+@login_required
+def standard_template_builder_view(request):
+    return render(request, 'registration/chat/standard_template_builder.html')
+
 @login_required
 def carousel_sender_view(request):
-    return render(request, 'registration/chat/carousel_sender.html')
+    """
+    Fetches ONLY carousel templates from the Meta API and renders the sender page.
+    """
+    templates_data = []
+    error = None
+    contacts = ChatContact.objects.all()
+    try:
+        META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+        
+        WABA_ID="1477047197063313"
+        
+        
+        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
 
+        all_templates = response.json().get('data', [])
+        # Filter for approved templates that contain a CAROUSEL component
+        templates_data = [
+            t for t in all_templates 
+            if t.get('status') == 'APPROVED' and any(c.get('type') == 'CAROUSEL' for c in t.get('components', []))
+        ]
+    except Exception as e:
+        logger.error(f"Failed to fetch templates: {e}")
+        error = "Could not load templates from Meta API."
+    
+    return render(request, 'registration/chat/carousel_sender.html', {
+        "templates": templates_data,
+        "contacts": contacts,
+        "error": error,
+    })
 # registration/views.py
 import requests # Make sure this is imported
 
@@ -728,6 +835,33 @@ import requests # Make sure this is imported
 @login_required
 def carousel_template_builder_view(request):
     return render(request, 'registration/chat/carousel_template_builder.html')
+
+
+# registration/views.py
+from .whats_app import upload_media_for_template_handle # Add this import
+
+@csrf_exempt
+@login_required
+def upload_template_media_api_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+    try:
+        media_file = request.FILES.get('file')
+        if not media_file:
+            return JsonResponse({'status': 'error', 'message': 'No file provided'}, status=400)
+
+        handle = upload_media_for_template_handle(media_file)
+
+        if handle:
+            return JsonResponse({'status': 'success', 'handle': handle})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Failed to get handle from Meta'}, status=500)
+    
+    except Exception as e:
+        logger.error(f"Error in upload_template_media_api_view: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
 
 @csrf_exempt
 @login_required
@@ -750,6 +884,8 @@ def create_template_api_view(request):
             "Content-Type": "application/json",
         }
 
+        print("=== Sending template data ===")
+        print(json.dumps(template_data, indent=2))
         # Forward the request to the Meta API
         response = requests.post(url, json=template_data, headers=headers)
         
@@ -760,7 +896,52 @@ def create_template_api_view(request):
         logger.error(f"Error creating template: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
+# registration/views.py
+from datetime import datetime
+from django.core.files.storage import default_storage
+from .tasks import send_scheduled_template_campaign
 
+@csrf_exempt
+@login_required
+def schedule_template_api_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        recipients = request.POST.getlist('recipients[]')
+        template_name = request.POST.get('template_name')
+        params = request.POST.getlist('params[]')
+        scheduled_time_str = request.POST.get('scheduled_time')
+        media_file = request.FILES.get('header_image')
+
+        if not all([recipients, template_name, scheduled_time_str]):
+            return JsonResponse({'status': 'error', 'message': 'Missing required fields.'}, status=400)
+
+        # Convert the string from the form into a datetime object
+        naive_dt = datetime.fromisoformat(scheduled_time_str)
+
+        # 2. Make the datetime object "aware" of your project's local timezone (e.g., IST)
+        aware_dt = timezone.make_aware(naive_dt, timezone.get_current_timezone())
+        
+        media_file_path = None
+        if media_file:
+            # We must save the file first, as we can't pass the file object to Celery.
+            # We pass the file's path instead.
+            media_file_path = default_storage.save(f"temp/{media_file.name}", media_file)
+
+        # Create the Celery task with a scheduled time (eta)
+        send_scheduled_template_campaign.apply_async(
+            args=[recipients, template_name, params, media_file_path],
+            eta=aware_dt
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Campaign for template "{template_name}" has been scheduled for {scheduled_time_str}.'
+        })
+    except Exception as e:
+        logger.error(f"Error scheduling campaign: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 # registration/views.py
 import json # Make sure this is imported
 
@@ -873,6 +1054,33 @@ def template_builder_view(request):
 def chat_contact_list_view(request):
     contacts = ChatContact.objects.all().order_by(F('last_contact_at').desc(nulls_last=True))
     return render(request, 'registration/chat/chat_list.html', {'contacts': contacts})
+
+def template_sch_view(request):
+    
+    templates_data = []
+    error = None
+    contacts = ChatContact.objects.all()
+    try:
+        META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+        
+        WABA_ID="1477047197063313"
+        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        # Filter for only approved templates
+        all_templates = response.json().get('data', [])
+        templates_data = [t for t in all_templates if t.get('status') == 'APPROVED']
+    except Exception as e:
+        logger.error(f"Failed to fetch templates: {e}")
+        error = "Could not load templates from Meta API. Please check your credentials."
+
+    
+    return render(request, 'registration/chat/template_sender_sch.html', {
+        "templates": templates_data,
+        "contacts": contacts,
+        "error": error,
+    })
 
 @login_required
 def chat_detail_view(request, wa_id):
@@ -1010,6 +1218,71 @@ def send_reply_api_view(request):
         return JsonResponse({'status': 'success', 'data': response_data})
     else:
         return JsonResponse({'status': 'error', 'data': response_data}, status=500)
+
+# registration/views.py
+# ... add these imports at the top
+from .models import Flow
+import json
+
+# ...
+
+
+def get_whatsapp_templates_api(request):
+    """API endpoint to fetch approved WhatsApp templates for the React frontend."""
+    # This logic is copied from your `template_sender_view`
+    try:
+        META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+        
+        WABA_ID="1477047197063313"
+        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        all_templates = response.json().get('data', [])
+        
+        # We need to extract button texts for the frontend
+        templates_data = []
+        for t in all_templates:
+            if t.get('status') == 'APPROVED':
+                buttons = []
+                for comp in t.get('components', []):
+                    if comp.get('type') == 'BUTTONS':
+                        for btn in comp.get('buttons', []):
+                            buttons.append(btn.get('text'))
+                templates_data.append({'id': t.get('name'), 'name': t.get('name'), 'buttons': buttons})
+        
+        return JsonResponse(templates_data, safe=False)
+    except Exception as e:
+        logger.error(f"Failed to fetch templates for API: {e}")
+        return JsonResponse({"error": "Could not load templates."}, status=500)
+
+# NEW API VIEW 2: To save the flow from React
+@csrf_exempt
+
+def save_flow_api(request):
+    """API endpoint to save a flow definition from the React frontend."""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            template_name = data.get('template_name')
+            flow_data = data.get('flow')
+            
+            if not template_name or not flow_data:
+                return JsonResponse({'status': 'error', 'message': 'Missing template_name or flow data.'}, status=400)
+
+            # Use update_or_create to save the flow
+            flow_obj, created = Flow.objects.update_or_create(
+                template_name=template_name,
+                defaults={'flow_data': flow_data}
+            )
+            
+            status_message = "Flow created successfully." if created else "Flow updated successfully."
+            return JsonResponse({'status': 'success', 'message': status_message})
+        except Exception as e:
+            logger.error(f"Error saving flow: {e}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
 
 
 def success_view(request):

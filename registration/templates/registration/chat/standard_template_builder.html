@@ -1,0 +1,239 @@
+{% extends 'registration/job/base.html' %}
+
+{% block extra_head %}
+<style>
+    .builder-container { display: flex; flex-wrap: wrap; gap: 30px; }
+    .builder-panel { flex: 2; min-width: 400px; }
+    .preview-panel { flex: 1; min-width: 320px; }
+    .component-box { border: 1px solid #eee; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+    .phone-preview { width: 320px; height: 580px; background: #111; border-radius: 40px; padding: 15px; margin: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .phone-screen { background: #ece5dd; height: 100%; border-radius: 25px; padding: 10px; display: flex; flex-direction: column; font-family: sans-serif; overflow-y: auto; }
+    .preview-header-image { width: 100%; border-radius: 12px; margin-bottom: 8px; }
+    .preview-header-text { font-weight: bold; font-size: 1.1em; padding: 8px 12px; margin-bottom: 5px; word-wrap: break-word; }
+    .preview-body { background: #fff; padding: 10px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); max-width: 90%; font-size: 14px; line-height: 1.4; word-break: break-word; white-space: pre-wrap; }
+    .preview-body p, .preview-footer p { margin: 0; }
+    .preview-footer { font-size: 12px; color: #888; padding: 8px 12px; max-width: 90%;}
+    .preview-buttons-container { margin-top: auto; padding-top: 10px; }
+    .preview-button { background: #f8f8f8; color: #007bff; text-align: center; padding: 10px; border-radius: 8px; margin-top: 5px; font-size: 14px; cursor: pointer; }
+    #api-response-pre { background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Standard Template Builder</h2>
+    <div class="builder-container">
+        <div class="builder-panel">
+            <form id="template-form">
+                {% csrf_token %}
+                <h4>1. Template Information</h4>
+                <div class="component-box">
+                    <div class="form-group"><label>Template Name</label><input type="text" id="template-name" class="form-control" placeholder="e.g., order_update (lowercase_and_underscores)" required></div>
+                    <div class="form-group"><label>Category</label><select id="template-category" class="form-control"><option value="MARKETING">Marketing</option><option value="UTILITY">Utility</option><option value="AUTHENTICATION">Authentication</option></select></div>
+                    <div class="form-group"><label>Language</label><input type="text" id="template-language" class="form-control" value="en_US" placeholder="e.g., en_US, hi" required></div>
+                </div>
+
+                <h4>2. Template Components</h4>
+                <div class="component-box">
+                    <h5>Header (Optional)</h5>
+                    <select id="header-type" class="form-control">
+                        <option value="NONE">None</option>
+                        <option value="TEXT">Text</option>
+                        <option value="IMAGE">Image</option>
+                        <option value="VIDEO">Video</option>
+                        <option value="DOCUMENT">Document</option>
+                    </select>
+                    <div id="header-text-group" class="form-group mt-2" style="display: none;">
+                        <label>Header Text (Max 60 chars. Use {{1}} for one variable)</label>
+                        <input type="text" id="header-text" class="form-control" maxlength="60">
+                    </div>
+                </div>
+
+                <div class="component-box">
+                    <h5>Body</h5>
+                    <textarea id="body-text" class="form-control" rows="8" placeholder="Enter your message here... Use {{1}}, {{2}}, etc., for variables." required></textarea>
+                    <button type="button" id="add-param-btn" class="btn btn-secondary btn-sm mt-2">Add Parameter {{n}}</button>
+                    <div class="form-group mt-2">
+                        <label>Example Body Variables (comma-separated)</label>
+                        <input type="text" id="body-examples" class="form-control" placeholder="e.g., John Doe, #12345, Shipped">
+                    </div>
+                </div>
+
+                <div class="component-box">
+                    <h5>Footer (Optional)</h5>
+                    <input type="text" id="footer-text" class="form-control" placeholder="e.g., Your Company Name" maxlength="60">
+                </div>
+
+                <div class="component-box">
+                    <h5>Buttons (Optional)</h5>
+                    <div id="quick-reply-buttons">
+                        <label>Quick Reply Buttons (Max 3)</label>
+                        <input type="text" class="form-control mb-1 quick-reply-input" placeholder="Button 1 Text">
+                        <input type="text" class="form-control mb-1 quick-reply-input" placeholder="Button 2 Text (Optional)">
+                        <input type="text" class="form-control mb-1 quick-reply-input" placeholder="Button 3 Text (Optional)">
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-lg mt-3">Create Template</button>
+            </form>
+        </div>
+
+        <div class="preview-panel">
+            <h4>Live Preview</h4>
+            <div class="phone-preview">
+                <div class="phone-screen">
+                    <div id="preview-header-text" class="preview-header-text" style="display: none;"></div>
+                    <div class="preview-body"><p id="preview-body-text"></p></div>
+                    <div class="preview-footer"><p id="preview-footer-text"></p></div>
+                    <div id="preview-buttons-container" class="preview-buttons-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="response-container" class="mt-4" style="display:none;">
+        <h4>API Response</h4>
+        <pre id="api-response-pre"></pre>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_script %}
+<script>
+    const createTemplateUrl = "{% url 'registration:create_template_api' %}";
+    const csrfToken = "{{ csrf_token }}";
+
+    {% verbatim %}
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('template-form');
+        const allInputs = form.querySelectorAll('input, select, textarea');
+        
+        const preview = {
+            headerText: document.getElementById('preview-header-text'),
+            bodyText: document.getElementById('preview-body-text'),
+            footerText: document.getElementById('preview-footer-text'),
+            buttons: document.getElementById('preview-buttons-container'),
+        };
+
+        function updatePreview() {
+            // Update Header
+            const headerType = document.getElementById('header-type').value;
+            const headerTextEl = document.getElementById('header-text');
+            if (headerType === 'TEXT' && headerTextEl.value) {
+                preview.headerText.style.display = 'block';
+                let headerContent = headerTextEl.value.replace('{{1}}', '[Example Header]');
+                preview.headerText.textContent = headerContent;
+            } else {
+                preview.headerText.style.display = 'none';
+            }
+            if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerType)) {
+                preview.headerText.style.display = 'block';
+                preview.headerText.textContent = `[Example ${headerType}]`;
+            }
+
+            // Update Body
+            let bodyText = document.getElementById('body-text').value;
+            const bodyExamples = document.getElementById('body-examples').value.split(',').map(s => s.trim());
+            bodyText = bodyText.replace(/\{\{(\d+)\}\}/g, (match, n) => {
+                return `[${bodyExamples[n-1] || 'param' + n}]`;
+            });
+            preview.bodyText.textContent = bodyText;
+
+            // Update Footer
+            preview.footerText.textContent = document.getElementById('footer-text').value;
+            
+            // Update Buttons
+            preview.buttons.innerHTML = '';
+            document.querySelectorAll('.quick-reply-input').forEach(input => {
+                if (input.value) {
+                    const btnDiv = document.createElement('div');
+                    btnDiv.className = 'preview-button';
+                    btnDiv.textContent = input.value;
+                    preview.buttons.appendChild(btnDiv);
+                }
+            });
+        }
+        
+        allInputs.forEach(input => input.addEventListener('input', updatePreview));
+
+        document.getElementById('header-type').addEventListener('change', (e) => {
+            document.getElementById('header-text-group').style.display = e.target.value === 'TEXT' ? 'block' : 'none';
+        });
+
+        document.getElementById('add-param-btn').addEventListener('click', () => {
+            const bodyTextEl = document.getElementById('body-text');
+            const currentParamCount = (bodyTextEl.value.match(/\{\{/g) || []).length;
+            bodyTextEl.value += `{{${currentParamCount + 1}}}`;
+            updatePreview();
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('template-name').value.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+                language: document.getElementById('template-language').value,
+                category: document.getElementById('template-category').value,
+                components: []
+            };
+
+            // Build Header Component
+            const headerType = document.getElementById('header-type').value;
+            if (headerType !== 'NONE') {
+                const headerComponent = { type: 'HEADER', format: headerType };
+                if (headerType === 'TEXT') {
+                    headerComponent.text = document.getElementById('header-text').value;
+                }
+                // NOTE: For media headers, you must add an 'example' with a handle.
+                // This basic builder doesn't include that step.
+                payload.components.push(headerComponent);
+            }
+
+            // Build Body Component
+            const bodyText = document.getElementById('body-text').value;
+            const bodyComponent = { type: 'BODY', text: bodyText };
+            const bodyExamples = document.getElementById('body-examples').value.split(',').map(s => s.trim()).filter(s => s);
+            if (bodyExamples.length > 0) {
+                bodyComponent.example = { body_text: [bodyExamples] };
+            }
+            payload.components.push(bodyComponent);
+
+            // Build Footer Component
+            const footerText = document.getElementById('footer-text').value;
+            if (footerText) {
+                payload.components.push({ type: 'FOOTER', text: footerText });
+            }
+
+            // Build Buttons Component
+            const buttons = [];
+            document.querySelectorAll('.quick-reply-input').forEach(input => {
+                if (input.value) {
+                    buttons.push({ type: 'QUICK_REPLY', text: input.value });
+                }
+            });
+            if (buttons.length > 0) {
+                payload.components.push({ type: 'BUTTONS', buttons: buttons });
+            }
+            
+            // --- API Call ---
+            const responseContainer = document.getElementById('response-container');
+            const apiResponsePre = document.getElementById('api-response-pre');
+            try {
+                const response = await fetch(createTemplateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                apiResponsePre.textContent = JSON.stringify(result, null, 2);
+                responseContainer.style.display = 'block';
+            } catch (error) {
+                apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
+            }
+        });
+        updatePreview();
+    });
+    {% endverbatim %}
+</script>
+{% endblock %}

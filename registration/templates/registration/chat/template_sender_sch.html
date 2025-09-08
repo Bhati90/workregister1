@@ -1,0 +1,317 @@
+{% extends 'registration/job/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="template-sender-container">
+        <!-- Sender Panel -->
+        <div class="sender-panel">
+            <h2>WhatsApp Template Sender</h2>
+
+            {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+            {% else %}
+            <form id="sender-form" 
+                  enctype="multipart/form-data"
+                  
+                  data-csrf="{{ csrf_token }}">
+                {% csrf_token %}
+                <input type="hidden" name="template_name" id="hidden-template-name">
+
+                <!-- Template Dropdown -->
+                <div class="form-group">
+                    <label for="template-select">Select Template</label>
+                    <select id="template-select" class="form-control">
+                        <option value="" disabled selected>-- Choose a template --</option>
+                        {% for t in templates %}
+                            <option value="{{ t.name }}">{{ t.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Dynamic Fields -->
+                <div id="dynamic-fields" class="mt-3" style="display: none;">
+                    <!-- <div class="form-group">
+                        <label for="recipient-input">Recipient Phone Number</label>
+                        <input type="text" name="recipient" id="recipient-input" class="form-control" placeholder="e.g., 919876543210" required>
+                    </div> -->
+                    <div class="form-group">
+    <label for="contact-select">Select Recipients</label>
+    <select id="contact-select" name="recipients[]" class="form-control" multiple required>
+        {% for c in contacts %}
+            <option value="{{ c.wa_id }}" data-name="{{ c.name }}">{{ c.name|default:c.wa_id }}</option>
+        {% endfor %}
+    </select>
+    <small class="form-text text-muted">Hold CTRL (Windows) or CMD (Mac) to select multiple.</small>
+</div>
+
+                    <!-- Header Image -->
+                    <div id="header-image-container" class="form-group" style="display: none;">
+                        <label for="header-image-input">Header Image</label>
+                        <input type="file" name="header_image" id="header-image-input" class="form-control" accept="image/png, image/jpeg">
+                    </div>
+
+                    <!-- Params -->
+                    <div id="params-container"></div>
+                      <div class="form-group mt-3">
+                            <label for="scheduled-time"><b>Schedule for a future time</b></label>
+                            <input type="datetime-local" id="scheduled-time" name="scheduled_time" class="form-control" required>
+                        </div>
+
+                        <button type="submit" class="send-button">Schedule Campaign</button>
+                    <!-- <button type="submit" class="send-button">Send Message</button> -->
+                </div>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Preview Panel -->
+        <div class="preview-panel">
+            <h4>Live Preview</h4>
+            <div class="phone-preview">
+                <div class="phone-screen">
+                    <div id="preview-header-image-wrapper" style="display: none;">
+                        <img src="" alt="Header preview" class="preview-header-image">
+                    </div>
+                    <div id="preview-header-placeholder" class="preview-header-placeholder" style="display: none;">[Header Image]</div>
+                    <div class="preview-body">
+                        <p id="preview-text">Select a template to see a preview.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Response -->
+    <div id="response-container" class="mt-4" style="display:none;">
+        <h4>API Response</h4>
+        <pre id="api-response-pre"></pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .template-sender-container { display: flex; gap: 30px; }
+    .sender-panel, .preview-panel { flex: 1; }
+    .form-group { margin-bottom: 1rem; }
+    .send-button {
+        width: 100%; padding: 12px; margin-top: 20px;
+        font-size: 1.1em; background-color: #28a745; color: white;
+        border: none; border-radius: 5px; cursor: pointer;
+    }
+    .phone-preview {
+    width: 360px;
+    height: 640px;
+    background: #111;
+    border-radius: 40px;
+    padding: 20px;
+    margin: auto;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    position: relative;
+}
+
+.phone-screen {
+    background: #ece5dd;
+    height: 100%;
+    border-radius: 20px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+.preview-header-image {
+    width: 100%;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.preview-header-placeholder {
+    width: 100%;
+    height: 180px;
+    background: #d9d9d9;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    font-weight: bold;
+}
+
+.preview-body {
+    background: #fff;
+    padding: 12px 14px;
+    border-radius: 8px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    max-width: 85%;
+    font-size: 15px;
+    line-height: 1.4;
+    color: #111;
+    margin-bottom: 8px;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+/* Add a little tail like WhatsApp bubbles */
+.preview-body::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: -8px;
+    width: 0;
+    height: 0;
+    border-top: 8px solid #fff;
+    border-right: 8px solid transparent;
+}
+
+/* Scrollbar hidden */
+.phone-screen::-webkit-scrollbar {
+    display: none;
+}
+
+    .preview-body p { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
+    #api-response-pre {
+        background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px;
+    }
+</style>
+{% endblock %}
+
+{% block extra_script %}
+{{ templates|json_script:"templates-data" }}
+
+<script>
+    // 1. Get Django-rendered values and store them in JavaScript variables FIRST.
+    const scheduleApiUrl = "{% url 'registration:schedule_template_api' %}";
+    const csrfToken = "{{ csrf_token }}";
+
+    // 2. Wrap all pure JavaScript logic in verbatim to prevent template errors.
+    {% verbatim %}
+    document.addEventListener('DOMContentLoaded', () => {
+        const templatesData = JSON.parse(document.getElementById('templates-data').textContent);
+        const senderForm = document.getElementById('sender-form');
+        const templateSelect = document.getElementById('template-select');
+        const contactSelect = document.getElementById('contact-select');
+        const dynamicFields = document.getElementById('dynamic-fields');
+        const paramsContainer = document.getElementById('params-container');
+        const headerImageContainer = document.getElementById('header-image-container');
+        const headerImageInput = document.getElementById('header-image-input');
+        
+        // Preview Elements
+        const previewText = document.getElementById('preview-text');
+        const previewHeaderPlaceholder = document.getElementById('preview-header-placeholder');
+        const previewHeaderImageWrapper = document.getElementById('preview-header-image-wrapper');
+        const previewHeaderImage = previewHeaderImageWrapper.querySelector('img');
+
+        // Response Elements
+        const responseContainer = document.getElementById('response-container');
+        const apiResponsePre = document.getElementById('api-response-pre');
+        
+        let currentTemplate = null;
+
+        // --- UNIFIED PREVIEW FUNCTION ---
+        function updatePreview() {
+            if (!currentTemplate) return;
+
+            let bodyComponent = currentTemplate.components.find(c => c.type === 'BODY');
+            if (!bodyComponent) return;
+            
+            let bodyText = bodyComponent.text || '';
+
+            // A. Handle special variables like $name from contact selection
+            const selectedContact = contactSelect.selectedOptions[0];
+            if (selectedContact && selectedContact.dataset.name) {
+                bodyText = bodyText.replace(/\$name/g, selectedContact.dataset.name);
+            }
+
+            // B. Handle numbered parameters from input fields
+            const paramInputs = paramsContainer.querySelectorAll('.param-input');
+            paramInputs.forEach((input, index) => {
+                const paramValue = input.value || `{{${index + 1}}}`;
+                const placeholder = new RegExp(`\\{\\{${index + 1}\\}\\}`, "g");
+                bodyText = bodyText.replace(placeholder, paramValue);
+            });
+            
+            previewText.textContent = bodyText;
+        }
+
+        // --- EVENT LISTENERS ---
+        templateSelect.addEventListener('change', (e) => {
+            const selectedName = e.target.value;
+            currentTemplate = templatesData.find(t => t.name === selectedName);
+            if (!currentTemplate) return;
+            
+            senderForm.querySelector('#hidden-template-name').value = selectedName;
+            paramsContainer.innerHTML = '';
+            dynamicFields.style.display = 'block';
+
+            const bodyComponent = currentTemplate.components.find(c => c.type === 'BODY');
+            const paramCount = (bodyComponent?.text?.match(/\{\{/g) || []).length;
+            
+            for (let i = 1; i <= paramCount; i++) {
+                const group = document.createElement('div');
+                group.className = 'form-group';
+                const label = document.createElement('label');
+                label.textContent = `Parameter {{${i}}}`;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.name = 'params[]';
+                input.className = 'form-control param-input';
+                input.addEventListener('input', updatePreview); // Hooks into the unified preview
+                group.appendChild(label);
+                group.appendChild(input);
+                paramsContainer.appendChild(group);
+            }
+
+            const needsImage = currentTemplate.components.some(c => c.type === 'HEADER' && c.format === 'IMAGE');
+            headerImageContainer.style.display = needsImage ? 'block' : 'none';
+            previewHeaderPlaceholder.style.display = needsImage ? 'flex' : 'none';
+            previewHeaderImageWrapper.style.display = 'none';
+            headerImageInput.value = '';
+            updatePreview(); // Initial preview update
+        });
+
+        headerImageInput.addEventListener('change', () => {
+            if (headerImageInput.files && headerImageInput.files[0]) {
+                previewHeaderImage.src = URL.createObjectURL(headerImageInput.files[0]);
+                previewHeaderPlaceholder.style.display = 'none';
+                previewHeaderImageWrapper.style.display = 'block';
+            }
+        });
+
+        // Contact selection now also hooks into the unified preview
+        contactSelect.addEventListener("change", updatePreview);
+
+        // --- FORM SUBMISSION ---
+        senderForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(senderForm);
+            const sendButton = senderForm.querySelector('.send-button');
+            
+            sendButton.disabled = true;
+            sendButton.textContent = 'Scheduling...';
+
+            try {
+                // 3. Use the JavaScript variables for the fetch call
+                const response = await fetch(scheduleApiUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                const result = await response.json();
+                apiResponsePre.textContent = JSON.stringify(result, null, 2);
+                responseContainer.style.display = 'block';
+            } catch (error) {
+                apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
+                responseContainer.style.display = 'block';
+            } finally {
+                sendButton.disabled = false;
+                sendButton.textContent = 'Schedule Campaign';
+            }
+        });
+    });
+    {% endverbatim %}
+</script>
+{% endblock %}

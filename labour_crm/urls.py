@@ -35,7 +35,7 @@ urlpatterns = [
     # For now, keep it, but understand it might conflict with PWA's root handling.
     # The PWA START_URL is /register/registration/, so this root path might be for general site landing.
     path('', registration_views.home_view, name='root'),
-
+    path('api/', include('registration.urls', namespace='registration')),
     # A catch-all for development if you have a separate offline page.
     path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline_page'),
 ]

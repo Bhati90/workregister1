@@ -38,6 +38,11 @@
                 </div>
 
                 <div class="component-box">
+    <h4>Body Text (Appears above the carousel)</h4>
+    <textarea id="template-body-text" class="form-control" rows="3" placeholder="Enter the main message text here..."></textarea>
+</div>
+
+                <div class="component-box">
                     <h4>2. Carousel Cards (Max 10)</h4>
                     <div id="cards-container">
                         </div>
@@ -72,10 +77,20 @@
     <div class="card-editor">
         <button type="button" class="btn-close remove-card-btn" aria-label="Close"></button>
         <h5 class="card-title">Card</h5>
-        <div class="form-group"><label>Header Image URL (Example)</label><input type="text" class="form-control card-header-image" placeholder="https://example.com/image.png"></div>
+         <div class="form-group">
+          <label>Image Media ID</label>
+          <input type="text" class="form-control card-image-id" placeholder="Enter uploaded image ID">
+      </div>
         <div class="form-group"><label>Body Text</label><textarea class="form-control card-body" rows="4"></textarea></div>
-        <div class="form-group"><label>Button 1 (Quick Reply)</label><input type="text" class="form-control card-button" placeholder="Button Text"></div>
-    </div>
+        <div class="form-group">
+  <label>Button 1 (Quick Reply)</label>
+  <input type="text" class="form-control card-button" placeholder="Button Text">
+</div>
+<div class="form-group">
+  <label>URL Button Example Value (e.g. BLUE_ELF)</label>
+  <input type="text" class="form-control card-url-example" placeholder="e.g. BLUE_ELF">
+</div>
+  </div>
 </template>
 {% endblock %}
 
@@ -174,68 +189,113 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addCardBtn.addEventListener('click', addCard);
     // --- FORM SUBMISSION ---
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        // --- Build the JSON Payload ---
-        const payload = {
-            name: document.getElementById('template-name').value,
-            language: document.getElementById('template-language').value,
-            category: document.getElementById('template-category').value,
-            allow_category_change: true,
-            components: []
-        };
+   // In carousel_template_builder.html -> inside the <script> tag
 
-        const carouselButtonComponent = {
-            type: 'BUTTONS',
-            buttons: [{
-                type: 'CAROUSEL',
-                cards: []
-            }]
-        };
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-        cardsContainer.querySelectorAll('.card-editor').forEach((editor, index) => {
-            const card = {
-                card_index: index,
-                components: []
-            };
-            // Header
-            const headerUrl = editor.querySelector('.card-header-image').value;
-            if(headerUrl) card.components.push({ type: 'HEADER', format: 'IMAGE', example: { header_handle: [headerUrl] }});
-            // Body
-            const bodyText = editor.querySelector('.card-body').value;
-            if(bodyText) card.components.push({ type: 'BODY', text: bodyText });
-            // Buttons
-            const buttonText = editor.querySelector('.card-button').value;
-            if(buttonText) card.components.push({ type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: buttonText }] });
-            
-            carouselButtonComponent.buttons[0].cards.push(card);
+    const payload = {
+        name: document.getElementById('template-name').value,
+        language: document.getElementById('template-language').value,
+        category: document.getElementById('template-category').value.toUpperCase(),
+        allow_category_change: true,
+        components: []
+    };
+
+    // ✅ Body with variables and example
+    const mainBodyText = document.getElementById('template-body-text').value;
+    if (mainBodyText) {
+        payload.components.push({
+            type: 'body',
+            text: mainBodyText,
+            example: {
+                body_text: [["Pablo", "30%", "30OFF"]] // <- You can make this dynamic if needed
+            }
         });
+    }
 
-        payload.components.push(carouselButtonComponent);
+    // ✅ Carousel block
+    const carouselComponent = {
+        type: 'carousel',
+        cards: []
+    };
 
-        // --- Send to API ---
-        const responseContainer = document.getElementById('response-container');
-        const apiResponsePre = document.getElementById('api-response-pre');
-        
-        try {
-            const response = await fetch("{% url 'registration:create_template_api' %}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify(payload)
+    cardsContainer.querySelectorAll('.card-editor').forEach((editor, index) => {
+        const card = { components: [] };
+
+        // ✅ Header image
+        const imageId = editor.querySelector('.card-image-id')?.value;
+        if (imageId) {
+            card.components.push({
+                type: 'header',
+                format: 'image', // Note: lowercase "image"
+                example: {
+                    header_handle: [imageId]
+                }
             });
-            const result = await response.json();
-            apiResponsePre.textContent = JSON.stringify(result, null, 2);
-            responseContainer.style.display = 'block';
-
-        } catch (error) {
-            apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
-            responseContainer.style.display = 'block';
         }
+
+        // ✅ Body text (optional)
+        const bodyText = editor.querySelector('.card-body')?.value;
+        if (bodyText) {
+            card.components.push({
+                type: 'body',
+                text: bodyText
+            });
+        }
+
+        // ✅ Buttons (supports 2: quick_reply and URL with example)
+        const buttonText = editor.querySelector('.card-button')?.value;
+        if (buttonText) {
+            card.components.push({
+                type: 'buttons',
+                buttons: [
+                    {
+                        type: 'quick_reply',
+                        text: "Send me more like this!"
+                    },
+                    {
+                        type: 'url',
+                        text: "Shop",
+                        url: `https://www.luckyshrub.com/rare-succulents/{{1}}`,
+                        example: [
+                            ["BLUE_ELF", "BUDDHA", "BLACK_PRINCE"][index] || "PLANT"
+                        ]
+                    }
+                ]
+            });
+        }
+
+        carouselComponent.cards.push(card);
     });
 
-    // --- INITIALIZE ---
-    addCard();
+    if (carouselComponent.cards.length > 0) {
+        payload.components.push(carouselComponent);
+    }
+
+    // --- API call ---
+    const responseContainer = document.getElementById('response-container');
+    const apiResponsePre = document.getElementById('api-response-pre');
+
+    try {
+        const response = await fetch("{% url 'registration:create_template_api' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        apiResponsePre.textContent = JSON.stringify(result, null, 2);
+        responseContainer.style.display = 'block';
+    } catch (error) {
+        apiResponsePre.textContent = JSON.stringify({ error: error.message }, null, 2);
+        responseContainer.style.display = 'block';
+    }
+});
+addCard();
 });
 </script>
-{% endblock %}
+{% endblock %} 
