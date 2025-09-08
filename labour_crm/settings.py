@@ -2,17 +2,15 @@
 from pathlib import Path
 import os
 import dj_database_url
-
+import cloudinary
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'replace-this-in-production')
-DEBUG = 'True'
-# ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
-CORS_ALLOWED_ORIGINS = [
-      "*"  # Your React development server
-]
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -23,11 +21,17 @@ CORS_ALLOWED_ORIGINS = [
 # DEBUG = True
   # Allow all origins for CORS (not recommended for production)
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = ['*']
 AUTH_USER_MODEL = 'auth.User' 
 
 # Application definition
 # Configure Cloudinary (you already have this, but make sure it's properly set)
+cloudinary.config(
+    cloud_name="df8f5bxfp",  # Your cloud name from the URL
+    api_key="196762722111821",  # Your API key from the URL  
+    api_secret="nKpyWbKl0UAdaqgkjI9W0HpQkR4",  # Your API secret from the URL
+    secure=True
+)
 
 # Optional: Add logging configuration for better debugging
 LOGGING = {
@@ -60,8 +64,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
- # Django staticfiles
-    'whitenoise.storage',
     # 'authentication', 
     #       # PWA support
     'cloudinary',
@@ -121,12 +123,7 @@ DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL'),
         conn_max_age=600,
-    ),
-    
-}
-
-DATABASES['default']['OPTIONS'] = {
-    'client_encoding': 'UTF8',
+    )
 }
 # --- TEMPORARY DEBUG PRINT ---
 print("\n--- DEBUG: DATABASES CONFIG ---")
@@ -159,28 +156,22 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Kolkata'
+TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
 USE_TZ = True
-
+MEDIA_URL = '/media/'
 # MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 # Static & Media
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR/'media' # 
-
-# # Static files (CSS, JavaScript, Images)
-# # https://docs.djangoproject.com/en/5.2/howto/static-files/
-# Static & Media
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR/'static']
-STATIC_ROOT = BASE_DIR/'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' # <--- CORRECTED TYPO HERE
+
 
 # PWA Settings
 PWA_APP_NAME = 'AgroIntel'
@@ -210,6 +201,14 @@ PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'registration', 'static', 'regi
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = True
 
+# --- Cloudinary Storage Configuration ---
+CLOUDINARY_STORAGE = {
+    'CLOUDINARY_URL':'cloudinary://196762722111821:nKpyWbKl0UAdaqgkjI9W0HpQkR4@df8f5bxfp'
+    # It's recommended to store this URL in an environment variable for security
+}
+
+# Set Cloudinary as the default file storage
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 
