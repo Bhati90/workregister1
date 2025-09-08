@@ -11,7 +11,6 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'replace-this-in-production')
 DEBUG = 'True'
 # ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 CORS_ALLOWED_ORIGINS = [
-    "https://luminous-cuchufli-a8fc9e.netlify.app",
       "*"  # Your React development server
 ]
 # Quick-start development settings - unsuitable for production
@@ -24,7 +23,7 @@ CORS_ALLOWED_ORIGINS = [
 # DEBUG = True
   # Allow all origins for CORS (not recommended for production)
 
-# ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*']
 AUTH_USER_MODEL = 'auth.User' 
 
 # Application definition
