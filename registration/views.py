@@ -360,6 +360,7 @@ def submit_registration_api(request):
         return JsonResponse({'status': 'error', 'message': 'An unexpected server error occurred.'}, status=500)
 
 
+
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .models import ChatContact, Message
