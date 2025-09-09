@@ -1,0 +1,84 @@
+{% extends 'registration/job/base.html' %}
+
+
+{% block title %}WhatsApp Template Inspector{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h3>WhatsApp Template Inspector</h3>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Click the button to fetch and display the full JSON schema for all approved WhatsApp templates directly from the Meta API.</p>
+            
+            <button id="fetch-templates-btn" class="btn btn-primary">Fetch All Templates</button>
+            <hr>
+            
+            <div id="spinner" class="d-none text-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+            
+            <div id="error-container" class="alert alert-danger d-none"></div>
+            
+            <div id="inspector-results">
+                <!-- Template data will be dynamically inserted here by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('fetch-templates-btn').addEventListener('click', async () => {
+    const spinner = document.getElementById('spinner');
+    const resultsContainer = document.getElementById('inspector-results');
+    const errorContainer = document.getElementById('error-container');
+
+    // Show spinner and clear previous results
+    spinner.classList.remove('d-none');
+    resultsContainer.innerHTML = '';
+    errorContainer.classList.add('d-none');
+
+    try {
+        // Fetch data from the new API endpoint
+        const response = await fetch("{% url 'registration:template_inspector_api' %}");
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
+        
+        const templates = await response.json();
+        
+        if (templates.length === 0) {
+            resultsContainer.innerHTML = '<div class="alert alert-info">No approved templates found.</div>';
+        } else {
+            templates.forEach(template => {
+                const templateCard = `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <strong>Template Name: ${template.name}</strong>
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title">Full JSON Schema</h5>
+                            <pre class="bg-dark text-white p-3 mt-2 rounded"><code>${JSON.stringify(template, null, 4)}</code></pre>
+                        </div>
+                    </div>
+                `;
+                resultsContainer.innerHTML += templateCard;
+            });
+        }
+
+    } catch (error) {
+        console.error('Failed to fetch templates:', error);
+        errorContainer.textContent = `Error: ${error.message}`;
+        errorContainer.classList.remove('d-none');
+    } finally {
+        // Hide spinner
+        spinner.classList.add('d-none');
+    }
+});
+</script>
+{% endblock %}

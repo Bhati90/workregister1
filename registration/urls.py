@@ -36,6 +36,8 @@ urlpatterns = [
     path('carousel-builder/', views.carousel_template_builder_view, name='carousel_template_builder'),
     path('template-builder/', views.standard_template_builder_view, name='standard_template_builder'),
 
+    path('api/template-inspector/', views.template_inspector_api_view, name='template_inspector_api'),
+    path('template-inspector/', views.template_inspector_page_view, name='template_inspector_page'),
 
     # This is an API endpoint for sending replies from the frontend
     path('api/chat/send-reply/', views.send_reply_api_view, name='send_reply_api'),

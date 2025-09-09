@@ -604,25 +604,64 @@ from .whats_app import upload_media_to_meta, send_whatsapp_message, save_outgoin
 
 logger = logging.getLogger(__name__)
 
+def template_inspector_page_view(request):
+    return render(request, 'registration/chat/template_inspector.html')
+
+def template_inspector_api_view(request):
+    """
+    API endpoint that returns the full JSON schema for all approved templates.
+    """
+    try:
+        META_ACCESS_TOKEN = "EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+        WABA_ID = "1477047197063313"
+        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status,category,language"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        all_templates = response.json().get('data', [])
+        
+        # Filter for only approved templates
+        approved_templates = [t for t in all_templates if t.get('status') == 'APPROVED']
+        
+        # Manually create an HttpResponse to force UTF-8 encoding.
+        json_response = json.dumps(approved_templates, indent=4, ensure_ascii=False)
+        return HttpResponse(json_response, content_type="application/json; charset=utf-8")
+
+    except Exception as e:
+        logger.error(f"Failed to fetch templates for API: {e}")
+        error_json = json.dumps({"error": "Could not load templates from Meta API."})
+        return HttpResponse(error_json, content_type="application/json; charset=utf-8", status=500)
+
 @login_required
 def template_sender_view(request):
     """
-    Fetches ALL approved templates from the Meta API and renders the sender tool page.
+    Fetches ALL approved templates from the Meta API and renders an inspector
+    and sender tool page, showing the full JSON schema for each template.
     """
     templates_data = []
     error = None
     contacts = ChatContact.objects.all()
     try:
-        META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
-        
-        WABA_ID="1477047197063313"
+        META_ACCESS_TOKEN = "EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+        WABA_ID = "1477047197063313"
         url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status,category,language"
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        
         response = requests.get(url, headers=headers)
         response.raise_for_status()
 
         all_templates = response.json().get('data', [])
-        templates_data = [t for t in all_templates if t.get('status') == 'APPROVED']
+        
+        # ** MODIFIED PART **
+        # Process templates to add a human-readable version of their FULL JSON schema.
+        for t in all_templates:
+            if t.get('status') == 'APPROVED':
+                # Add a new key with the formatted JSON of the entire template object
+                t['pretty_json'] = json.dumps(t, indent=4, ensure_ascii=False)
+                templates_data.append(t)
+
     except Exception as e:
         logger.error(f"Failed to fetch templates: {e}")
         error = "Could not load templates from Meta API. Please check your credentials."
@@ -632,7 +671,8 @@ def template_sender_view(request):
         "contacts": contacts,
         "error": error,
     })
-# VIEW 1: For sending STANDARD templates
+
+
 @csrf_exempt
 @login_required
 def send_standard_template_api_view(request):
@@ -778,7 +818,8 @@ def carousel_sender_view(request):
     try:
         META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
         
-        WABA_ID="1477047197063313"
+        
+        WABA_ID = 1477047197063313
         
         
         url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
@@ -801,6 +842,8 @@ def carousel_sender_view(request):
         "contacts": contacts,
         "error": error,
     })
+
+
 # registration/views.py
 import requests # Make sure this is imported
 
@@ -849,7 +892,8 @@ def create_template_api_view(request):
         # These should be stored securely, e.g., in settings or environment variables
         meta_access_token = "EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
         
-        waba_id="1477047197063313"
+        
+        waba_id =  1477047197063313
         
         url = f"https://graph.facebook.com/v19.0/{waba_id}/message_templates"
         headers = {
@@ -1133,7 +1177,7 @@ def get_whatsapp_templates_api(request):
     try:
         META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
         
-        WABA_ID="1477047197063313"
+        WABA_ID = "1437720030544254"
         url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
         response = requests.get(url, headers=headers)
