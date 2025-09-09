@@ -1,8 +1,9 @@
 
 
 from django.db import models
+from registration.models import ChatContact
 
-class Flow(models.Model):
+class Flows(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
     template_name = models.CharField(max_length=255, unique=True, help_text="The exact name of the WhatsApp template this flow is for.")
     flow_data = models.JSONField(help_text="The entire JSON object from React Flow (nodes and edges).")
@@ -12,10 +13,10 @@ class Flow(models.Model):
     def __str__(self):
         return f"Flow for template: {self.template_name}"
 
-class UserFlowSession(models.Model):
+class UserFlowSessions(models.Model):
     """Tracks the current position of a contact within a flow."""
     contact = models.OneToOneField(ChatContact, on_delete=models.CASCADE, primary_key=True)
-    flow = models.ForeignKey(Flow, on_delete=models.CASCADE)
+    flow = models.ForeignKey(Flows, on_delete=models.CASCADE)
     current_node_id = models.CharField(max_length=255, help_text="The ID of the user's current node in the flow.")
     updated_at = models.DateTimeField(auto_now=True)
 

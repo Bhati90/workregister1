@@ -412,6 +412,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 #     # 'authentication',
 #     #        # PWA support
 #     'corsheaders',
+#     'flow',
 #     'whitenoise.storage',  # For serving static files in production
 #     'registration',
 #     'pwa',  
