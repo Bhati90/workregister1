@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'cloudinary',
     'cloudinary_storage',
     'registration',
+    'flow',
     'pwa',  
     'whitenoise',  # For serving static files in production
 ]

@@ -1,4 +1,3 @@
-// src/App.js
 import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   ReactFlowProvider,
@@ -16,12 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import './FlowBuilder.css';
 
-// // --- 1. DUMMY TEMPLATE DATA (This would come from your API) ---
-// const TEMPLATES = [
-//   { id: 'template_01', name: 'Welcome Offer', buttons: ['Yes', 'No'] },
-//   { id: 'template_02', name: 'Appointment Confirmation', buttons: ['Confirm', 'Reschedule', 'Cancel'] },
-//   { id: 'template_03', name: 'Feedback Request', buttons: ['Give Feedback'] },
-// ];
+// --- Helper Functions ---
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -36,9 +30,11 @@ function getCookie(name) {
   }
   return cookieValue;
 }
-// --- 2. CUSTOM NODE COMPONENTS ---
 
-// Node for starting the flow
+let id = 1;
+const getId = () => `node_${id++}`;
+
+// --- CUSTOM NODE COMPONENTS ---
 const FlowStartNode = ({ data }) => (
   <div className="flow-node flow-start-node">
     <div className="flow-node-header"><span className="icon">➡️</span> Flow Start</div>
@@ -49,7 +45,6 @@ const FlowStartNode = ({ data }) => (
   </div>
 );
 
-// Node that represents the chosen template and its button outputs
 const TemplateNode = ({ data }) => (
   <div className="flow-node template-node">
     <Handle type="target" position={Position.Left} />
@@ -65,7 +60,7 @@ const TemplateNode = ({ data }) => (
             <Handle
               type="source"
               position={Position.Right}
-              id={buttonName} // CRUCIAL: The handle ID is the button name
+              id={buttonName}
               style={{ top: `${(index + 1) * (100 / (data.buttons.length + 1))}%` }}
             />
           </div>
@@ -75,7 +70,6 @@ const TemplateNode = ({ data }) => (
   </div>
 );
 
-// Node for sending a message (text, image, button)
 const MessageNode = ({ data, id }) => {
   const onDataChange = (field, value) => {
     data.onDataChange(id, { ...data, [field]: value });
@@ -98,74 +92,70 @@ const MessageNode = ({ data, id }) => {
   );
 };
 
-// --- 3. MAIN FLOW BUILDER COMPONENT ---
-
 const nodeTypes = {
   flowStart: FlowStartNode,
   template: TemplateNode,
   message: MessageNode,
 };
 
-let id = 1;
-const getId = () => `node_${id++}`;
-
+// --- MAIN FLOW BUILDER COMPONENT ---
 const FlowBuilder = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [showModal, setShowModal] = useState(false);
-  const [templates, setTemplates] = useState([]); // State to hold templates from API
- const reactFlowInstance = useReactFlow();
+  const [templates, setTemplates] = useState([]);
+  const reactFlowInstance = useReactFlow();
   const [activeTemplate, setActiveTemplate] = useState(null);
 
-    const onSave = useCallback(async () => { // Make the function async
-        if (!activeTemplate) {
-          alert("Please select a template before saving.");
-          return;
-        }
-        
-        const flow = reactFlowInstance.toObject();
-        const cleanFlow = {
-          ...flow,
-          nodes: flow.nodes.map(node => {
-            const { onDataChange, onChooseTemplate, ...restData } = node.data;
-            return { ...node, data: restData };
-          }),
-        };
+  const onSave = useCallback(async () => {
+    if (!activeTemplate) {
+      alert("Please select a template before saving.");
+      return;
+    }
+    
+    const flow = reactFlowInstance.toObject();
+    const cleanFlow = {
+      ...flow,
+      nodes: flow.nodes.map(node => {
+        const { onDataChange, onChooseTemplate, ...restData } = node.data;
+        return { ...node, data: restData };
+      }),
+    };
 
-        const payload = {
-          template_name: activeTemplate,
-          flow: cleanFlow,
-        };
+    const payload = {
+      template_name: activeTemplate,
+      flow: cleanFlow,
+    };
 
-        try {
-            const csrftoken = getCookie('csrftoken');
-            const response = await fetch('https://workregister1-g7pf.onrender.com/register/api/save-flow/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken,
-                },
-                body: JSON.stringify(payload),
-            });
+    try {
+      const csrftoken = getCookie('csrftoken');
+      const response = await fetch('https://workregister1-g7pf.onrender.com/register/api/save-flow/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify(payload),
+      });
 
-            const result = await response.json();
+      const result = await response.json();
 
-            if (response.ok) {
-                alert(result.message);
-                console.log('Saved Flow to Backend:', payload);
-            } else {
-                throw new Error(result.message || 'Failed to save flow.');
-            }
-        } catch (error) {
-            console.error('Error saving flow:', error);
-            alert(`Error: ${error.message}`);
-        }
-    }, [reactFlowInstance, activeTemplate]);
-  // NEW: Fetch templates from Django when the component loads
+      if (response.ok) {
+        alert(result.message);
+        console.log('Saved Flow to Backend:', payload);
+      } else {
+        throw new Error(result.message || 'Failed to save flow.');
+      }
+    } catch (error) {
+      console.error('Error saving flow:', error);
+      alert(`Error: ${error.message}`);
+    }
+  }, [reactFlowInstance, activeTemplate]);
+
   useEffect(() => {
     async function fetchTemplates() {
       try {
-        const response = await fetch('https://workregister1-g7pf.onrender.com/register/api/get-whatsapp-templates/'); // Your new Django API endpoint
+        const response = await fetch('https://workregister1-g7pf.onrender.com/register/api/get-whatsapp-templates/');
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
@@ -202,11 +192,10 @@ const FlowBuilder = () => {
     const position = { x: startNode.position.x + 400, y: startNode.position.y };
     addNode('template', template, position);
 
-    // Automatically connect the start node to the new template node
     setEdges((eds) => eds.concat({
       id: `e-${startNode.id}-template`,
       source: startNode.id,
-      target: `node_${id - 1}`, // The ID of the node we just added
+      target: `node_${id - 1}`,
       type: 'smoothstep',
     }));
 
@@ -214,7 +203,6 @@ const FlowBuilder = () => {
   };
 
   useEffect(() => {
-    // Add the initial start node if it doesn't exist
     if (nodes.length === 0) {
       setNodes([{
         id: 'node_0',
@@ -231,9 +219,12 @@ const FlowBuilder = () => {
         <div className="modal-overlay">
           <div className="modal-content">
             <h3>Choose a Template</h3>
+            {/* THIS DIV WRAPPER ENABLES SCROLLING */}
+            <div className="template-list">
               {templates.map(t => <button key={t.id} onClick={() => handleTemplateSelect(t)} className="flow-button">{t.name}</button>)}
+            </div>
             <button onClick={() => setShowModal(false)} style={{ background: '#6c757d', marginTop: '10px' }} className="flow-button">Cancel</button>
-         </div>
+          </div>
         </div>
       )}
       <aside className="sidebar">

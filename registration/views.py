@@ -1177,7 +1177,7 @@ def get_whatsapp_templates_api(request):
     try:
         META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
         
-        WABA_ID = "1437720030544254"
+        WABA_ID = "1477047197063313"
         url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
         response = requests.get(url, headers=headers)
