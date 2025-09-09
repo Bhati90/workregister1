@@ -14,8 +14,8 @@ urlpatterns = [
 
     path('api/upload-template-media/', views.upload_template_media_api_view, name='upload_template_media_api'),
     
-    path('api/get-whatsapp-templates/', views.get_whatsapp_templates_api, name='get_whatsapp_templates_api'),
-    path('api/save-flow/', views.save_flow_api, name='save_flow_api'),
+    # path('api/get-whatsapp-templates/', views.get_whatsapp_templates_api, name='get_whatsapp_templates_api'),
+    # path('api/save-flow/', views.save_flow_api, name='save_flow_api'),
     
 
 
@@ -41,7 +41,7 @@ urlpatterns = [
 
     # This is an API endpoint for sending replies from the frontend
     path('api/chat/send-reply/', views.send_reply_api_view, name='send_reply_api'),
-    path('whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
+    # path('whatsapp/webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
     path('api/chat/send-reaction/', views.send_reaction_api_view, name='send_reaction_api'),
     path('api/create-template/', views.create_template_api_view, name='create_template_api'),
     path('carousel-sender/', views.carousel_sender_view, name='carousel_sender'),

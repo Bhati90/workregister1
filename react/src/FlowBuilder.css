@@ -124,41 +124,22 @@ body {
   position: relative;
   font-weight: 500;
 }
-/* Modal overlay background */
+
+/* --- Modal Styles --- */
 .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
 }
 
-/* Modal box */
 .modal-content {
-  background: #fff;
-  padding: 20px;
+  background: white;
+  padding: 30px;
   border-radius: 10px;
-  width: 400px;       /* adjust as needed */
-  max-height: 80vh;   /* so modal never grows offscreen */
-  overflow: hidden;   /* only template list scrolls */
-  display: flex;
-  flex-direction: column;
+  width: 400px;
 }
-
-/* Scrollable template list */
-.template-list {
-  flex: 1;
-  overflow-y: auto;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  max-height: 50vh;   /* keeps list scrollable */
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  padding: 5px;
-}
-
+/* ... other modal styles can go here */

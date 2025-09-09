@@ -10,14 +10,27 @@ from django.shortcuts import render # Make sure render is imported
 def home_page(request):
     return render(request, 'contact_app/home.html', {'message': 'Welcome to my Contact App!'})
 
-from .models import Flow, Message, ChatContact # Make sure these are imported
+# from .models import Flow, Message, ChatContact # Make sure these are imported
+from registration.models import ChatContact, Message
+from .models import Flows as Flow
+from .models import UserFlowSessions as UserFlowSession
+from registration.whats_app import send_whatsapp_message, save_outgoing_message
+from django.utils import timezone
+
 import logging
 import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
-
+from django.http import HttpResponse
 logger = logging.getLogger(__name__)
+
+import requests
+
+
+META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+        
+WABA_ID = "1477047197063313"
 
 @csrf_exempt
 def whatsapp_webhook_view(request):
@@ -132,7 +145,19 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             logger.warning(f"DEBUG-FLOW:    FAILURE! The edge points to target node '{target_node_id}', but this node was not found in the flow data.")
             return False
         logger.info(f"DEBUG-FLOW: 6. Found target node. Type='{target_node.get('type')}'")
-
+        
+         # ** THIS IS THE NEW LOGIC TO SAVE THE SESSION **
+        # Before sending the message, update or create the session for this user.
+        logger.info(f"DEBUG-FLOW: 7. Saving user session. Contact='{contact.wa_id}', Flow='{template_name}', New Node='{target_node_id}'")
+        UserFlowSession.objects.update_or_create(
+            contact=contact,
+            defaults={
+                'flow': flow,
+                'current_node_id': target_node_id
+            }
+        )
+        logger.info("DEBUG-FLOW:    SUCCESS! User session saved to database.")
+        
         # 7. Construct and send the message
         node_data = target_node.get('data', {})
         message_text = node_data.get('text')
@@ -160,3 +185,57 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
     logger.info("---------- FLOW EXECUTION FAILED ----------")
     return False
 
+def get_whatsapp_templates_api(request):
+    """API endpoint to fetch approved WhatsApp templates for the React frontend."""
+    # This logic is copied from your `template_sender_view`
+    try:
+        
+        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        all_templates = response.json().get('data', [])
+        
+        # We need to extract button texts for the frontend
+        templates_data = []
+        for t in all_templates:
+            if t.get('status') == 'APPROVED':
+                buttons = []
+                for comp in t.get('components', []):
+                    if comp.get('type') == 'BUTTONS':
+                        for btn in comp.get('buttons', []):
+                            buttons.append(btn.get('text'))
+                templates_data.append({'id': t.get('name'), 'name': t.get('name'), 'buttons': buttons})
+        
+        json_response = json.dumps(templates_data, ensure_ascii=False)
+        return HttpResponse(json_response, content_type="application/json; charset=utf-8")
+
+    except Exception as e:
+        logger.error(f"Failed to fetch templates for API: {e}")
+        return JsonResponse({"error": "Could not load templates."}, status=500)
+
+# NEW API VIEW 2: To save the flow from React
+@csrf_exempt
+def save_flow_api(request):
+    """API endpoint to save a flow definition from the React frontend."""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            template_name = data.get('template_name')
+            flow_data = data.get('flow')
+            
+            if not template_name or not flow_data:
+                return JsonResponse({'status': 'error', 'message': 'Missing template_name or flow data.'}, status=400)
+
+            # Use update_or_create to save the flow
+            flow_obj, created = Flow.objects.update_or_create(
+                template_name=template_name,
+                defaults={'flow_data': flow_data}
+            )
+            
+            status_message = "Flow created successfully." if created else "Flow updated successfully."
+            return JsonResponse({'status': 'success', 'message': status_message})
+        except Exception as e:
+            logger.error(f"Error saving flow: {e}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
