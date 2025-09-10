@@ -5,7 +5,7 @@ from registration.models import ChatContact
 
 class Flows(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
-    template_name = models.CharField(max_length=255, unique=False, help_text="The template that triggers this flow. Other templates can be used inside.")
+    template_names = models.CharField(max_length=250, unique=False, help_text="The template that triggers this flow. Other templates can be used inside.")
     flow_data = models.JSONField(help_text="The entire JSON object from React Flow (nodes and edges).")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
