@@ -48,6 +48,15 @@ class ChatContact(models.Model):
 
 #     def __str__(self):
 #         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
+class Flow(models.Model):
+    """Stores the JSON definition of a flow created in React Flow."""
+    template_names = models.CharField(max_length=250, unique=False, help_text="The template that triggers this flow. Other templates can be used inside.")
+    flow_data = models.JSONField(help_text="The entire JSON object from React Flow (nodes and edges).")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Flow for template: {self.template_names}"
 
 
 class Message(models.Model):

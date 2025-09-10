@@ -11,7 +11,7 @@ class Flows(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Flow for template: {self.template_name}"
+        return f"Flow for template: {self.template_names}"
 
 class UserFlowSessions(models.Model):
     """Tracks the current position of a contact within a flow."""
