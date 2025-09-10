@@ -167,7 +167,7 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                 "type": "template",
                 "template": {
                     "name": target_template_name,
-                    "language": { "code": "en_US" }, # Or your desired language code
+                    "language": { "code": "en" }, # Or your desired language code
                     "components": components
                 }
             })
