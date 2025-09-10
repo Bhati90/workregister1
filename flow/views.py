@@ -286,25 +286,4 @@ def save_flow_api(request):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
 
-    """API endpoint to save a flow definition from the React frontend."""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            template_name = data.get('template_name')
-            flow_data = data.get('flow')
-            
-            if not template_name or not flow_data:
-                return JsonResponse({'status': 'error', 'message': 'Missing template_name or flow data.'}, status=400)
-
-            # Use update_or_create to save the flow
-            flow_obj, created = Flow.objects.update_or_create(
-                template_name=template_name,
-                defaults={'flow_data': flow_data}
-            )
-            
-            status_message = "Flow created successfully." if created else "Flow updated successfully."
-            return JsonResponse({'status': 'success', 'message': status_message})
-        except Exception as e:
-            logger.error(f"Error saving flow: {e}", exc_info=True)
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+   
