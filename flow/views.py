@@ -12,8 +12,8 @@ def home_page(request):
 
 # from .models import Flow, Message, ChatContact # Make sure these are imported
 from registration.models import ChatContact, Message
-from .models import Flows as Flow
-from .models import UserFlowSessions as UserFlowSession
+from .models import Flowss as Flow
+from .models import UserFlowSessionss as UserFlowSession
 from registration.whats_app import send_whatsapp_message, save_outgoing_message, upload_media_for_template_handle
 from django.utils import timezone
 import os
@@ -188,7 +188,7 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
             return False
 
-    except (Message.DoesNotExist, Flows.DoesNotExist):
+    except (Message.DoesNotExist, Flow.DoesNotExist):
         logger.warning(f"Could not find original message or flow for wamid {replied_to_wamid}")
         return False
     except Exception as e:
