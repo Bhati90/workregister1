@@ -12,8 +12,8 @@ def home_page(request):
 
 # from .models import Flow, Message, ChatContact # Make sure these are imported
 from registration.models import ChatContact, Message
-from .models import Flowss as Flow
-from .models import UserFlowSessionss as UserFlowSession
+from .models import Flows as Flow
+from .models import UserFlowSessions as UserFlowSession
 from registration.whats_app import send_whatsapp_message, save_outgoing_message, upload_media_for_template_handle
 from django.utils import timezone
 import os
