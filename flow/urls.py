@@ -7,5 +7,5 @@ urlpatterns = [
     path('api/flows/save/', views.save_flow_api, name='save_flow_api'),
     path('webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
     # path('upload-template-media/', views.upload_media_to_meta ),
-    path('api/flows/list/', views.get_flows_list_api, name='api_list_flows'),
+    # path('api/flows/list/', views.get_flows_list_api, name='api_list_flows'),
 ]
