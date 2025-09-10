@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     # 'authentication', 
     #       # PWA support
     'cloudinary',
+    'rest_framework',
     'cloudinary_storage',
     'registration',
     'flow',
@@ -411,6 +412,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 #     'django.contrib.staticfiles',
 #     # 'authentication',
 #     #        # PWA support
+#     'rest_framework',
 #     'corsheaders',
 #     'flow',
 #     'whitenoise.storage',  # For serving static files in production

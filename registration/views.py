@@ -804,7 +804,7 @@ def send_carousel_template_api_view(request):
 
 
 # registration/views.py
-@login_required
+
 def standard_template_builder_view(request):
     return render(request, 'registration/chat/standard_template_builder.html')
 
@@ -858,7 +858,6 @@ def carousel_template_builder_view(request):
 from .whats_app import upload_media_for_template_handle # Add this import
 
 @csrf_exempt
-@login_required
 def upload_template_media_api_view(request):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)

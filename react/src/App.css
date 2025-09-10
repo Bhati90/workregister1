@@ -1,42 +1,151 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+/* src/App.css */
+.App {
+  height: 100vh;
+  width: 100vw;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.dndflow {
+  display: flex;
+  height: 100%;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.sidebar {
+  width: 250px;
+  border-right: 1px solid #eee;
+  padding: 15px;
+  background: #fcfcfc;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.sidebar .description {
+  margin-bottom: 15px;
+  font-size: 12px;
+  color: #555;
 }
 
-.card {
-  padding: 2em;
+.sidebar .dndnode {
+  padding: 10px;
+  border: 1px solid #1a192b;
+  border-radius: 3px;
+  margin-bottom: 10px;
+  cursor: grab;
+  text-align: center;
+  font-weight: 500;
+  background: white;
 }
 
-.read-the-docs {
+.reactflow-wrapper {
+  flex-grow: 1;
+  height: 100%;
+}
+
+.flow-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.flow-controls input {
+    border: 1px solid #ccc;
+    padding: 8px;
+    border-radius: 3px;
+}
+
+.flow-controls button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.flow-controls button:hover {
+    background-color: #0056b3;
+}
+
+/* --- Custom Node Styles --- */
+.custom-node {
+    border: 1px solid #777;
+    border-radius: 5px;
+    background: white;
+    width: 250px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}
+
+.node-header {
+    background-color: #f0f0f0;
+    padding: 5px 10px;
+    border-bottom: 1px solid #ddd;
+    border-radius: 5px 5px 0 0;
+}
+
+.node-content {
+    padding: 10px;
+    font-size: 12px;
+}
+
+.node-content label {
+    display: block;
+    margin-top: 8px;
+    margin-bottom: 3px;
+    font-weight: bold;
+    text-align: left;
+}
+
+.node-content select, .node-content textarea, .node-content input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+}
+
+.variable-input {
+    margin-top: 10px;
+}
+
+.delete-button {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ff4d4d;
+    color: white;
+    border: 1px solid white;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    z-index: 10;
+}
+
+.node-footer {
+    background: #fafafa;
+    border-top: 1px solid #eee;
+    border-radius: 0 0 5px 5px;
+}
+
+.output-handle-wrapper {
+    position: relative;
+    padding: 8px 10px;
+    background: #e6f7ff;
+    border-top: 1px solid #b3e0ff;
+    text-align: left;
+}
+
+.no-buttons-message {
+    padding: 10px;
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+}
+
+.loading-pane {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #888;
 }

@@ -46,6 +46,7 @@ def upload_media_for_template_handle(file_object):
     except Exception as e:
         logger.error(f"Failed to upload media for handle: {e}", exc_info=True)
         return None
+
 def send_whatsapp_template(to_number, template_name, components):
     """
     Sends a WhatsApp template message using the Meta Graph API.
@@ -88,6 +89,9 @@ def send_whatsapp_template(to_number, template_name, components):
         logger.error(f"Failed to send WhatsApp template to {to_number}: {e}")
         error_details = e.response.json() if e.response else str(e)
         return False, {"error": error_details}
+
+
+
 def download_media_from_meta(media_id):
     try:
         url = f"{META_API_URL}/{media_id}/"

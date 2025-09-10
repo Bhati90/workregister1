@@ -14,9 +14,10 @@ def home_page(request):
 from registration.models import ChatContact, Message
 from .models import Flows as Flow
 from .models import UserFlowSessions as UserFlowSession
-from registration.whats_app import send_whatsapp_message, save_outgoing_message
+from registration.whats_app import send_whatsapp_message, save_outgoing_message, upload_media_for_template_handle
 from django.utils import timezone
-
+import os
+import mimetypes
 import logging
 import json
 from django.http import JsonResponse
@@ -26,6 +27,10 @@ from django.http import HttpResponse
 logger = logging.getLogger(__name__)
 
 import requests
+API_VERSION = 'v19.0'
+META_API_URL = f"https://graph.facebook.com/{API_VERSION}"
+
+PHONE_NUMBER_ID = 705449502657013
 
 
 META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
@@ -88,135 +93,199 @@ def whatsapp_webhook_view(request):
 # ==============================================================================
 # UPDATED HELPER FUNCTION: Filled with logging to find the failure point
 # ==============================================================================
+# contact_app/views.py
+
+# ... (keep all your other imports and views)
+
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
-    """
-    Tries to find and execute a step from a saved flow, with detailed logging.
-    """
-    logger.info("---------- STARTING FLOW EXECUTION ----------")
+    """Finds and executes the next step in a flow."""
     try:
-        # 1. Find the original message
-        logger.info(f"DEBUG-FLOW: 1. Attempting to find original message with wamid='{replied_to_wamid}'")
         original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
-        logger.info(f"DEBUG-FLOW:    SUCCESS! Found original message. Text: '{original_message.text_content}'")
-        
-        # 2. Extract template name
-        if "Sent template: " not in original_message.text_content:
-            logger.warning("DEBUG-FLOW:    FAILURE! 'Sent template: ' text not found in original message. Cannot determine template name.")
-            return False
         template_name = original_message.text_content.replace("Sent template: ", "").strip()
-        logger.info(f"DEBUG-FLOW: 2. Extracted template_name='{template_name}'")
         
-        # 3. Load the flow from DB
-        logger.info(f"DEBUG-FLOW: 3. Attempting to find flow in DB for template_name='{template_name}'")
         flow = Flow.objects.get(template_name=template_name)
-        logger.info("DEBUG-FLOW:    SUCCESS! Found flow object in the database.")
-        
         flow_data = flow.flow_data
         nodes = flow_data.get('nodes', [])
         edges = flow_data.get('edges', [])
         
-        # 4. Find the template node
-        logger.info("DEBUG-FLOW: 4. Searching for the 'template' node in the flow data.")
-        template_node = next((n for n in nodes if n.get('type') == 'template'), None)
-        if not template_node:
-            logger.warning("DEBUG-FLOW:    FAILURE! Could not find a node with type='template' in the saved flow JSON.")
-            return False
-        logger.info(f"DEBUG-FLOW:    SUCCESS! Found template node with id='{template_node.get('id')}'")
+        template_node = next((n for n in nodes if n.get('type') == 'templateNode'), None)
+        if not template_node: return False
 
-        # 5. Find the matching edge
-        logger.info(f"DEBUG-FLOW: 5. Searching for an edge from node '{template_node.get('id')}' that matches user_input='{user_input}'")
-        next_edge = None
-        for edge in edges:
-            source_handle = edge.get('sourceHandle')
-            logger.info(f"DEBUG-FLOW:    - Checking edge with sourceHandle: '{source_handle}'")
-            if edge.get('source') == template_node.get('id') and source_handle == user_input:
-                next_edge = edge
-                break
-        
-        if not next_edge:
-            logger.warning(f"DEBUG-FLOW:    FAILURE! No edge found with sourceHandle matching '{user_input}'. Check for typos or character encoding issues in the saved flow.")
-            return False
-        logger.info(f"DEBUG-FLOW:    SUCCESS! Found matching edge. It points to target node id='{next_edge.get('target')}'")
+        next_edge = next((e for e in edges if e.get('source') == template_node.get('id') and e.get('sourceHandle') == user_input), None)
+        if not next_edge: return False
 
-        # 6. Find the target node
         target_node_id = next_edge.get('target')
         target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
-        if not target_node:
-            logger.warning(f"DEBUG-FLOW:    FAILURE! The edge points to target node '{target_node_id}', but this node was not found in the flow data.")
-            return False
-        logger.info(f"DEBUG-FLOW: 6. Found target node. Type='{target_node.get('type')}'")
+        if not target_node: return False
         
-         # ** THIS IS THE NEW LOGIC TO SAVE THE SESSION **
-        # Before sending the message, update or create the session for this user.
-        logger.info(f"DEBUG-FLOW: 7. Saving user session. Contact='{contact.wa_id}', Flow='{template_name}', New Node='{target_node_id}'")
-        UserFlowSession.objects.update_or_create(
-            contact=contact,
-            defaults={
-                'flow': flow,
-                'current_node_id': target_node_id
-            }
-        )
-        logger.info("DEBUG-FLOW:    SUCCESS! User session saved to database.")
-        
-        # 7. Construct and send the message
+        node_type = target_node.get('type')
         node_data = target_node.get('data', {})
-        message_text = node_data.get('text')
-        logger.info(f"DEBUG-FLOW: 7. Preparing to send message with text: '{message_text}'")
         
-        payload = {"messaging_product": "whatsapp", "to": contact.wa_id, "type": "text", "text": {"body": message_text}}
+        payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
+        message_type_to_save = 'unknown'
+        text_content_to_save = f"Flow Step: {node_type}"
+
+        if node_type == 'textNode':
+            message_text = node_data.get('text', '...')
+            payload.update({"type": "text", "text": {"body": message_text}})
+            message_type_to_save = 'text'
+            text_content_to_save = message_text
+        
+        # --- NEW LOGIC TO HANDLE SENDING A TEMPLATE ---
+        elif node_type == 'templateNode':
+            target_template_name = node_data.get('selectedTemplateName')
+            if not target_template_name:
+                logger.error("Flow Error: Target node is a template but no template name is selected.")
+                return False
+
+            components = []
+            # Check for header variable
+            if 'headerUrl' in node_data and node_data['headerUrl']:
+                components.append({
+                    "type": "header",
+                    "parameters": [{
+                        "type": "image",
+                        "image": { "link": node_data['headerUrl'] }
+                    }]
+                })
+            
+            # Check for body variables
+            body_params = []
+            # Find all body variables (bodyVar1, bodyVar2, etc.) saved in the node data
+            for i in range(1, 10): # Check for up to 9 variables
+                var_key = f'bodyVar{i}'
+                if var_key in node_data and node_data[var_key]:
+                    body_params.append({ "type": "text", "text": node_data[var_key] })
+                else:
+                    # Stop checking once a variable is missing
+                    break
+            
+            if body_params:
+                components.append({ "type": "body", "parameters": body_params })
+
+            payload.update({
+                "type": "template",
+                "template": {
+                    "name": target_template_name,
+                    "language": { "code": "en_US" }, # Or your desired language code
+                    "components": components
+                }
+            })
+            message_type_to_save = 'template'
+            text_content_to_save = f"Sent template: {target_template_name}"
+            
+        # --- END OF NEW LOGIC ---
+        else:
+            return False
+            
         success, response_data = send_whatsapp_message(payload)
         
         if success:
-            save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type='text', text_content=message_text)
-            logger.info("DEBUG-FLOW:    SUCCESS! Message sent and saved.")
-            logger.info("---------- FLOW EXECUTION COMPLETE ----------")
+            save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type=message_type_to_save, text_content=text_content_to_save)
+            logger.info(f"Flow step executed successfully for contact {contact.wa_id}")
             return True
         else:
-            logger.error(f"DEBUG-FLOW:    FAILURE! send_whatsapp_message failed. Response: {response_data}")
+            logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
             return False
-            
-    except Message.DoesNotExist:
-        logger.warning(f"DEBUG-FLOW:    FAILURE at step 1! The original message with wamid='{replied_to_wamid}' was not found in the database as an outbound template.")
-    except Flow.DoesNotExist:
-        logger.warning(f"DEBUG-FLOW:    FAILURE at step 3! The flow for template '{template_name}' does not exist in the database.")
+
+    except (Message.DoesNotExist, Flows.DoesNotExist):
+        logger.warning(f"Could not find original message or flow for wamid {replied_to_wamid}")
+        return False
     except Exception as e:
-        logger.error(f"DEBUG-FLOW:    CRITICAL ERROR! An unexpected exception occurred: {e}", exc_info=True)
-    
-    logger.info("---------- FLOW EXECUTION FAILED ----------")
-    return False
+        logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
+        return False
+# contact_app/views.py
+
+# ... (keep all your other imports and views)
+# contact_app/views.py
+
+# ... (keep all your other imports and views)
 
 def get_whatsapp_templates_api(request):
     """API endpoint to fetch approved WhatsApp templates for the React frontend."""
-    # This logic is copied from your `template_sender_view`
     try:
-        
         url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,components,status"
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         all_templates = response.json().get('data', [])
         
-        # We need to extract button texts for the frontend
         templates_data = []
         for t in all_templates:
             if t.get('status') == 'APPROVED':
                 buttons = []
-                for comp in t.get('components', []):
-                    if comp.get('type') == 'BUTTONS':
-                        for btn in comp.get('buttons', []):
-                            buttons.append(btn.get('text'))
-                templates_data.append({'id': t.get('name'), 'name': t.get('name'), 'buttons': buttons})
-        
-        json_response = json.dumps(templates_data, ensure_ascii=False)
-        return HttpResponse(json_response, content_type="application/json; charset=utf-8")
+                template_components = t.get('components', [])
 
+                # --- THIS IS THE CORRECTED LOGIC ---
+                for comp in template_components:
+                    # First, find the component with type 'BUTTONS'
+                    if comp.get('type') == 'BUTTONS':
+                        # Then, loop through the 'buttons' array inside it
+                        for btn in comp.get('buttons', []):
+                            # Check the type of the INDIVIDUAL button
+                            if btn.get('type') == 'QUICK_REPLY':
+                                # If it's a quick reply, add it to our list
+                                buttons.append({'text': btn.get('text')})
+
+                templates_data.append({
+                    'name': t.get('name'),
+                    'components': template_components,
+                    'buttons': buttons
+                })
+        
+        return JsonResponse(templates_data, safe=False)
     except Exception as e:
         logger.error(f"Failed to fetch templates for API: {e}")
         return JsonResponse({"error": "Could not load templates."}, status=500)
 
+# ... (keep all your other views like save_flow_api etc.)
+# ... (keep all your other views like save_flow_api etc.)
 # NEW API VIEW 2: To save the flow from React
+
+
+def get_flows_list_api(request):
+    """API endpoint to get a list of all saved flows."""
+    flows = Flow.objects.all().order_by('-updated_at')
+    data = [{'id': f.id, 'name': f.name, 'template_name': f.template_name, 'updated_at': f.updated_at} for f in flows]
+    return JsonResponse(data, safe=False)
+
+
+# contact_app/views.py
+
+# ...
+
 @csrf_exempt
 def save_flow_api(request):
+    """API endpoint to save or update a flow definition from the React frontend."""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            flow_name = data.get('name')
+            # The 'template_name' is still useful for identifying the trigger
+            trigger_template_name = data.get('template_name')
+            flow_data = data.get('flow')
+            
+            if not all([flow_name, flow_data]):
+                return JsonResponse({'status': 'error', 'message': 'Missing flow name or flow data.'}, status=400)
+
+            # --- CHANGE THIS LOGIC ---
+            # Use the flow's name as the unique identifier to update or create
+            flow_obj, created = Flow.objects.update_or_create(
+                name=flow_name,
+                defaults={
+                    'template_name': trigger_template_name, # Save the trigger template
+                    'flow_data': flow_data
+                }
+            )
+            # --- END OF CHANGE ---
+            
+            status_message = "Flow created." if created else "Flow updated."
+            return JsonResponse({'status': 'success', 'message': status_message})
+        except Exception as e:
+            logger.error(f"Error saving flow: {e}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
     """API endpoint to save a flow definition from the React frontend."""
     if request.method == 'POST':
         try:
