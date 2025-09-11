@@ -65,20 +65,25 @@ def whatsapp_webhook_view(request):
                             # --- START: FLOW ENGINE TRIGGER ---
                             replied_to_wamid = msg.get('context', {}).get('id')
                             user_input = None
+                            if message_type == 'text':
+                                user_input = msg.get('text', {}).get('body')
 
-                            if message_type == 'button':
+                            elif message_type == 'button':
                                 user_input = msg.get('button', {}).get('text')
                             elif message_type == 'interactive' and msg.get('interactive', {}).get('type') == 'button_reply':
                                 user_input = msg.get('interactive', {}).get('button_reply', {}).get('title')
                             
                             logger.info(f"DEBUG-FLOW: Extracted user_input='{user_input}' and replied_to_wamid='{replied_to_wamid}'")
-
+                            flow_handled = False
                             if user_input and replied_to_wamid:
                                 flow_handled = try_execute_flow_step(contact, user_input, replied_to_wamid)
-                                if flow_handled:
-                                    logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
-                                    continue # Go to the next message
-
+                            elif user_input:
+                                logger.info(f"User sent input '{user_input}' without replying to a flow message. No action taken.")
+                                pass
+                                # Go to the next message
+                            if flow_handled:
+                                logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
+                                continue
                             # --- FALLBACK LOGIC ---
                             # ... (Your existing hardcoded command logic goes here) ...
                             # ... (It will run only if flow_handled is False) ...
@@ -275,35 +280,7 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
         return False
 
-#             message_type_to_save = 'interactive'
-#             text_content_to_save = body_text
-    
-#         # --- END OF NEW LOGIC ---
-#         else:
-#             return False
-            
-#         success, response_data = send_whatsapp_message(payload)
-        
-#         if success:
-#             save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type=message_type_to_save, text_content=text_content_to_save)
-#             logger.info(f"Flow step executed successfully for contact {contact.wa_id}")
-#             return True
-#         else:
-#             logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
-#             return False
-
-#     except (Message.DoesNotExist, Flow.DoesNotExist):
-#         logger.warning(f"Could not find original message or flow for wamid {replied_to_wamid}")
-#         return False
-#     except Exception as e:
-#         logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
-#         return False
-# contact_app/views.py
-
-# ... (keep all your other imports and views)
-# contact_app/views.py
-
-# ... (keep all your other imports and views)
+#            
 
 def get_whatsapp_templates_api(request):
     """API endpoint to fetch approved WhatsApp templates for the React frontend."""
