@@ -101,6 +101,59 @@ def whatsapp_webhook_view(request):
 # from registration.models import Message
 # import logging
 # logger = logging.getLogger(__name__)
+import requests
+import mimetypes # Add this import if not already present
+from django.core.files.uploadedfile import InMemoryUploadedFile # Add this import
+
+@csrf_exempt
+def upload_image_to_meta_api(request):
+    """
+    API endpoint to upload an image file directly to Meta's WhatsApp Business API
+    and return the Meta Media ID.
+    """
+    if request.method == 'POST':
+        if 'image' not in request.FILES:
+            return JsonResponse({'status': 'error', 'message': 'No image file provided.'}, status=400)
+
+        image_file: InMemoryUploadedFile = request.FILES['image']
+        
+        # Determine content type (e.g., image/jpeg, image/png)
+        content_type, _ = mimetypes.guess_type(image_file.name)
+        if not content_type or not content_type.startswith('image/'):
+            return JsonResponse({'status': 'error', 'message': 'Invalid file type. Only images are allowed.'}, status=400)
+
+        upload_url = f"{META_API_URL}/{PHONE_NUMBER_ID}/media"
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+        }
+        files = {
+            'file': (image_file.name, image_file.read(), content_type),
+            'type': (None, content_type), # Important for Meta API
+            'messaging_product': (None, 'whatsapp'),
+        }
+
+        try:
+            response = requests.post(upload_url, headers=headers, files=files)
+            response.raise_for_status() # Raise an exception for HTTP errors
+            meta_response = response.json()
+            
+            media_id = meta_response.get('id')
+            if media_id:
+                logger.info(f"Image uploaded to Meta, Media ID: {media_id}")
+                return JsonResponse({'status': 'success', 'media_id': media_id})
+            else:
+                logger.error(f"Meta upload response missing media ID: {meta_response}")
+                return JsonResponse({'status': 'error', 'message': 'Meta did not return a media ID.'}, status=500)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error uploading image to Meta: {e}. Response: {response.text if 'response' in locals() else 'No response.'}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': f'Failed to upload image to Meta: {e}'}, status=500)
+        except Exception as e:
+            logger.error(f"Unexpected error in upload_image_to_meta_api: {e}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
 
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
     """
@@ -202,18 +255,18 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                 components.append({ "type": "body", "parameters": body_params })
             payload.update({
                 "type": "template",
-                "template": {"name": target_template_name, "language": { "code": "en_US" }, "components": components }
+                "template": {"name": target_template_name, "language": { "code": "en" }, "components": components }
             })
             message_type_to_save = 'template'
             text_content_to_save = f"Sent template: {target_template_name}"
             
         elif node_type == 'imageNode':
-            image_url = node_data.get('imageUrl')
+            meta_media_id = node_data.get('metaMediaId') # We will now store the Meta Media ID
             caption = node_data.get('caption')
-            if not image_url:
+            if not meta_media_id:
                 logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
                 return False
-            payload.update({"type": "image", "image": {"link": image_url, "caption": caption}})
+            payload.update({"type": "image", "image": {"id": meta_media_id, "caption": caption}})
             message_type_to_save = 'image'
             text_content_to_save = caption or "Sent an image"
             

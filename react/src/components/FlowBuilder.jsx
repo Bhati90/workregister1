@@ -111,7 +111,9 @@ const FlowBuilder = () => {
         newNode = {
           id: newNodeId, type, position,
           data: {
-            id: newNodeId, imageUrl: '', caption: '',
+            id: newNodeId,  metaMediaId: '', // Initialize Meta Media ID
+            imageUrl: '', // Will store filename for display
+            caption: '',
             onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
             onDelete: deleteNode,
           },
