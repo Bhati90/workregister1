@@ -104,7 +104,7 @@ def whatsapp_webhook_view(request):
                             
                             # Find the outgoing message and update its status
                             Message.objects.filter(wamid=wamid_to_update, direction='outbound').update(
-                                delivery_status=new_status,
+                                # delivery_status=new_status,
                                 updated_at=timezone.now()
                             )
                             logger.info(f"Updated status for wamid {wamid_to_update} to '{new_status}'")

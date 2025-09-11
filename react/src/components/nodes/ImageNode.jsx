@@ -3,7 +3,7 @@ import React, { memo, useState } from 'react'; // Import useState
 import { Handle, Position } from 'reactflow';
 import axios from 'axios'; // Import axios for uploads
 
-const API_BASE_URL = 'http://127.0.0.1:8000/register/whatsapp'; // Make sure this matches your Django backend URL
+const API_BASE_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp'; // Make sure this matches your Django backend URL
 
 export default memo(({ data, isConnectable }) => {
   const [uploading, setUploading] = useState(false);
