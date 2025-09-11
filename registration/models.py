@@ -113,8 +113,9 @@ class Message(models.Model):
     null=True,
     help_text="Reaction emoji (e.g. 👍, ❤️)."
    )
-    delivery = models.CharField(max_length=50, null=True, blank=True, help_text="e.g., sent, delivered, read")
+    delivery_status = models.CharField(max_length=50, null=True, blank=True, help_text="e.g., sent, delivered, read")
   
+    
     
     timestamp = models.DateTimeField(help_text="Timestamp from the WhatsApp message.")
     media_id = models.CharField(max_length=255, blank=True, null=True)
