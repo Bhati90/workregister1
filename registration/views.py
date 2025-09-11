@@ -438,7 +438,7 @@ logger = logging.getLogger(__name__)
 
 # ... (keep all your existing imports and other views) ...
 from .models import Message, ChatContact # Make sure these are imported
-# from flow.models import Flows
+from flow.models import Flowss
 import logging
 import json
 from django.http import JsonResponse
@@ -1165,7 +1165,7 @@ def send_reply_api_view(request):
 
 # registration/views.py
 # ... add these imports at the top
-# from flow.models import Flowss as Flow
+from flow.models import Flowss as Flow
 import json
 from django.http import HttpResponse
 # ...
