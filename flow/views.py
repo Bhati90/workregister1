@@ -37,17 +37,14 @@ META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt
         
 WABA_ID = "1477047197063313"
 
-# contact_app/views.py
-
-# Make sure all necessary models and libraries are imported at the top of the file
-
 @csrf_exempt
 def whatsapp_webhook_view(request):
     """Handles all incoming WhatsApp events, prioritizing dynamic flows."""
-    # 1. HANDLE WEBHOOK VERIFICATION (for initial setup with Meta)
-    # 2. PROCESS INCOMING POST REQUESTS FROM META
+    # ** NEW LOG 1: Check if the view is being hit at all **
+    logger.info("====== WEBHOOK URL HAS BEEN HIT ======")
+    
     if request.method == 'POST':
-        logger.info("====== WEBHOOK URL HAS BEEN HIT ======")
+        # ** NEW LOG 2: Check if the request body is being read **
         logger.info("====== Webhook is a POST request. Attempting to read body. ======")
         
         data = json.loads(request.body)
@@ -56,183 +53,50 @@ def whatsapp_webhook_view(request):
             for entry in data.get('entry', []):
                 for change in entry.get('changes', []):
                     value = change.get('value', {})
-                    
-                    # 3. HANDLE INCOMING MESSAGES
                     if 'messages' in value:
                         for msg in value.get('messages', []):
+                            # ... (Your message saving logic remains the same) ...
                             contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
                             contact.last_contact_at = timezone.now()
                             contact.save()
-                            
-                            # 3a. Save Incoming Message to DB
                             message_type = msg.get('type')
-                            text_content = ""
-                            if message_type == 'text':
-                                text_content = msg.get('text', {}).get('body')
-                            elif message_type == 'interactive':
-                                # This handles both button and list replies
-                                text_content = msg.get('interactive', {}).get('button_reply', {}).get('title') or \
-                                               msg.get('interactive', {}).get('list_reply', {}).get('title')
+                            # ... (The rest of your code to save the incoming message instance) ...
                             
-                            Message.objects.create(
-                                contact=contact,
-                                wamid=msg.get('id'),
-                                direction='inbound',
-                                message_type=message_type,
-                                text_content=text_content,
-                                timestamp=timezone.datetime.fromtimestamp(int(msg.get('timestamp')))
-                            )
-
-                            # 3b. Process User Input and Trigger Flows
+                            # --- START: FLOW ENGINE TRIGGER ---
                             replied_to_wamid = msg.get('context', {}).get('id')
-                            user_input = text_content # We use the text_content we just extracted
+                            user_input = None
 
+                            if message_type == 'button':
+                                user_input = msg.get('button', {}).get('text')
+                            elif message_type == 'interactive' and msg.get('interactive', {}).get('type') == 'button_reply':
+                                user_input = msg.get('interactive', {}).get('button_reply', {}).get('title')
+                            
                             logger.info(f"DEBUG-FLOW: Extracted user_input='{user_input}' and replied_to_wamid='{replied_to_wamid}'")
 
                             if user_input and replied_to_wamid:
-                                # This function now contains the smart session logic
                                 flow_handled = try_execute_flow_step(contact, user_input, replied_to_wamid)
                                 if flow_handled:
                                     logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
-                                    continue
-                    
-                    # 4. HANDLE MESSAGE STATUS UPDATES
-                    elif 'statuses' in value:
-                        for status_update in value.get('statuses', []):
-                            wamid_to_update = status_update.get('id')
-                            new_status = status_update.get('status')
-                            
-                            # Find the outgoing message and update its status
-                            Message.objects.filter(wamid=wamid_to_update, direction='outbound').update(
-                                # delivery_status=new_status,
-                                updated_at=timezone.now()
-                            )
-                            logger.info(f"Updated status for wamid {wamid_to_update} to '{new_status}'")
+                                    continue # Go to the next message
 
+                            # --- FALLBACK LOGIC ---
+                            # ... (Your existing hardcoded command logic goes here) ...
+                            # ... (It will run only if flow_handled is False) ...
+                            
+                    elif 'statuses' in value:
+                        # ... (Your status update logic) ...
+                        pass
         except Exception as e:
             logger.error(f"Error in webhook: {e}", exc_info=True)
-            
-    return JsonResponse({"status": "success"}, status=200)
+        return JsonResponse({"status": "success"}, status=200)
 
-
-# --- UPDATE THIS VIEW ---
-def get_flows_list_api(request):
-    """API endpoint to get a list of all saved flows."""
-    flows = Flow.objects.all().order_by('-updated_at')
-    # Add the new is_active field to the response
-    data = [{
-        'id': f.id, 
-        'name': f.name, 
-        'template_name': f.template_name, 
-        'updated_at': f.updated_at,
-        'is_active': f.is_active # <-- NEW
-    } for f in flows]
-    return JsonResponse(data, safe=False)
-
-# --- ADD THESE THREE NEW VIEWS ---
-def get_flow_detail_api(request, flow_id):
-    """API endpoint to get the full data for a single flow for editing."""
-    try:
-        flow = Flow.objects.get(pk=flow_id)
-        # Return all the data the frontend needs to rebuild the canvas
-        data = {
-            'id': flow.id,
-            'name': flow.name,
-            'flow_data': flow.flow_data,
-            'is_active': flow.is_active,
-        }
-        return JsonResponse(data)
-    except Flow.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Flow not found.'}, status=404)
-
-@csrf_exempt
-def update_flow_status_api(request, flow_id):
-    """API endpoint to toggle the active status of a flow."""
-    if request.method == 'POST':
-        try:
-            flow = Flow.objects.get(pk=flow_id)
-            data = json.loads(request.body)
-            flow.is_active = data.get('is_active', flow.is_active)
-            flow.save()
-            return JsonResponse({'status': 'success', 'message': 'Status updated.'})
-        except Flow.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Flow not found.'}, status=404)
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
-
-@csrf_exempt
-def delete_flow_api(request, flow_id):
-    """API endpoint to delete a flow."""
-    if request.method == 'DELETE':
-        try:
-            flow = Flow.objects.get(pk=flow_id)
-            flow.delete()
-            return JsonResponse({'status': 'success', 'message': 'Flow deleted successfully.'})
-        except Flow.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Flow not found.'}, status=404)
-    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
-
-
-import requests
-import mimetypes # Add this import if not already present
-from django.core.files.uploadedfile import InMemoryUploadedFile # Add this import
-
-@csrf_exempt
-def upload_image_to_meta_api(request):
-    """
-    API endpoint to upload an image file directly to Meta's WhatsApp Business API
-    and return the Meta Media ID.
-    """
-    if request.method == 'POST':
-        if 'image' not in request.FILES:
-            return JsonResponse({'status': 'error', 'message': 'No image file provided.'}, status=400)
-
-        image_file: InMemoryUploadedFile = request.FILES['image']
-        
-        # Determine content type (e.g., image/jpeg, image/png)
-        content_type, _ = mimetypes.guess_type(image_file.name)
-        if not content_type or not content_type.startswith('image/'):
-            return JsonResponse({'status': 'error', 'message': 'Invalid file type. Only images are allowed.'}, status=400)
-
-        upload_url = f"{META_API_URL}/{PHONE_NUMBER_ID}/media"
-        headers = {
-            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
-        }
-        files = {
-            'file': (image_file.name, image_file.read(), content_type),
-            'type': (None, content_type), # Important for Meta API
-            'messaging_product': (None, 'whatsapp'),
-        }
-
-        try:
-            response = requests.post(upload_url, headers=headers, files=files)
-            response.raise_for_status() # Raise an exception for HTTP errors
-            meta_response = response.json()
-            
-            media_id = meta_response.get('id')
-            if media_id:
-                logger.info(f"Image uploaded to Meta, Media ID: {media_id}")
-                return JsonResponse({'status': 'success', 'media_id': media_id})
-            else:
-                logger.error(f"Meta upload response missing media ID: {meta_response}")
-                return JsonResponse({'status': 'error', 'message': 'Meta did not return a media ID.'}, status=500)
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error uploading image to Meta: {e}. Response: {response.text if 'response' in locals() else 'No response.'}", exc_info=True)
-            return JsonResponse({'status': 'error', 'message': f'Failed to upload image to Meta: {e}'}, status=500)
-        except Exception as e:
-            logger.error(f"Unexpected error in upload_image_to_meta_api: {e}", exc_info=True)
-            return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
-
-    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
 
 
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
     """
     Finds and executes the next step in a flow using a session-based approach.
     """
-    try :
+    try:
         flow = None
         current_node = None
 
@@ -244,6 +108,7 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             flow = session.flow
             flow_data = flow.flow_data
             nodes = flow_data.get('nodes', [])
+            # Find the node the user was left at
             current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
             logger.info(f"Found active session for contact {contact.wa_id} in flow '{flow.name}' at node '{session.current_node_id}'")
 
@@ -253,12 +118,15 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                 original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
                 template_name = original_message.text_content.replace("Sent template: ", "").strip()
                 
-                possible_flows = Flow.objects.filter(is_active=True, template_name=template_name).order_by('-updated_at')
+                # Find the most recently updated flow for this trigger template
+                possible_flows = Flow.objects.filter(template_name=template_name).order_by('-updated_at')
                 if not possible_flows.exists():
-                    logger.warning(f"No active flow found with trigger template: {template_name}")
+                    logger.warning(f"No flow found with trigger template: {template_name}")
                     return False
                 
                 flow = possible_flows.first()
+                
+                # Since a new flow is starting, the "current" node is the trigger template
                 flow_data = flow.flow_data
                 nodes = flow_data.get('nodes', [])
                 current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
@@ -272,7 +140,7 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         # 2. FIND THE NEXT STEP
         if not flow or not current_node:
             logger.error(f"Could not determine a flow or current node for contact {contact.wa_id}")
-            if session: session.delete()
+            if session: session.delete() # Clean up broken session
             return False
 
         edges = flow.flow_data.get('edges', [])
@@ -290,7 +158,7 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             logger.error(f"Edge points to a non-existent target node ID: '{target_node_id}'")
             return False
 
-        # 3. CONSTRUCT AND SEND THE MESSAGE (This part is unchanged)
+        # 3. CONSTRUCT AND SEND THE MESSAGE
         node_type = target_node.get('type')
         node_data = target_node.get('data', {})
         payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
@@ -324,18 +192,18 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                 components.append({ "type": "body", "parameters": body_params })
             payload.update({
                 "type": "template",
-                "template": {"name": target_template_name, "language": { "code": "en" }, "components": components }
+                "template": {"name": target_template_name, "language": { "code": "en_US" }, "components": components }
             })
             message_type_to_save = 'template'
             text_content_to_save = f"Sent template: {target_template_name}"
             
         elif node_type == 'imageNode':
-            meta_media_id = node_data.get('metaMediaId') # We will now store the Meta Media ID
+            image_url = node_data.get('imageUrl')
             caption = node_data.get('caption')
-            if not meta_media_id:
+            if not image_url:
                 logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
                 return False
-            payload.update({"type": "image", "image": {"id": meta_media_id, "caption": caption}})
+            payload.update({"type": "image", "image": {"link": image_url, "caption": caption}})
             message_type_to_save = 'image'
             text_content_to_save = caption or "Sent an image"
             
@@ -363,26 +231,18 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         if success:
             save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type=message_type_to_save, text_content=text_content_to_save)
             
-            current_node_type = current_node.get('type')
             target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
-        
-            if current_node_type == 'buttonsNode':
-                logger.info(f"User selected from a buttonsNode menu. Session remains at node {current_node.get('id')}.")
-                # We don't update or delete the session. We leave it as is.
-            
-            # If the next node also has outputs, we advance the session state
-            elif target_has_outputs:
+
+            if target_has_outputs:
                 UserFlowSession.objects.update_or_create(
                     contact=contact,
                     defaults={'flow': flow, 'current_node_id': target_node_id}
                 )
                 logger.info(f"Session for {contact.wa_id} updated to node '{target_node_id}'")
-
-            # Otherwise, this is the end of a branch, so we delete the session.
             else:
                 if session:
                     session.delete()
-                logger.info(f"Flow branch ended for {contact.wa_id}. Session deleted.")
+                logger.info(f"Flow ended for {contact.wa_id}. Session deleted.")
             
             return True
         else:
@@ -395,6 +255,35 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
 
 
 
+#             message_type_to_save = 'interactive'
+#             text_content_to_save = body_text
+    
+#         # --- END OF NEW LOGIC ---
+#         else:
+#             return False
+            
+#         success, response_data = send_whatsapp_message(payload)
+        
+#         if success:
+#             save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type=message_type_to_save, text_content=text_content_to_save)
+#             logger.info(f"Flow step executed successfully for contact {contact.wa_id}")
+#             return True
+#         else:
+#             logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
+#             return False
+
+#     except (Message.DoesNotExist, Flow.DoesNotExist):
+#         logger.warning(f"Could not find original message or flow for wamid {replied_to_wamid}")
+#         return False
+#     except Exception as e:
+#         logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
+#         return False
+# contact_app/views.py
+
+# ... (keep all your other imports and views)
+# contact_app/views.py
+
+# ... (keep all your other imports and views)
 
 def get_whatsapp_templates_api(request):
     """API endpoint to fetch approved WhatsApp templates for the React frontend."""
@@ -433,6 +322,9 @@ def get_whatsapp_templates_api(request):
         logger.error(f"Failed to fetch templates for API: {e}")
         return JsonResponse({"error": "Could not load templates."}, status=500)
 
+# ... (keep all your other views like save_flow_api etc.)
+# ... (keep all your other views like save_flow_api etc.)
+# NEW API VIEW 2: To save the flow from React
 
 
 def get_flows_list_api(request):
@@ -442,6 +334,9 @@ def get_flows_list_api(request):
     return JsonResponse(data, safe=False)
 
 
+# contact_app/views.py
+
+# ...
 
 @csrf_exempt
 def save_flow_api(request):
