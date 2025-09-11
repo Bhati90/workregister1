@@ -114,7 +114,7 @@ class Message(models.Model):
     null=True,
     help_text="Reaction emoji (e.g. 👍, ❤️)."
    )
-    delivery_status = models.CharField(max_length=50, null=True, blank=True, help_text="e.g., sent, delivered, read")
+    delivery = models.CharField(max_length=50, null=True, blank=True, help_text="e.g., sent, delivered, read")
   
     
     timestamp = models.DateTimeField(help_text="Timestamp from the WhatsApp message.")
@@ -135,7 +135,7 @@ class Message(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
 class WhatsAppLog(models.Model):
     recipient_number = models.CharField(max_length=20)
     template_name = models.CharField(max_length=100)
