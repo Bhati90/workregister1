@@ -91,10 +91,18 @@ def whatsapp_webhook_view(request):
         return JsonResponse({"status": "success"}, status=200)
 
 
+# contact_app/views.py
+
+# ... (keep all your other imports: JsonResponse, csrf_exempt, models, etc.)
+import logging
+logger = logging.getLogger(__name__)
+
+# ... (keep your whatsapp_webhook_view and other views)
 
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
     """
     Finds and executes the next step in a flow using a session-based approach.
+    This version only triggers flows marked as active.
     """
     try:
         flow = None
@@ -106,9 +114,13 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         if session:
             # User is already in a flow.
             flow = session.flow
+            if not flow.is_active:
+                logger.warning(f"Contact {contact.wa_id} is in a session for an INACTIVE flow '{flow.name}'. Deleting session.")
+                session.delete()
+                return False # Stop execution
+
             flow_data = flow.flow_data
             nodes = flow_data.get('nodes', [])
-            # Find the node the user was left at
             current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
             logger.info(f"Found active session for contact {contact.wa_id} in flow '{flow.name}' at node '{session.current_node_id}'")
 
@@ -118,15 +130,17 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                 original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
                 template_name = original_message.text_content.replace("Sent template: ", "").strip()
                 
-                # Find the most recently updated flow for this trigger template
-                possible_flows = Flow.objects.filter(template_name=template_name).order_by('-updated_at')
+                # --- MODIFIED LOGIC ---
+                # Find the most recently updated ACTIVE flow for this trigger template
+                possible_flows = Flow.objects.filter(template_name=template_name, is_active=True).order_by('-updated_at')
+                
                 if not possible_flows.exists():
-                    logger.warning(f"No flow found with trigger template: {template_name}")
+                    logger.warning(f"No ACTIVE flow found with trigger template: {template_name}")
                     return False
                 
                 flow = possible_flows.first()
+                # --- END MODIFIED LOGIC ---
                 
-                # Since a new flow is starting, the "current" node is the trigger template
                 flow_data = flow.flow_data
                 nodes = flow_data.get('nodes', [])
                 current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
@@ -147,7 +161,12 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
         
         if not next_edge:
-            logger.warning(f"No outgoing edge found from node '{current_node.get('id')}' for input '{user_input}'")
+            # --- HELPFUL DEBUG LOG ---
+            logger.warning(f"No outgoing edge found from node '{current_node.get('id')}' for input '{user_input}'. Checking available handles:")
+            for edge in edges:
+                if edge.get('source') == current_node.get('id'):
+                    logger.info(f"  - Available sourceHandle: '{edge.get('sourceHandle')}'")
+            # --- END DEBUG LOG ---
             return False
 
         nodes = flow.flow_data.get('nodes', [])
@@ -158,13 +177,13 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             logger.error(f"Edge points to a non-existent target node ID: '{target_node_id}'")
             return False
 
-        # 3. CONSTRUCT AND SEND THE MESSAGE
+        # 3. CONSTRUCT AND SEND THE MESSAGE (This part remains the same)
         node_type = target_node.get('type')
         node_data = target_node.get('data', {})
         payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
         message_type_to_save = 'unknown'
         text_content_to_save = f"Flow Step: {node_type}"
-
+        # ... (All your elif blocks for textNode, templateNode, imageNode, buttonsNode are correct and go here) ...
         if node_type == 'textNode':
             message_text = node_data.get('text', '...')
             payload.update({"type": "text", "text": {"body": message_text}})
@@ -231,7 +250,9 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         if success:
             save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type=message_type_to_save, text_content=text_content_to_save)
             
+            # --- MODIFIED LOGIC WITH DEBUG LOGS ---
             target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
+            logger.info(f"DEBUG-SESSION: Checking for outputs from target_node_id: '{target_node_id}'. Has outputs: {target_has_outputs}")
 
             if target_has_outputs:
                 UserFlowSession.objects.update_or_create(
@@ -242,7 +263,8 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             else:
                 if session:
                     session.delete()
-                logger.info(f"Flow ended for {contact.wa_id}. Session deleted.")
+                logger.info(f"Flow ended for {contact.wa_id} because node has no outputs. Session deleted.")
+            # --- END MODIFIED LOGIC ---
             
             return True
         else:
@@ -250,10 +272,8 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             return False
 
     except Exception as e:
-            logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
-            return False
-
-
+        logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
+        return False
 
 #             message_type_to_save = 'interactive'
 #             text_content_to_save = body_text

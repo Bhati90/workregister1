@@ -12,8 +12,9 @@ class Flows(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
-        return f"Flow for template: {self.template_name}"
+    class Meta:
+        verbose_name_plural = "Flows"
+        ordering = ['-updated_at']
 
     def __str__(self):
         return f"Flow '{self.name}' (Active: {self.is_active})"
@@ -25,9 +26,11 @@ class UserFlowSessions(models.Model):
     current_node_id = models.CharField(max_length=255, help_text="The ID of the user's current node in the flow.")
     updated_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
-        return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
+    class Meta:
+        verbose_name_plural = "User Flow Sessions"
 
+    def __str__(self):
+        return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.name}"
 
 class Flowss(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
