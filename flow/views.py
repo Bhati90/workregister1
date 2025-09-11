@@ -73,14 +73,17 @@ def whatsapp_webhook_view(request):
                                 # This handles both button and list replies
                                 text_content = msg.get('interactive', {}).get('button_reply', {}).get('title') or \
                                                msg.get('interactive', {}).get('list_reply', {}).get('title')
-                            
+                            aware_timestamp = timezone.make_aware(
+                                timezone.datetime.fromtimestamp(int(msg.get('timestamp')))
+                            )
                             Message.objects.create(
                                 contact=contact,
                                 wamid=msg.get('id'),
                                 direction='inbound',
                                 message_type=message_type,
                                 text_content=text_content,
-                                timestamp=timezone.datetime.fromtimestamp(int(msg.get('timestamp')))
+                                timestamp=aware_timestamp,
+                                raw_data=msg
                             )
 
                             # 3b. Process User Input and Trigger Flows
@@ -104,8 +107,7 @@ def whatsapp_webhook_view(request):
                             
                             # Find the outgoing message and update its status
                             Message.objects.filter(wamid=wamid_to_update, direction='outbound').update(
-                                delivery_status=new_status,
-                                updated_at=timezone.now()
+                                status=new_status
                             )
                             logger.info(f"Updated status for wamid {wamid_to_update} to '{new_status}'")
 
