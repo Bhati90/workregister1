@@ -10,11 +10,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='message',
-            name='delivery_status',
-            field=models.CharField(blank=True, help_text='e.g., sent, delivered, read', max_length=50, null=True),
-        ),
+        
         migrations.AddField(
             model_name='message',
             name='updated_at',
