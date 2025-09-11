@@ -217,12 +217,12 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             text_content_to_save = f"Sent template: {target_template_name}"
             
         elif node_type == 'imageNode':
-            image_url = node_data.get('imageUrl')
+            meta_media_id = node_data.get('metaMediaId') # We will now store the Meta Media ID
             caption = node_data.get('caption')
-            if not image_url:
+            if not meta_media_id:
                 logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
                 return False
-            payload.update({"type": "image", "image": {"link": image_url, "caption": caption}})
+            payload.update({"type": "image", "image": {"id": meta_media_id, "caption": caption}})
             message_type_to_save = 'image'
             text_content_to_save = caption or "Sent an image"
             
