@@ -173,7 +173,55 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             })
             message_type_to_save = 'template'
             text_content_to_save = f"Sent template: {target_template_name}"
+           # --- ADD LOGIC FOR NEW NODE TYPES ---
+        
+        elif node_type == 'imageNode':
+            image_url = node_data.get('imageUrl')
+            caption = node_data.get('caption')
+            if not image_url:
+                logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
+                return False
             
+            payload.update({
+                "type": "image",
+                "image": {
+                    "link": image_url,
+                    "caption": caption
+                }
+            })
+            message_type_to_save = 'image'
+            text_content_to_save = caption or "Sent an image"
+            
+        elif node_type == 'buttonsNode':
+            body_text = node_data.get('text')
+            buttons = node_data.get('buttons', [])
+            if not body_text or not buttons:
+                logger.error(f"Flow Error: Buttons node for contact {contact.wa_id} is missing text or buttons.")
+                return False
+
+            action = {
+                "buttons": []
+            }
+            for btn in buttons:
+                action["buttons"].append({
+                    "type": "reply",
+                    "reply": {
+                        "id": btn.get('text'), # The ID and title must be the button text
+                        "title": btn.get('text')
+                    }
+                })
+
+            payload.update({
+                "type": "interactive",
+                "interactive": {
+                    "type": "button",
+                    "body": { "text": body_text },
+                    "action": action
+                }
+            })
+            message_type_to_save = 'interactive'
+            text_content_to_save = body_text
+    
         # --- END OF NEW LOGIC ---
         else:
             return False

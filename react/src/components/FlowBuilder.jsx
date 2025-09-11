@@ -12,9 +12,14 @@ import axios from 'axios';
 import Sidebar from './Sidebar';
 import TemplateNode from './nodes/TemplateNode';
 import TextNode from './nodes/TextNode';
+import ButtonsNode from './nodes/ButtonsNode';
+import ImageNode from './nodes/ImageNode';
 
-const nodeTypes = { templateNode: TemplateNode, textNode: TextNode };
-const API_URL = 'http://127.0.0.1:8000/register/whatsapp'; // Change to your Django server URL
+
+
+const nodeTypes = { templateNode: TemplateNode, textNode: TextNode,buttonsNode: ButtonsNode,
+  imageNode: ImageNode, };
+const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp'; // Change to your Django server URL
 
 let id = 0;
 const getId = () => `dndnode_${id++}`;
@@ -88,6 +93,25 @@ const FlowBuilder = () => {
           id: newNodeId, type, position,
           data: {
             id: newNodeId, text: '',
+            onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
+            onDelete: deleteNode,
+          },
+        };
+      }
+      else if (type === 'buttonsNode') {
+        newNode = {
+          id: newNodeId, type, position,
+          data: {
+            id: newNodeId, text: '', buttons: [],
+            onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
+            onDelete: deleteNode,
+          },
+        };
+      } else if (type === 'imageNode') {
+        newNode = {
+          id: newNodeId, type, position,
+          data: {
+            id: newNodeId, imageUrl: '', caption: '',
             onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
             onDelete: deleteNode,
           },

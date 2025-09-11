@@ -25,6 +25,14 @@ const Sidebar = () => {
       >
         Text Message
       </div>
+
+       {/* --- NEW NODES --- */}
+      <div className="dndnode" onDragStart={(event) => onDragStart(event, 'buttonsNode')} draggable>
+        Text with Buttons
+      </div>
+      <div className="dndnode" onDragStart={(event) => onDragStart(event, 'imageNode')} draggable>
+        Image & Caption
+      </div>
     </aside>
   );
 };
