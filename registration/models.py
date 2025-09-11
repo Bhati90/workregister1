@@ -82,8 +82,7 @@ class Message(models.Model):
         DELIVERED = 'delivered', 'Delivered'
         READ = 'read', 'Read'
         FAILED = 'failed', 'Failed'
-    is_interactive_response_received = models.BooleanField(default=False, help_text="True if a reply to this interactive message has been processed")
-
+    
     contact = models.ForeignKey(ChatContact, on_delete=models.CASCADE, related_name='messages')
     wamid = models.CharField(max_length=255, unique=True, help_text="The unique WhatsApp Message ID from Meta.")
     direction = models.CharField(max_length=10, choices=MessageDirection.choices)
@@ -134,8 +133,7 @@ class Message(models.Model):
         return f"{self.direction.capitalize()} message {self.id} to/from {self.contact.wa_id}"
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
+    
 class WhatsAppLog(models.Model):
     recipient_number = models.CharField(max_length=20)
     template_name = models.CharField(max_length=100)
