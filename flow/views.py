@@ -124,8 +124,8 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             logger.error(f"Could not find a starting template node in Flow ID {flow.id} for template {template_name}")
             return False
         
-        
-        next_edge = next((e for e in edges if e.get('source') == template_node.get('id') and e.get('sourceHandle') == user_input), None)
+
+        next_edge = next((e for e in edges if e.get('source') == trigger_node.get('id') and e.get('sourceHandle') == user_input), None)
         if not next_edge: return False
 
         target_node_id = next_edge.get('target')
