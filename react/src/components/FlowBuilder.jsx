@@ -30,7 +30,7 @@ const FlowBuilder = ({ initialData }) => {
   const navigate = useNavigate();
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.flow_data?.nodes || []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.flow_data?.nodes || []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.flow_data?.edges || []); // <-- CORRECTED
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [templates, setTemplates] = useState([]);
   // const [flowName, setFlowName] = useState('My New Flow');

@@ -103,7 +103,55 @@ import logging
 logger = logging.getLogger(__name__)
 
 # ... (keep your whatsapp_webhook_view and other views)
+# Add this to flow/views.py for debugging purposes
+from .models import Flows as Flow
 
+def debug_flow_data(flow_id):
+    """
+    A utility function to print the structure of a flow's data to find mismatches.
+    Run this in the Django shell: python manage.py shell
+    """
+    try:
+        flow = Flow.objects.get(pk=flow_id)
+        print(f"--- Debugging Flow: '{flow.name}' (ID: {flow.id}) ---")
+        
+        flow_data = flow.flow_data
+        nodes = flow_data.get('nodes', [])
+        edges = flow_data.get('edges', [])
+        
+        if not nodes:
+            print("This flow has no nodes.")
+            return
+
+        print("\nNODES:")
+        for node in nodes:
+            print(f"- Node ID: {node.get('id')}, Type: {node.get('type')}")
+            
+        if not edges:
+            print("\nThis flow has no edges.")
+            return
+            
+        print("\nEDGES (Connections):")
+        for edge in edges:
+            print(f"- From Node '{edge.get('source')}' --> To Node '{edge.get('target')}' (Using handle: '{edge.get('sourceHandle')}')")
+            
+        # Mismatch Check
+        print("\nCHECKING FOR MISMATCHES...")
+        all_node_ids = {n.get('id') for n in nodes}
+        mismatches_found = False
+        for edge in edges:
+            if edge.get('source') not in all_node_ids:
+                print(f"  [!!] MISMATCH FOUND: Edge source '{edge.get('source')}' does not match any known Node ID.")
+                mismatches_found = True
+            if edge.get('target') not in all_node_ids:
+                print(f"  [!!] MISMATCH FOUND: Edge target '{edge.get('target')}' does not match any known Node ID.")
+                mismatches_found = True
+        
+        if not mismatches_found:
+            print("  No ID mismatches found between nodes and edges.")
+            
+    except Flow.DoesNotExist:
+        print(f"Error: Flow with ID {flow_id} not found.")
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
     """
     Finds and executes the next step in a flow using a session-based approach.
