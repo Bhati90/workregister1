@@ -103,14 +103,28 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
         template_name = original_message.text_content.replace("Sent template: ", "").strip()
         
-        flow = Flow.objects.get(template_name=template_name)
+        possible_flows = Flow.objects.filter(template_name=template_name).order_by('-updated_at')
+        
+        if not possible_flows.exists():
+            logger.warning(f"No flow found with trigger template: {template_name}")
+            return False
+        
+        # Always pick the most recently updated flow if multiple exist for the same trigger
+        flow = possible_flows.first()
         flow_data = flow.flow_data
         nodes = flow_data.get('nodes', [])
         edges = flow_data.get('edges', [])
         
-        template_node = next((n for n in nodes if n.get('type') == 'templateNode'), None)
-        if not template_node: return False
+        trigger_node = next((n for n in nodes if n.get('type') == 'templateNode' and n['data'].get('selectedTemplateName') == template_name), None)
+        if not trigger_node:
+             # Fallback for older saved flows
+            trigger_node = next((n for n in nodes if n.get('type') == 'templateNode'), None)
 
+        if not trigger_node: 
+            logger.error(f"Could not find a starting template node in Flow ID {flow.id} for template {template_name}")
+            return False
+        
+        
         next_edge = next((e for e in edges if e.get('source') == template_node.get('id') and e.get('sourceHandle') == user_input), None)
         if not next_edge: return False
 
