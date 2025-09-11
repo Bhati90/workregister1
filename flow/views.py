@@ -96,45 +96,81 @@ def whatsapp_webhook_view(request):
 # contact_app/views.py
 
 # ... (keep all your other imports and views)
+# In contact_app/views.py, make sure these are imported at the top of the file:
+# from .models import Flows as Flow, UserFlowSessions
+# from registration.models import Message
+# import logging
+# logger = logging.getLogger(__name__)
 
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
-    """Finds and executes the next step in a flow."""
+    """
+    Finds and executes the next step in a flow using a session-based approach.
+    """
     try:
-        original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
-        template_name = original_message.text_content.replace("Sent template: ", "").strip()
-        
-        possible_flows = Flow.objects.filter(template_name=template_name).order_by('-updated_at')
-        
-        if not possible_flows.exists():
-            logger.warning(f"No flow found with trigger template: {template_name}")
+        flow = None
+        current_node = None
+
+        # 1. CHECK FOR AN ACTIVE SESSION
+        session = UserFlowSession.objects.filter(contact=contact).first()
+
+        if session:
+            # User is already in a flow.
+            flow = session.flow
+            flow_data = flow.flow_data
+            nodes = flow_data.get('nodes', [])
+            # Find the node the user was left at
+            current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
+            logger.info(f"Found active session for contact {contact.wa_id} in flow '{flow.name}' at node '{session.current_node_id}'")
+
+        else:
+            # NO SESSION: This must be the start of a new flow.
+            try:
+                original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
+                template_name = original_message.text_content.replace("Sent template: ", "").strip()
+                
+                # Find the most recently updated flow for this trigger template
+                possible_flows = Flow.objects.filter(template_name=template_name).order_by('-updated_at')
+                if not possible_flows.exists():
+                    logger.warning(f"No flow found with trigger template: {template_name}")
+                    return False
+                
+                flow = possible_flows.first()
+                
+                # Since a new flow is starting, the "current" node is the trigger template
+                flow_data = flow.flow_data
+                nodes = flow_data.get('nodes', [])
+                current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
+                
+                logger.info(f"Starting new session for contact {contact.wa_id} with flow '{flow.name}'")
+
+            except Message.DoesNotExist:
+                logger.warning(f"No active session and original message for wamid {replied_to_wamid} is not a trigger template.")
+                return False
+
+        # 2. FIND THE NEXT STEP
+        if not flow or not current_node:
+            logger.error(f"Could not determine a flow or current node for contact {contact.wa_id}")
+            if session: session.delete() # Clean up broken session
             return False
-        
-        # Always pick the most recently updated flow if multiple exist for the same trigger
-        flow = possible_flows.first()
-        flow_data = flow.flow_data
-        nodes = flow_data.get('nodes', [])
-        edges = flow_data.get('edges', [])
-        
-        trigger_node = next((n for n in nodes if n.get('type') == 'templateNode' and n['data'].get('selectedTemplateName') == template_name), None)
-        if not trigger_node:
-             # Fallback for older saved flows
-            trigger_node = next((n for n in nodes if n.get('type') == 'templateNode'), None)
 
-        if not trigger_node: 
-            logger.error(f"Could not find a starting template node in Flow ID {flow.id} for template {template_name}")
+        edges = flow.flow_data.get('edges', [])
+        next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
+        
+        if not next_edge:
+            logger.warning(f"No outgoing edge found from node '{current_node.get('id')}' for input '{user_input}'")
             return False
-        
 
-        next_edge = next((e for e in edges if e.get('source') == trigger_node.get('id') and e.get('sourceHandle') == user_input), None)
-        if not next_edge: return False
-
+        nodes = flow.flow_data.get('nodes', [])
         target_node_id = next_edge.get('target')
         target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
-        if not target_node: return False
         
+        if not target_node:
+            logger.error(f"Edge points to a non-existent target node ID: '{target_node_id}'")
+            return False
+
+        # 3. CONSTRUCT AND SEND THE MESSAGE
         node_type = target_node.get('type')
         node_data = target_node.get('data', {})
-        
         payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
         message_type_to_save = 'unknown'
         text_content_to_save = f"Flow Step: {node_type}"
@@ -145,64 +181,39 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             message_type_to_save = 'text'
             text_content_to_save = message_text
         
-        # --- NEW LOGIC TO HANDLE SENDING A TEMPLATE ---
         elif node_type == 'templateNode':
             target_template_name = node_data.get('selectedTemplateName')
             if not target_template_name:
                 logger.error("Flow Error: Target node is a template but no template name is selected.")
                 return False
-
             components = []
-            # Check for header variable
             if 'headerUrl' in node_data and node_data['headerUrl']:
                 components.append({
-                    "type": "header",
-                    "parameters": [{
-                        "type": "image",
-                        "image": { "link": node_data['headerUrl'] }
-                    }]
+                    "type": "header", "parameters": [{"type": "image", "image": { "link": node_data['headerUrl'] }}]
                 })
-            
-            # Check for body variables
             body_params = []
-            # Find all body variables (bodyVar1, bodyVar2, etc.) saved in the node data
-            for i in range(1, 10): # Check for up to 9 variables
+            for i in range(1, 10):
                 var_key = f'bodyVar{i}'
                 if var_key in node_data and node_data[var_key]:
                     body_params.append({ "type": "text", "text": node_data[var_key] })
                 else:
-                    # Stop checking once a variable is missing
                     break
-            
             if body_params:
                 components.append({ "type": "body", "parameters": body_params })
-
             payload.update({
                 "type": "template",
-                "template": {
-                    "name": target_template_name,
-                    "language": { "code": "en" }, # Or your desired language code
-                    "components": components
-                }
+                "template": {"name": target_template_name, "language": { "code": "en_US" }, "components": components }
             })
             message_type_to_save = 'template'
             text_content_to_save = f"Sent template: {target_template_name}"
-           # --- ADD LOGIC FOR NEW NODE TYPES ---
-        
+            
         elif node_type == 'imageNode':
             image_url = node_data.get('imageUrl')
             caption = node_data.get('caption')
             if not image_url:
                 logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
                 return False
-            
-            payload.update({
-                "type": "image",
-                "image": {
-                    "link": image_url,
-                    "caption": caption
-                }
-            })
+            payload.update({"type": "image", "image": {"link": image_url, "caption": caption}})
             message_type_to_save = 'image'
             text_content_to_save = caption or "Sent an image"
             
@@ -212,50 +223,207 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             if not body_text or not buttons:
                 logger.error(f"Flow Error: Buttons node for contact {contact.wa_id} is missing text or buttons.")
                 return False
-
-            action = {
-                "buttons": []
-            }
+            action = {"buttons": []}
             for btn in buttons:
-                action["buttons"].append({
-                    "type": "reply",
-                    "reply": {
-                        "id": btn.get('text'), # The ID and title must be the button text
-                        "title": btn.get('text')
-                    }
-                })
-
+                action["buttons"].append({"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}})
             payload.update({
                 "type": "interactive",
-                "interactive": {
-                    "type": "button",
-                    "body": { "text": body_text },
-                    "action": action
-                }
+                "interactive": {"type": "button", "body": { "text": body_text }, "action": action}
             })
             message_type_to_save = 'interactive'
             text_content_to_save = body_text
-    
-        # --- END OF NEW LOGIC ---
         else:
             return False
             
+        # 4. SEND MESSAGE AND MANAGE SESSION
         success, response_data = send_whatsapp_message(payload)
         
         if success:
             save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type=message_type_to_save, text_content=text_content_to_save)
-            logger.info(f"Flow step executed successfully for contact {contact.wa_id}")
+            
+            target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
+
+            if target_has_outputs:
+                UserFlowSession.objects.update_or_create(
+                    contact=contact,
+                    defaults={'flow': flow, 'current_node_id': target_node_id}
+                )
+                logger.info(f"Session for {contact.wa_id} updated to node '{target_node_id}'")
+            else:
+                if session:
+                    session.delete()
+                logger.info(f"Flow ended for {contact.wa_id}. Session deleted.")
+            
             return True
         else:
             logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
             return False
 
-    except (Message.DoesNotExist, Flow.DoesNotExist):
-        logger.warning(f"Could not find original message or flow for wamid {replied_to_wamid}")
-        return False
     except Exception as e:
-        logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
-        return False
+            logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
+            return False
+
+
+
+# def try_execute_flow_step(contact, user_input, replied_to_wamid):
+#     """Finds and executes the next step in a flow."""
+#     try:
+#         original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
+#         template_name = original_message.text_content.replace("Sent template: ", "").strip()
+        
+#         possible_flows = Flow.objects.filter(template_name=template_name).order_by('-updated_at')
+        
+#         if not possible_flows.exists():
+#             logger.warning(f"No flow found with trigger template: {template_name}")
+#             return False
+        
+#         # Always pick the most recently updated flow if multiple exist for the same trigger
+#         flow = possible_flows.first()
+#         flow_data = flow.flow_data
+#         nodes = flow_data.get('nodes', [])
+#         edges = flow_data.get('edges', [])
+        
+#         trigger_node = next((n for n in nodes if n.get('type') == 'templateNode' and n['data'].get('selectedTemplateName') == template_name), None)
+#         if not trigger_node:
+#              # Fallback for older saved flows
+#             trigger_node = next((n for n in nodes if n.get('type') == 'templateNode'), None)
+
+#         if not trigger_node: 
+#             logger.error(f"Could not find a starting template node in Flow ID {flow.id} for template {template_name}")
+#             return False
+        
+
+#         next_edge = next((e for e in edges if e.get('source') == trigger_node.get('id') and e.get('sourceHandle') == user_input), None)
+#         if not next_edge: return False
+
+#         target_node_id = next_edge.get('target')
+#         target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
+#         if not target_node: return False
+        
+#         node_type = target_node.get('type')
+#         node_data = target_node.get('data', {})
+        
+#         payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
+#         message_type_to_save = 'unknown'
+#         text_content_to_save = f"Flow Step: {node_type}"
+
+#         if node_type == 'textNode':
+#             message_text = node_data.get('text', '...')
+#             payload.update({"type": "text", "text": {"body": message_text}})
+#             message_type_to_save = 'text'
+#             text_content_to_save = message_text
+        
+#         # --- NEW LOGIC TO HANDLE SENDING A TEMPLATE ---
+#         elif node_type == 'templateNode':
+#             target_template_name = node_data.get('selectedTemplateName')
+#             if not target_template_name:
+#                 logger.error("Flow Error: Target node is a template but no template name is selected.")
+#                 return False
+
+#             components = []
+#             # Check for header variable
+#             if 'headerUrl' in node_data and node_data['headerUrl']:
+#                 components.append({
+#                     "type": "header",
+#                     "parameters": [{
+#                         "type": "image",
+#                         "image": { "link": node_data['headerUrl'] }
+#                     }]
+#                 })
+            
+#             # Check for body variables
+#             body_params = []
+#             # Find all body variables (bodyVar1, bodyVar2, etc.) saved in the node data
+#             for i in range(1, 10): # Check for up to 9 variables
+#                 var_key = f'bodyVar{i}'
+#                 if var_key in node_data and node_data[var_key]:
+#                     body_params.append({ "type": "text", "text": node_data[var_key] })
+#                 else:
+#                     # Stop checking once a variable is missing
+#                     break
+            
+#             if body_params:
+#                 components.append({ "type": "body", "parameters": body_params })
+
+#             payload.update({
+#                 "type": "template",
+#                 "template": {
+#                     "name": target_template_name,
+#                     "language": { "code": "en" }, # Or your desired language code
+#                     "components": components
+#                 }
+#             })
+#             message_type_to_save = 'template'
+#             text_content_to_save = f"Sent template: {target_template_name}"
+#            # --- ADD LOGIC FOR NEW NODE TYPES ---
+        
+#         elif node_type == 'imageNode':
+#             image_url = node_data.get('imageUrl')
+#             caption = node_data.get('caption')
+#             if not image_url:
+#                 logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
+#                 return False
+            
+#             payload.update({
+#                 "type": "image",
+#                 "image": {
+#                     "link": image_url,
+#                     "caption": caption
+#                 }
+#             })
+#             message_type_to_save = 'image'
+#             text_content_to_save = caption or "Sent an image"
+            
+#         elif node_type == 'buttonsNode':
+#             body_text = node_data.get('text')
+#             buttons = node_data.get('buttons', [])
+#             if not body_text or not buttons:
+#                 logger.error(f"Flow Error: Buttons node for contact {contact.wa_id} is missing text or buttons.")
+#                 return False
+
+#             action = {
+#                 "buttons": []
+#             }
+#             for btn in buttons:
+#                 action["buttons"].append({
+#                     "type": "reply",
+#                     "reply": {
+#                         "id": btn.get('text'), # The ID and title must be the button text
+#                         "title": btn.get('text')
+#                     }
+#                 })
+
+#             payload.update({
+#                 "type": "interactive",
+#                 "interactive": {
+#                     "type": "button",
+#                     "body": { "text": body_text },
+#                     "action": action
+#                 }
+#             })
+#             message_type_to_save = 'interactive'
+#             text_content_to_save = body_text
+    
+#         # --- END OF NEW LOGIC ---
+#         else:
+#             return False
+            
+#         success, response_data = send_whatsapp_message(payload)
+        
+#         if success:
+#             save_outgoing_message(contact=contact, wamid=response_data['messages'][0]['id'], message_type=message_type_to_save, text_content=text_content_to_save)
+#             logger.info(f"Flow step executed successfully for contact {contact.wa_id}")
+#             return True
+#         else:
+#             logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
+#             return False
+
+#     except (Message.DoesNotExist, Flow.DoesNotExist):
+#         logger.warning(f"Could not find original message or flow for wamid {replied_to_wamid}")
+#         return False
+#     except Exception as e:
+#         logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
+#         return False
 # contact_app/views.py
 
 # ... (keep all your other imports and views)
