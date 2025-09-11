@@ -1,17 +1,22 @@
-// src/App.js
+// src/App.jsx
 import React from 'react';
-import { ReactFlowProvider } from 'reactflow';
-import FlowBuilder from './components/FlowBuilder.jsx';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import FlowListPage from './pages/FlowListPage';
+import FlowBuilderPage from './pages/FlowBuilderPage';
 import 'reactflow/dist/style.css';
 import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <ReactFlowProvider>
-        <FlowBuilder />
-      </ReactFlowProvider>
-    </div>
+    <Router>
+      <div className="App">
+        <Routes>
+          <Route path="/" element={<FlowListPage />} />
+          {/* This one route handles both creating a new flow and editing an existing one */}
+          <Route path="/flow/:flowId" element={<FlowBuilderPage />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 

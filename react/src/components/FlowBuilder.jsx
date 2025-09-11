@@ -1,5 +1,5 @@
 // src/components/FlowBuilder.jsx
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+// import { useRuseCallback, useEffect } from 'react';
 import ReactFlow, {
   addEdge,
   useNodesState,
@@ -15,23 +15,30 @@ import TextNode from './nodes/TextNode';
 import ButtonsNode from './nodes/ButtonsNode';
 import ImageNode from './nodes/ImageNode';
 
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 
 const nodeTypes = { templateNode: TemplateNode, textNode: TextNode,buttonsNode: ButtonsNode,
   imageNode: ImageNode, };
-const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp'; // Change to your Django server URL
+const API_URL = 'http://127.0.0.1:8000/register/whatsapp'; // Change to your Django server URL
 
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
-const FlowBuilder = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+const FlowBuilder = ({ initialData }) => {
+  const navigate = useNavigate();
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.flow_data?.nodes || []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.flow_data?.nodes || []);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [templates, setTemplates] = useState([]);
-  const [flowName, setFlowName] = useState('My New Flow');
+  // const [flowName, setFlowName] = useState('My New Flow');
   const [isLoading, setIsLoading] = useState(true);
 
+
+  const [flowName, setFlowName] = useState(initialData?.name || 'My New Flow');
+  
   const updateNodeData = (nodeId, field, value) => {
     setNodes((nds) =>
       nds.map((node) => {
@@ -130,20 +137,38 @@ const FlowBuilder = () => {
   const onSave = useCallback(() => {
     if (!reactFlowInstance) return;
     const flow = reactFlowInstance.toObject();
+
     const templateNode = flow.nodes.find(n => n.type === 'templateNode');
+
+    const triggerTemplateName = templateNode?.data.selectedTemplateName || null;
+
     if (!templateNode || !templateNode.data.selectedTemplateName) {
       alert("Error: A template must be selected to save the flow.");
       return;
     }
+
+    
+    if (!flowName.trim()) {
+      alert("Please enter a name for the flow.");
+      return;
+    }
     const payload = {
       name: flowName,
-      template_name: templateNode.data.selectedTemplateName,
+      template_name: triggerTemplateName,
       flow: flow,
     };
+
+
     axios.post(`${API_URL}/api/flows/save/`, payload)
-      .then(response => alert(response.data.message))
-      .catch(error => alert("Failed to save flow."));
-  }, [reactFlowInstance, flowName]);
+      .then(response => {
+        alert(response.data.message);
+        navigate('/'); // <-- Navigate back to the list page
+      })
+      .catch(error => {
+        console.error("Error saving flow:", error);
+        alert("Failed to save flow.");
+      });
+  }, [reactFlowInstance, flowName, navigate]);
 
   return (
     <div className="dndflow">
@@ -177,6 +202,10 @@ const FlowBuilder = () => {
           <Background />
         </ReactFlow>
       </div>
+
+      <div className="back-to-list">
+         <button onClick={() => navigate('/')}>← Back to Flows</button>
+       </div>
     </div>
   );
 };

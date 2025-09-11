@@ -82,6 +82,7 @@ class Message(models.Model):
         DELIVERED = 'delivered', 'Delivered'
         READ = 'read', 'Read'
         FAILED = 'failed', 'Failed'
+    is_interactive_response_received = models.BooleanField(default=False, help_text="True if a reply to this interactive message has been processed")
 
     contact = models.ForeignKey(ChatContact, on_delete=models.CASCADE, related_name='messages')
     wamid = models.CharField(max_length=255, unique=True, help_text="The unique WhatsApp Message ID from Meta.")
@@ -113,7 +114,8 @@ class Message(models.Model):
     null=True,
     help_text="Reaction emoji (e.g. 👍, ❤️)."
    )
-
+    delivery_status = models.CharField(max_length=50, null=True, blank=True, help_text="e.g., sent, delivered, read")
+  
     
     timestamp = models.DateTimeField(help_text="Timestamp from the WhatsApp message.")
     media_id = models.CharField(max_length=255, blank=True, null=True)

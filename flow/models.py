@@ -5,6 +5,7 @@ from registration.models import ChatContact
 class Flows(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
     name = models.CharField(max_length=255, unique=True, default="Untitled Flow")
+    is_active = models.BooleanField(default=True, help_text="Indicates if the flow is currently active and can be triggered.")
 
     template_name = models.CharField(max_length=250, unique=False, help_text="The template that triggers this flow. Other templates can be used inside.")
     flow_data = models.JSONField(help_text="The entire JSON object from React Flow (nodes and edges).")
@@ -14,6 +15,9 @@ class Flows(models.Model):
     def __str__(self):
         return f"Flow for template: {self.template_name}"
 
+    def __str__(self):
+        return f"Flow '{self.name}' (Active: {self.is_active})"
+    
 class UserFlowSessions(models.Model):
     """Tracks the current position of a contact within a flow."""
     contact = models.OneToOneField(ChatContact, on_delete=models.CASCADE, primary_key=True)
