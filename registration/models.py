@@ -134,7 +134,8 @@ class Message(models.Model):
         return f"{self.direction.capitalize()} message {self.id} to/from {self.contact.wa_id}"
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
-
+    updated_at = models.DateTimeField(auto_now=True)
+    
 class WhatsAppLog(models.Model):
     recipient_number = models.CharField(max_length=20)
     template_name = models.CharField(max_length=100)
