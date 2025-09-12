@@ -171,7 +171,12 @@ def send_whatsapp_message(payload):
         logger.error(f"Error from Meta API. Status: {e.response.status_code if e.response else 'N/A'}. Details: {error_details}")
         
         return False, error_details
-def save_outgoing_message(contact, wamid, message_type, text_content="", caption="", raw_data={}, replied_to_wamid=None,media_file = None):
+    
+
+def save_outgoing_message(contact, wamid, message_type, text_content="", caption="", raw_data={}, replied_to_wamid=None, media_file=None, source_node_id=None):
+    """
+    Saves an outgoing message to the database, now including the source_node_id from a flow.
+    """
     defaults = {
         'contact': contact,
         'direction': 'outbound',
@@ -180,8 +185,10 @@ def save_outgoing_message(contact, wamid, message_type, text_content="", caption
         'caption': caption,
         'timestamp': timezone.now(),
         'raw_data': raw_data,
-        'status': 'sent'
+        'status': 'sent',
+        'source_node_id': source_node_id  # <-- ADDED THIS LINE
     }
+    
     if replied_to_wamid:
         try:
             defaults['replied_to'] = Message.objects.get(wamid=replied_to_wamid)

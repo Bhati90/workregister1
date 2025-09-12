@@ -114,7 +114,7 @@ class Message(models.Model):
     help_text="Reaction emoji (e.g. 👍, ❤️)."
    )
     delivery_status = models.CharField(max_length=50, null=True, blank=True, help_text="e.g., sent, delivered, read")
-  
+    source_node_id = models.CharField(max_length=255, null=True, blank=True, help_text="The ID of the flow node that sent this message.")
     
     
     timestamp = models.DateTimeField(help_text="Timestamp from the WhatsApp message.")
