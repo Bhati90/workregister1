@@ -158,71 +158,55 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
     This version only triggers flows marked as active.
     """
     try:
-        flow = None
-        current_node = None
-
-        # 1. CHECK FOR AN ACTIVE SESSION
         session = UserFlowSession.objects.filter(contact=contact).first()
+        flow = session.flow if session else None
+        current_node = None
+        next_edge = None
 
+        # --- Stage 1: Try to find the next step based on the current session ---
         if session:
-            # User is already in a flow.
-            flow = session.flow
-            # if not flow.is_active:
-            #     logger.warning(f"Contact {contact.wa_id} is in a session for an INACTIVE flow '{flow.name}'. Deleting session.")
-            #     session.delete()
-            #     return False # Stop execution
-
-            flow_data = flow.flow_data
-            nodes = flow_data.get('nodes', [])
+            logger.info(f"Found active session for contact {contact.wa_id} in flow '{flow.name}' at node '{session.current_node_id}'.")
+            nodes = flow.flow_data.get('nodes', [])
             current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
-            logger.info(f"Found active session for contact {contact.wa_id} in flow '{flow.name}' at node '{session.current_node_id}'")
-        # 2. FIND THE NEXT STEP FROM THE CURRENT NODE
-        if flow and current_node:
-            edges = flow.flow_data.get('edges', [])
-            next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-        else:
-            next_edge = None
+            if current_node:
+                edges = flow.flow_data.get('edges', [])
+                next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
 
+        # --- Stage 2: If no path found, try to branch from a historical message ---
         if not next_edge:
-            logger.warning(f"No path from current node '{current_node.get('id') if current_node else 'None'}' for input '{user_input}'.")
-            logger.info("Attempting to find a path from the replied-to message context...")
-            
+            logger.warning(f"No valid path from current session. Attempting to branch from historical context of replied message...")
             try:
-                # Find the original message the user replied to
                 original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound')
                 historical_node_id = original_message.source_node_id
 
                 if historical_node_id:
-                    # If the flow isn't loaded yet (no session), load it now
+                    # If we don't know the flow (because the session was deleted), we must find it.
                     if not flow:
-                        # We need to find which flow this node belongs to. This is a limitation.
-                        # For simplicity, we'll assume the user is still in the same flow if they had a session.
-                        # If no session, this will be harder. Let's assume a session exists for this logic.
-                        if session:
-                             flow = session.flow
-                        else:
-                            # Fallback: Try to find a flow containing this node_id (less efficient)
-                            # This part is complex, for now we will rely on an existing session.
-                            logger.error("Cannot determine flow without an active session for historical branching.")
-                            return False
-
-                    logger.info(f"Found historical context: User is replying to a message from node '{historical_node_id}'.")
-                    nodes = flow.flow_data.get('nodes', [])
-                    current_node = next((n for n in nodes if n.get('id') == historical_node_id), None)
+                        logger.info("No active flow. Searching all active flows for historical node...")
+                        # This is the new, robust fallback logic
+                        active_flows = Flow.objects.filter(is_active=True)
+                        for f in active_flows:
+                            # Check if the historical node exists in this flow's data
+                            if any(n.get('id') == historical_node_id for n in f.flow_data.get('nodes', [])):
+                                flow = f
+                                logger.info(f"Found historical node in flow '{flow.name}'.")
+                                break
                     
-                    if current_node:
-                        edges = flow.flow_data.get('edges', [])
-                        next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-                        if next_edge:
-                            logger.info(f"SUCCESS: Found a valid historical path. The user is branching the flow from '{historical_node_id}'.")
-
+                    if flow:
+                        nodes = flow.flow_data.get('nodes', [])
+                        current_node = next((n for n in nodes if n.get('id') == historical_node_id), None)
+                        if current_node:
+                            edges = flow.flow_data.get('edges', [])
+                            next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
+                            if next_edge:
+                                logger.info(f"SUCCESS: Found a valid historical path. Branching from node '{historical_node_id}'.")
             except Message.DoesNotExist:
-                 logger.warning(f"Could not find the original message for wamid {replied_to_wamid} to check historical context.")
-                 pass # Will proceed to the final check which will fail
-
-        # ---
-        # 3. IF STILL NO PATH, TRY TO START A NEW FLOW
+                logger.debug("Replied-to message not found in DB for historical check.")
+                pass
+        
+        # --- Stage 3: If still no path, try to start a brand new flow ---
         if not next_edge:
+            logger.warning(f"No historical path found. Attempting to start a new flow from a trigger template...")
             try:
                 original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
                 template_name = original_message.text_content.replace("Sent template: ", "").strip()
@@ -232,79 +216,28 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                     flow = possible_flows.first()
                     nodes = flow.flow_data.get('nodes', [])
                     current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
-                    edges = flow.flow_data.get('edges', [])
-                    next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-                    logger.info(f"Starting a new session for contact {contact.wa_id} with flow '{flow.name}'")
-
+                    if current_node:
+                        edges = flow.flow_data.get('edges', [])
+                        next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
+                        if next_edge:
+                            logger.info(f"SUCCESS: Starting new session for contact {contact.wa_id} with flow '{flow.name}'")
             except Message.DoesNotExist:
-                pass # This is expected if it's not a trigger template
+                logger.debug("Replied-to message is not a trigger template.")
+                pass
 
-        # 4. FINAL CHECK AND EXECUTION
+        # --- Stage 4: Final check and execution ---
         if not flow or not current_node or not next_edge:
-            logger.error(f"After all checks, could not determine a valid next step for contact {contact.wa_id}")
+            logger.error(f"After all checks, could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'. Halting execution.")
             return False
 
         nodes = flow.flow_data.get('nodes', [])
+        edges = flow.flow_data.get('edges', [])
         target_node_id = next_edge.get('target')
         target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
         
         if not target_node:
-            logger.error(f"Edge points to a non-existent target node ID: '{target_node_id}'")
+            logger.error(f"FATAL: Edge points to a non-existent target node ID: '{target_node_id}'")
             return False
-
-        # else:
-        #     # NO SESSION: This must be the start of a new flow.
-        #     try:
-        #         original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
-        #         template_name = original_message.text_content.replace("Sent template: ", "").strip()
-                
-        #         # --- MODIFIED LOGIC ---
-        #         # Find the most recently updated ACTIVE flow for this trigger template
-        #         possible_flows = Flow.objects.filter(template_name=template_name, is_active=True).order_by('-updated_at')
-                
-        #         if not possible_flows.exists():
-        #             logger.warning(f"No ACTIVE flow found with trigger template: {template_name}")
-        #             return False
-                
-        #         flow = possible_flows.first()
-        #         # --- END MODIFIED LOGIC ---
-                
-        #         flow_data = flow.flow_data
-        #         nodes = flow_data.get('nodes', [])
-        #         current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
-                
-        #         logger.info(f"Starting new session for contact {contact.wa_id} with flow '{flow.name}'")
-
-        #     except Message.DoesNotExist:
-        #         logger.warning(f"No active session and original message for wamid {replied_to_wamid} is not a trigger template.")
-        #         return False
-
-        # # 2. FIND THE NEXT STEP
-        # if not flow or not current_node:
-        #     logger.error(f"Could not determine a flow or current node for contact {contact.wa_id}")
-        #     if session: session.delete() # Clean up broken session
-        #     return False
-
-        # edges = flow.flow_data.get('edges', [])
-        # next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-        
-        # if not next_edge:
-        #     # --- HELPFUL DEBUG LOG ---
-        #     logger.warning(f"No outgoing edge found from node '{current_node.get('id')}' for input '{user_input}'. Checking available handles:")
-        #     for edge in edges:
-        #         if edge.get('source') == current_node.get('id'):
-        #             logger.info(f"  - Available sourceHandle: '{edge.get('sourceHandle')}'")
-        #     # --- END DEBUG LOG ---
-        #     return False
-
-        # nodes = flow.flow_data.get('nodes', [])
-        # target_node_id = next_edge.get('target')
-        # target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
-        
-        # if not target_node:
-        #     logger.error(f"Edge points to a non-existent target node ID: '{target_node_id}'")
-        #     return False
-
         # 3. CONSTRUCT AND SEND THE MESSAGE (This part remains the same)
         node_type = target_node.get('type')
         node_data = target_node.get('data', {})
