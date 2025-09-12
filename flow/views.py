@@ -339,7 +339,7 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                 components.append({ "type": "body", "parameters": body_params })
             payload.update({
                 "type": "template",
-                "template": {"name": target_template_name, "language": { "code": "en_US" }, "components": components }
+                "template": {"name": target_template_name, "language": { "code": "en" }, "components": components }
             })
             message_type_to_save = 'template'
             text_content_to_save = f"Sent template: {target_template_name}"
