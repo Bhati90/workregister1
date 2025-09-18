@@ -33,6 +33,16 @@ const Sidebar = () => {
       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'imageNode')} draggable>
         Image & Caption
       </div>
+
+            <div className="dndnode" onDragStart={(event) => onDragStart(event, 'interactiveImageNode')} draggable>
+        Image with Buttons
+      </div>
+      <div className="dndnode" onDragStart={(event) => onDragStart(event, 'interactiveListNode')} draggable>
+        Interactive List
+      </div>
+       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'mediaNode')} draggable>
+        Media Message
+      </div>
     </aside>
   );
 };

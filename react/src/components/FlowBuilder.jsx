@@ -1,5 +1,4 @@
-// src/components/FlowBuilder.jsx
-// import { useRuseCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   addEdge,
   useNodesState,
@@ -9,34 +8,42 @@ import ReactFlow, {
   Panel,
 } from 'reactflow';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
+
+// Import all node types
 import TemplateNode from './nodes/TemplateNode';
 import TextNode from './nodes/TextNode';
 import ButtonsNode from './nodes/ButtonsNode';
 import ImageNode from './nodes/ImageNode';
+import InteractiveImageNode from './nodes/ImageButton';
+import InteractiveListNode from './nodes/ListNode';
+import MediaNode from './nodes/MediaNode';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
+// --- REGISTER ALL NODE TYPES ---
+const nodeTypes = { 
+  templateNode: TemplateNode, 
+  textNode: TextNode,
+  buttonsNode: ButtonsNode,
+  imageNode: ImageNode,
+  interactiveImageNode: InteractiveImageNode,
+  interactiveListNode: InteractiveListNode,
+  mediaNode: MediaNode,
+};
 
-const nodeTypes = { templateNode: TemplateNode, textNode: TextNode,buttonsNode: ButtonsNode,
-  imageNode: ImageNode, };
-const API_URL = 'http://127.0.0.1:8000/register/whatsapp'; // Change to your Django server URL
+const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
 
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
 const FlowBuilder = ({ initialData }) => {
   const navigate = useNavigate();
-
   const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.flow_data?.nodes || []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.flow_data?.edges || []); // <-- CORRECTED
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.flow_data?.edges || []);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [templates, setTemplates] = useState([]);
-  // const [flowName, setFlowName] = useState('My New Flow');
   const [isLoading, setIsLoading] = useState(true);
-
-
   const [flowName, setFlowName] = useState(initialData?.name || 'My New Flow');
   
   const updateNodeData = (nodeId, field, value) => {
@@ -57,16 +64,9 @@ const FlowBuilder = ({ initialData }) => {
 
   useEffect(() => {
     axios.get(`${API_URL}/api/templates/`)
-      .then(response => {
-        setTemplates(response.data);
-      })
-      .catch(error => {
-        console.error("Could not fetch WhatsApp templates:", error);
-        alert("Could not fetch WhatsApp templates from the server.");
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+      .then(response => setTemplates(response.data))
+      .catch(error => console.error("Could not fetch WhatsApp templates:", error))
+      .finally(() => setIsLoading(false));
   }, []);
 
   const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
@@ -81,88 +81,68 @@ const FlowBuilder = ({ initialData }) => {
       const type = event.dataTransfer.getData('application/reactflow');
       if (typeof type === 'undefined' || !type) return;
 
-     
       const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
       const newNodeId = getId();
+      
+      const commonData = {
+        id: newNodeId,
+        onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
+        onDelete: deleteNode,
+      };
+      
       let newNode;
-
-      if (type === 'templateNode') {
-        newNode = {
-          id: newNodeId, type, position,
-          data: {
-            id: newNodeId, templates: templates,
-            onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
-            onDelete: deleteNode,
-          },
-        };
-      } else if (type === 'textNode') {
-        newNode = {
-          id: newNodeId, type, position,
-          data: {
-            id: newNodeId, text: '',
-            onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
-            onDelete: deleteNode,
-          },
-        };
+      switch (type) {
+        case 'templateNode':
+          newNode = { id: newNodeId, type, position, data: { ...commonData, templates: templates } };
+          break;
+        case 'textNode':
+          newNode = { id: newNodeId, type, position, data: { ...commonData, text: '' } };
+          break;
+        case 'buttonsNode':
+          newNode = { id: newNodeId, type, position, data: { ...commonData, text: '', buttons: [] } };
+          break;
+        case 'imageNode':
+          newNode = { id: newNodeId, type, position, data: { ...commonData,  metaMediaId: '', imageUrl: '', caption: '' } };
+          break;
+        // --- ADD NEW NODE INITIALIZATION ---
+        case 'interactiveImageNode':
+            newNode = { id: newNodeId, type, position, data: { ...commonData, metaMediaId: '', imageUrl: '', bodyText: '', buttons: [] }};
+            break;
+        case 'interactiveListNode':
+            newNode = { id: newNodeId, type, position, data: { ...commonData, header: '', body: '', footer: '', buttonText: '', sections: [] }};
+            break;
+        case 'mediaNode':
+            newNode = { id: newNodeId, type, position, data: { ...commonData, mediaType: 'document', metaMediaId: '', mediaUrl: '', caption: '', filename: '' }};
+            break;
+        default:
+            return;
       }
-      else if (type === 'buttonsNode') {
-        newNode = {
-          id: newNodeId, type, position,
-          data: {
-            id: newNodeId, text: '', buttons: [],
-            onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
-            onDelete: deleteNode,
-          },
-        };
-      } else if (type === 'imageNode') {
-        newNode = {
-          id: newNodeId, type, position,
-          data: {
-            id: newNodeId,  metaMediaId: '', // Initialize Meta Media ID
-            imageUrl: '', // Will store filename for display
-            caption: '',
-            onUpdate: (field, value) => updateNodeData(newNodeId, field, value),
-            onDelete: deleteNode,
-          },
-        };
-      }
-
-      if (newNode) {
-        setNodes((nds) => nds.concat(newNode));
-      }
+      
+      setNodes((nds) => nds.concat(newNode));
     },
-    [reactFlowInstance, nodes, templates, deleteNode]
+    [reactFlowInstance, templates, deleteNode]
   );
   
   const onSave = useCallback(() => {
     if (!reactFlowInstance) return;
     const flow = reactFlowInstance.toObject();
-
     const templateNode = flow.nodes.find(n => n.type === 'templateNode');
-
     const triggerTemplateName = templateNode?.data.selectedTemplateName || null;
 
-    if (!templateNode || !templateNode.data.selectedTemplateName) {
-      alert("Error: A template must be selected to save the flow.");
+    if (!templateNode || !triggerTemplateName) {
+      alert("Error: A 'WhatsApp Template' node must exist and have a template selected to save the flow.");
       return;
     }
-
-    
     if (!flowName.trim()) {
       alert("Please enter a name for the flow.");
       return;
     }
-    const payload = {
-      name: flowName,
-      template_name: triggerTemplateName,
-      flow: flow,
-    };
-
+    const payload = { name: flowName, template_name: triggerTemplateName, flow: flow };
 
     axios.post(`${API_URL}/api/flows/save/`, payload)
       .then(response => {
         alert(response.data.message);
-        navigate('/'); // <-- Navigate back to the list page
+        navigate('/');
       })
       .catch(error => {
         console.error("Error saving flow:", error);
@@ -172,13 +152,7 @@ const FlowBuilder = ({ initialData }) => {
 
   return (
     <div className="dndflow">
-      { !isLoading ? (
-        <Sidebar />
-      ) : (
-        <div className="sidebar loading-pane">
-          <p>Loading Templates...</p>
-        </div>
-      )}
+      {!isLoading ? <Sidebar /> : <div className="sidebar loading-pane"><p>Loading...</p></div>}
       <div className="reactflow-wrapper">
         <ReactFlow
           nodes={nodes}
@@ -202,8 +176,7 @@ const FlowBuilder = ({ initialData }) => {
           <Background />
         </ReactFlow>
       </div>
-
-      <div className="back-to-list">
+       <div className="back-to-list">
          <button onClick={() => navigate('/')}>← Back to Flows</button>
        </div>
     </div>

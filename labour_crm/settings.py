@@ -412,6 +412,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 #     'django.contrib.staticfiles',
 #     # 'authentication',
 #     #        # PWA support
+#     'analytics',
 #     'rest_framework',
 #     'corsheaders',
 #     'flow',
