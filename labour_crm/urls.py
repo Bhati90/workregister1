@@ -29,7 +29,7 @@ urlpatterns = [
     path('register/', include('registration.urls', namespace='registration')), # Added namespace
     path('register/whatsapp/', include('flow.urls')),
     path('', include('pwa.urls')), # PWA URLs at the root level
-    path('register/api/analytics/', include('analytics.urls')), # <-- Add this line
+    # path('register/api/analytics/', include('analytics.urls')), # <-- Add this line
 
     # A root URL that redirects to the registration home page.
     # Be careful with conflicts here. This will match before pwa.urls if ordered higher.
