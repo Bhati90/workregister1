@@ -116,12 +116,61 @@ def whatsapp_webhook_view(request):
                                 continue
                             
                     elif 'statuses' in value:
-                        # Handle status updates
-                        pass
+                        for status_update in value.get('statuses', []):
+                            if status_update.get('status') == 'read':
+                                wamid = status_update.get('id')
+                                wa_id = status_update.get('recipient_id')
+                                logger.info(f"Received 'read' status for message {wamid} from user {wa_id}.")
+                                try_execute_status_trigger(wamid, wa_id)
+
+    
         except Exception as e:
             logger.error(f"Error in webhook: {e}", exc_info=True)
         
         return JsonResponse({"status": "success"}, status=200)
+
+def try_execute_status_trigger(wamid, wa_id):
+    """
+    Executes a flow step triggered by a 'read' status update.
+    """
+    try:
+        message = Message.objects.get(wamid=wamid)
+        contact = ChatContact.objects.get(wa_id=wa_id)
+        session = UserFlowSession.objects.filter(contact=contact).first()
+
+        if not session or not message.source_node_id:
+            logger.warning("No active session or source node ID for status trigger. Halting.")
+            return False
+
+        flow = session.flow
+        source_node_id = message.source_node_id
+        
+        edges = flow.flow_data.get('edges', [])
+        # Find the edge connected to the "onRead" handle
+        next_edge = next((e for e in edges if e.get('source') == source_node_id and e.get('sourceHandle') == 'onRead'), None)
+
+        if not next_edge:
+            logger.info(f"No 'onRead' trigger found for node {source_node_id}.")
+            return False
+
+        nodes = flow.flow_data.get('nodes', [])
+        target_node_id = next_edge.get('target')
+        target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
+
+        if not target_node:
+            logger.error(f"'onRead' edge points to a non-existent target node ID: {target_node_id}")
+            return False
+            
+        logger.info(f"Executing 'onRead' trigger from node {source_node_id} to {target_node_id}.")
+        # Re-use the main flow execution logic to send the message and update the session
+        return execute_flow_node(contact, flow, target_node)
+
+    except (Message.DoesNotExist, ChatContact.DoesNotExist):
+        logger.warning(f"Could not find message or contact for status update (wamid: {wamid})")
+        return False
+    except Exception as e:
+        logger.error(f"CRITICAL STATUS TRIGGER ERROR: {e}", exc_info=True)
+        return False
 
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
     """
@@ -367,6 +416,49 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
         return False
 
+def execute_flow_node(contact, flow, target_node):
+    """
+    Helper function to construct and send a message for a given target node
+    and update the user's session.
+    """
+    target_node_id = target_node.get('id')
+    node_type = target_node.get('type')
+    node_data = target_node.get('data', {})
+    
+    payload = {}
+    message_type_to_save = node_type
+    text_content_to_save = f"Flow Step: {node_type}"
+
+    # ... (This is the same message construction logic from your try_execute_flow_step function)
+    if node_type == 'interactiveListNode':
+        # ... (logic for list node)
+        pass # Add your other node types here as well
+    
+    # Send the message
+    final_payload = {"messaging_product": "whatsapp", "to": contact.wa_id, **payload}
+    success, response_data = send_whatsapp_message(final_payload)
+
+    if success:
+        wamid = response_data['messages'][0]['id']
+        save_outgoing_message(
+            contact=contact, wamid=wamid, message_type=message_type_to_save, 
+            text_content=text_content_to_save, source_node_id=target_node_id
+        )
+        
+        edges = flow.flow_data.get('edges', [])
+        target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
+        
+        if target_has_outputs:
+            UserFlowSession.objects.update_or_create(
+                contact=contact,
+                defaults={'flow': flow, 'current_node_id': target_node_id}
+            )
+            logger.info(f"Session for {contact.wa_id} set to node '{target_node_id}'")
+        else:
+            UserFlowSession.objects.filter(contact=contact).delete()
+            logger.info(f"Flow ended for {contact.wa_id}. Session deleted.")
+        return True
+    return False
 # Keep all your other existing views (get_whatsapp_templates_api, save_flow_api, etc.)
 # @csrf_exempt
 # def whatsapp_webhook_view(request):

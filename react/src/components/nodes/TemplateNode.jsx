@@ -1,5 +1,3 @@
-// src/components/nodes/TemplateNode.jsx
-
 import React, { memo, useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 
@@ -101,6 +99,18 @@ export default memo(({ data, isConnectable }) => {
                     This template has no Quick Reply buttons to connect.
                 </div>
             ) : null}
+
+            {/* --- NEW "On Read" TRIGGER HANDLE --- */}
+            <div className="output-handle-wrapper event-handle">
+                <span>On Read</span>
+                <Handle
+                    type="source"
+                    position={Position.Right}
+                    id="onRead" 
+                    isConnectable={isConnectable}
+                    style={{ background: '#28a745' }} // Green color to distinguish
+                />
+            </div>
         </div>
     </div>
   );
