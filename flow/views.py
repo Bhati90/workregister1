@@ -137,13 +137,33 @@ def try_execute_status_trigger(wamid, wa_id):
         message = Message.objects.get(wamid=wamid)
         contact = ChatContact.objects.get(wa_id=wa_id)
         session = UserFlowSession.objects.filter(contact=contact).first()
-
-        if not session or not message.source_node_id:
-            logger.warning("No active session or source node ID for status trigger. Halting.")
-            return False
-
-        flow = session.flow
+        
         source_node_id = message.source_node_id
+        flow = None
+        
+        # --- NEW FALLBACK LOGIC ---
+        # If the source_node_id is missing, it might be the initial trigger template.
+        if not source_node_id and message.message_type == 'template':
+            logger.info(f"Message {wamid} has no source node. Checking if it's a trigger template.")
+            template_name = message.text_content.replace("Sent template: ", "").strip()
+            # Find the flow that this template triggers
+            possible_flow = Flow.objects.filter(template_name=template_name, is_active=True).order_by('-updated_at').first()
+            if possible_flow:
+                flow = possible_flow
+                nodes = flow.flow_data.get('nodes', [])
+                # Find the starting template node in that flow
+                start_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
+                if start_node:
+                    source_node_id = start_node.get('id')
+                    logger.info(f"Identified trigger template. Deduced source node ID: {source_node_id}")
+
+        # If a session exists, use its flow.
+        elif session:
+            flow = session.flow
+
+        if not flow or not source_node_id:
+            logger.warning("Could not determine a flow or source node for this status trigger. Halting.")
+            return False
         
         edges = flow.flow_data.get('edges', [])
         # Find the edge connected to the "onRead" handle
@@ -172,254 +192,11 @@ def try_execute_status_trigger(wamid, wa_id):
         logger.error(f"CRITICAL STATUS TRIGGER ERROR: {e}", exc_info=True)
         return False
 
-def try_execute_flow_step(contact, user_input, replied_to_wamid):
-    """
-    Finds and executes the next step in a flow using a session-based approach.
-    This version handles interactive list selections properly.
-    """
-    try:
-        session = UserFlowSession.objects.filter(contact=contact).first()
-        flow = session.flow if session else None
-        current_node = None
-        next_edge = None
-
-        # Stage 1: Try to find the next step based on the current session
-        if session:
-            logger.info(f"Found active session for contact {contact.wa_id} in flow '{flow.name}' at node '{session.current_node_id}'.")
-            nodes = flow.flow_data.get('nodes', [])
-            current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
-            if current_node:
-                edges = flow.flow_data.get('edges', [])
-                next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-
-        # Stage 2: If no path found, try to branch from a historical message
-        if not next_edge:
-            logger.warning(f"No valid path from current session. Attempting to branch from historical context...")
-            try:
-                original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound')
-                historical_node_id = original_message.source_node_id
-
-                if historical_node_id:
-                    if not flow:
-                        logger.info("No active flow. Searching all active flows for historical node...")
-                        active_flows = Flow.objects.filter(is_active=True)
-                        for f in active_flows:
-                            if any(n.get('id') == historical_node_id for n in f.flow_data.get('nodes', [])):
-                                flow = f
-                                logger.info(f"Found historical node in flow '{flow.name}'.")
-                                break
-                    
-                    if flow:
-                        nodes = flow.flow_data.get('nodes', [])
-                        current_node = next((n for n in nodes if n.get('id') == historical_node_id), None)
-                        if current_node:
-                            edges = flow.flow_data.get('edges', [])
-                            next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-                            if next_edge:
-                                logger.info(f"SUCCESS: Found a valid historical path. Branching from node '{historical_node_id}'.")
-            except Message.DoesNotExist:
-                logger.debug("Replied-to message not found in DB for historical check.")
-
-        # Stage 3: If still no path, try to start a brand new flow
-        if not next_edge:
-            logger.warning(f"No historical path found. Attempting to start a new flow from a trigger template...")
-            try:
-                original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
-                template_name = original_message.text_content.replace("Sent template: ", "").strip()
-                possible_flows = Flow.objects.filter(template_name=template_name, is_active=True).order_by('-updated_at')
-                
-                if possible_flows.exists():
-                    flow = possible_flows.first()
-                    nodes = flow.flow_data.get('nodes', [])
-                    current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
-                    if current_node:
-                        edges = flow.flow_data.get('edges', [])
-                        next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-                        if next_edge:
-                            logger.info(f"SUCCESS: Starting new session for contact {contact.wa_id} with flow '{flow.name}'")
-            except Message.DoesNotExist:
-                logger.debug("Replied-to message is not a trigger template.")
-
-        # Stage 4: Final check and execution
-        if not flow or not current_node or not next_edge:
-            logger.error(f"After all checks, could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'. Halting execution.")
-            return False
-
-        nodes = flow.flow_data.get('nodes', [])
-        edges = flow.flow_data.get('edges', [])
-        target_node_id = next_edge.get('target')
-        target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
-        
-        if not target_node:
-            logger.error(f"FATAL: Edge points to a non-existent target node ID: '{target_node_id}'")
-            return False
-
-        # Construct and send the message
-        node_type = target_node.get('type')
-        node_data = target_node.get('data', {})
-        payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
-        message_type_to_save = 'unknown'
-        text_content_to_save = f"Flow Step: {node_type}"
-
-        if node_type == 'textNode':
-            message_text = node_data.get('text', '...')
-            payload.update({"type": "text", "text": {"body": message_text}})
-            message_type_to_save = 'text'
-            text_content_to_save = message_text
-        
-        elif node_type == 'templateNode':
-            target_template_name = node_data.get('selectedTemplateName')
-            if not target_template_name:
-                logger.error("Flow Error: Target node is a template but no template name is selected.")
-                return False
-            components = []
-            if 'headerUrl' in node_data and node_data['headerUrl']:
-                components.append({
-                    "type": "header", "parameters": [{"type": "image", "image": { "link": node_data['headerUrl'] }}]
-                })
-            body_params = []
-            for i in range(1, 10):
-                var_key = f'bodyVar{i}'
-                if var_key in node_data and node_data[var_key]:
-                    body_params.append({ "type": "text", "text": node_data[var_key] })
-                else:
-                    break
-            if body_params:
-                components.append({ "type": "body", "parameters": body_params })
-            payload.update({
-                "type": "template",
-                "template": {"name": target_template_name, "language": { "code": "en" }, "components": components }
-            })
-            message_type_to_save = 'template'
-            text_content_to_save = f"Sent template: {target_template_name}"
-            
-        elif node_type == 'imageNode':
-            meta_media_id = node_data.get('metaMediaId')
-            caption = node_data.get('caption')
-            if not meta_media_id:
-                logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no media ID.")
-                return False
-            payload.update({"type": "image", "image": {"id": meta_media_id, "caption": caption}})
-            message_type_to_save = 'image'
-            text_content_to_save = caption or "Sent an image"
-            
-        elif node_type == 'buttonsNode':
-            body_text = node_data.get('text')
-            buttons = node_data.get('buttons', [])
-            if not body_text or not buttons:
-                logger.error(f"Flow Error: Buttons node for contact {contact.wa_id} is missing text or buttons.")
-                return False
-            action = {"buttons": []}
-            for btn in buttons:
-                action["buttons"].append({"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}})
-            payload.update({
-                "type": "interactive",
-                "interactive": {"type": "button", "body": { "text": body_text }, "action": action}
-            })
-            message_type_to_save = 'interactive'
-            text_content_to_save = body_text
-
-        elif node_type == 'interactiveListNode':
-            # Handle the new list node type
-            header = node_data.get('header', '')
-            body = node_data.get('body', '')
-            footer = node_data.get('footer', '')
-            button_text = node_data.get('buttonText', 'View Options')
-            sections = node_data.get('sections', [])
-            
-            if not body or not sections:
-                logger.error(f"Flow Error: List node for contact {contact.wa_id} is missing body text or sections.")
-                return False
-            
-            # Build the interactive list payload
-            interactive_payload = {
-                "type": "list",
-                "body": {"text": body},
-                "action": {
-                    "button": button_text,
-                    "sections": []
-                }
-            }
-            
-            # Add header if provided
-            if header:
-                interactive_payload["header"] = {"type": "text", "text": header}
-            
-            # Add footer if provided
-            if footer:
-                interactive_payload["footer"] = {"text": footer}
-            
-            # Build sections
-            for section in sections:
-                section_data = {
-                    "title": section.get('title', 'Options'),
-                    "rows": []
-                }
-                
-                for row in section.get('rows', []):
-                    row_data = {
-                        "id": row.get('id'),
-                        "title": row.get('title'),
-                    }
-                    # Add description if provided
-                    if row.get('description'):
-                        row_data["description"] = row.get('description')
-                    
-                    section_data["rows"].append(row_data)
-                
-                interactive_payload["action"]["sections"].append(section_data)
-            
-            payload.update({
-                "type": "interactive",
-                "interactive": interactive_payload
-            })
-            message_type_to_save = 'interactive'
-            text_content_to_save = body
-
-        else:
-            logger.error(f"Unknown node type: {node_type}")
-            return False
-            
-        # Send message and manage session
-        success, response_data = send_whatsapp_message(payload)
-        
-        if success:
-            save_outgoing_message(
-                contact=contact, 
-                wamid=response_data['messages'][0]['id'], 
-                message_type=message_type_to_save, 
-                text_content=text_content_to_save,
-                source_node_id=target_node_id
-            )
-            
-            # Check if target node has outputs
-            target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
-            logger.info(f"DEBUG-SESSION: Checking for outputs from target_node_id: '{target_node_id}'. Has outputs: {target_has_outputs}")
-
-            if target_has_outputs:
-                UserFlowSession.objects.update_or_create(
-                    contact=contact,
-                    defaults={'flow': flow, 'current_node_id': target_node_id}
-                )
-                logger.info(f"Session for {contact.wa_id} updated to node '{target_node_id}'")
-            else:
-                if session:
-                    session.delete()
-                logger.info(f"Flow ended for {contact.wa_id} because node has no outputs. Session deleted.")
-            
-            return True
-        else:
-            logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
-            return False
-
-    except Exception as e:
-        logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
-        return False
 
 def execute_flow_node(contact, flow, target_node):
     """
     Helper function to construct and send a message for a given target node
-    and update the user's session.
+    and update the user's session. Now includes all node types.
     """
     target_node_id = target_node.get('id')
     node_type = target_node.get('type')
@@ -429,14 +206,68 @@ def execute_flow_node(contact, flow, target_node):
     message_type_to_save = node_type
     text_content_to_save = f"Flow Step: {node_type}"
 
-    # ... (This is the same message construction logic from your try_execute_flow_step function)
-    if node_type == 'interactiveListNode':
-        # ... (logic for list node)
-        pass # Add your other node types here as well
+    # Build the payload based on the node type
+    if node_type == 'textNode':
+        payload = {"type": "text", "text": {"body": node_data.get('text', '...')}}
+        message_type_to_save = 'text'
+        text_content_to_save = node_data.get('text', '...')
     
+    elif node_type == 'templateNode':
+        # This logic is for sending a template *during* a flow, not starting one.
+        components = []
+        if 'headerUrl' in node_data and node_data['headerUrl']:
+            # Assuming image for simplicity, extend as needed for video/document
+            components.append({"type": "header", "parameters": [{"type": "image", "image": {"link": node_data['headerUrl']}}]})
+        
+        body_params = []
+        for i in range(1, 10):
+            var_key = f'bodyVar{i}'
+            if var_key in node_data and node_data[var_key]:
+                body_params.append({"type": "text", "text": node_data[var_key]})
+        
+        if body_params:
+            components.append({"type": "body", "parameters": body_params})
+
+        payload = {
+            "type": "template",
+            "template": {
+                "name": node_data.get('selectedTemplateName'),
+                "language": {"code": "en"},
+                "components": components
+            }
+        }
+        message_type_to_save = 'template'
+        text_content_to_save = f"Sent template: {node_data.get('selectedTemplateName')}"
+
+    elif node_type == 'buttonsNode':
+        buttons = [{"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}} for btn in node_data.get('buttons', [])]
+        payload = {"type": "interactive", "interactive": {"type": "button", "body": {"text": node_data.get('text')}, "action": {"buttons": buttons}}}
+        text_content_to_save = node_data.get('text')
+        
+    elif node_type == 'interactiveListNode':
+        sections_data = []
+        for section in node_data.get('sections', []):
+            rows_data = [{"id": row.get('id'), "title": row.get('title'), "description": row.get('description', '')} for row in section.get('rows', [])]
+            sections_data.append({"title": section.get('title'), "rows": rows_data})
+
+        payload = {
+            "type": "interactive",
+            "interactive": {
+                "type": "list",
+                "header": {"type": "text", "text": node_data.get('header', '')},
+                "body": {"text": node_data.get('body', '')},
+                "footer": {"text": node_data.get('footer', '')},
+                "action": {"button": node_data.get('buttonText', 'Select'), "sections": sections_data}
+            }
+        }
+        text_content_to_save = node_data.get('body')
+    
+    else:
+        logger.error(f"Message construction for node type '{node_type}' is not implemented in execute_flow_node.")
+        return False
+
     # Send the message
-    final_payload = {"messaging_product": "whatsapp", "to": contact.wa_id, **payload}
-    success, response_data = send_whatsapp_message(final_payload)
+    success, response_data = send_whatsapp_message(payload)
 
     if success:
         wamid = response_data['messages'][0]['id']
@@ -459,6 +290,78 @@ def execute_flow_node(contact, flow, target_node):
             logger.info(f"Flow ended for {contact.wa_id}. Session deleted.")
         return True
     return False
+
+
+def try_execute_flow_step(contact, user_input, replied_to_wamid):
+    """
+    This function now finds the correct next step and passes it to the
+    centralized execute_flow_node function.
+    """
+    # ... (all of your existing logic to find the flow, current_node, and next_edge)
+    # This includes the session check, historical branching, and new flow trigger logic.
+    session = UserFlowSession.objects.filter(contact=contact).first()
+    flow = session.flow if session else None
+    current_node = None
+    next_edge = None
+
+    if session:
+        nodes = flow.flow_data.get('nodes', [])
+        current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
+        if current_node:
+            edges = flow.flow_data.get('edges', [])
+            next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
+
+    if not next_edge:
+        try:
+            original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound')
+            historical_node_id = original_message.source_node_id
+            if historical_node_id:
+                if not flow:
+                    active_flows = Flow.objects.filter(is_active=True)
+                    for f in active_flows:
+                        if any(n.get('id') == historical_node_id for n in f.flow_data.get('nodes', [])):
+                            flow = f
+                            break
+                if flow:
+                    nodes = flow.flow_data.get('nodes', [])
+                    current_node = next((n for n in nodes if n.get('id') == historical_node_id), None)
+                    if current_node:
+                        edges = flow.flow_data.get('edges', [])
+                        next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
+        except Message.DoesNotExist:
+            pass
+
+    if not next_edge:
+        try:
+            original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
+            template_name = original_message.text_content.replace("Sent template: ", "").strip()
+            possible_flows = Flow.objects.filter(template_name=template_name, is_active=True).order_by('-updated_at')
+            if possible_flows.exists():
+                flow = possible_flows.first()
+                nodes = flow.flow_data.get('nodes', [])
+                current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
+                if current_node:
+                    edges = flow.flow_data.get('edges', [])
+                    next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
+        except Message.DoesNotExist:
+            pass
+    
+    if not flow or not current_node or not next_edge:
+        logger.error(f"Could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'.")
+        return False
+
+    nodes = flow.flow_data.get('nodes', [])
+    target_node_id = next_edge.get('target')
+    target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
+    
+    if not target_node:
+        logger.error(f"Edge points to a non-existent target node ID: '{target_node_id}'")
+        return False
+
+    # Once the target_node is found, pass it to the executor.
+    return execute_flow_node(contact, flow, target_node)
+
+
 # Keep all your other existing views (get_whatsapp_templates_api, save_flow_api, etc.)
 # @csrf_exempt
 # def whatsapp_webhook_view(request):

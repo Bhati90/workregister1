@@ -2,7 +2,7 @@ import React, { memo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/register/whatsapp';
+const API_BASE_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
 
 const fileAcceptMap = {
     document: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx',
