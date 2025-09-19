@@ -71,6 +71,8 @@ WABA_ID = "1477047197063313" # Replace with your WABA ID
 
 # --- Core Flow Execution Logic ---
 
+# --- Core Flow Execution Logic ---
+
 def execute_flow_node(contact, flow, target_node):
     """
     Central helper function to construct a message payload for a given node,
@@ -80,48 +82,26 @@ def execute_flow_node(contact, flow, target_node):
     node_type = target_node.get('type')
     node_data = target_node.get('data', {})
     
-    # Initialize the payload with required fields for every message
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": contact.wa_id
-    }
+    payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
     message_type_to_save = node_type
     text_content_to_save = f"Flow Step: {node_type}"
 
-    # Build the rest of the payload based on the node type
     if node_type == 'templateNode':
         components = []
-        
-        # NEW: Check if there's a media ID for the header
         if 'metaMediaId' in node_data and node_data['metaMediaId']:
             header_format = node_data.get('headerComponent', {}).get('format', 'IMAGE').lower()
-            components.append({
-                "type": "header", 
-                "parameters": [{
-                    "type": header_format, 
-                    header_format: { "id": node_data['metaMediaId'] }
-                }]
-            })
-
+            components.append({"type": "header", "parameters": [{"type": header_format, header_format: {"id": node_data['metaMediaId']}}]})
         body_params = []
         for i in range(1, 10):
             var_key = f'bodyVar{i}'
             if var_key in node_data and node_data[var_key]:
-                body_params.append({ "type": "text", "text": node_data[var_key] })
-        
+                body_params.append({"type": "text", "text": node_data[var_key]})
         if body_params:
-            components.append({ "type": "body", "parameters": body_params })
-        
-        payload.update({
-            "type": "template",
-            "template": {
-                "name": node_data.get('selectedTemplateName'),
-                "language": {"code": "en"}, # Or your desired language code
-                "components": components
-            }
-        })
+            components.append({"type": "body", "parameters": body_params})
+        payload.update({"type": "template", "template": {"name": node_data.get('selectedTemplateName'), "language": {"code": "en"}, "components": components}})
         message_type_to_save = 'template'
         text_content_to_save = f"Sent template: {node_data.get('selectedTemplateName')}"
+
     elif node_type == 'textNode':
         payload.update({"type": "text", "text": {"body": node_data.get('text', '...')}})
         message_type_to_save = 'text'
@@ -147,7 +127,8 @@ def execute_flow_node(contact, flow, target_node):
         for section in node_data.get('sections', []):
             rows_data = [{"id": row.get('id'), "title": row.get('title'), "description": row.get('description', '')} for row in section.get('rows', [])]
             sections_data.append({"title": section.get('title'), "rows": rows_data})
-        payload.update({"type": "interactive", "interactive": {"type": "list", "header": {"type": "text", "text": node_data.get('header', '')}, "body": {"text": node_data.get('body', '')}, "footer": {"text": node_data.get('footer', '')}, "action": {"button": node_data.get('buttonText', 'Select'), "sections": sections_data}}})
+        button_text = node_data.get('buttonText') or 'Select an option'
+        payload.update({"type": "interactive", "interactive": {"type": "list", "header": {"type": "text", "text": node_data.get('header', '')}, "body": {"text": node_data.get('body', '')}, "footer": {"text": node_data.get('footer', '')}, "action": {"button": button_text, "sections": sections_data}}})
         text_content_to_save = node_data.get('body')
 
     elif node_type == 'mediaNode':
@@ -165,7 +146,6 @@ def execute_flow_node(contact, flow, target_node):
         logger.error(f"Message construction for node type '{node_type}' is not implemented.")
         return False
 
-    # Send the final message to the WhatsApp API
     success, response_data = send_whatsapp_message(payload)
 
     if success:
@@ -199,7 +179,6 @@ def try_execute_status_trigger(wamid, wa_id):
         flow = session.flow if session else None
 
         if not source_node_id and message.message_type == 'template':
-            logger.info(f"Message {wamid} has no source node. Checking if it's a trigger template.")
             template_name = message.text_content.replace("Sent template: ", "").strip()
             possible_flow = Flow.objects.filter(template_name=template_name, is_active=True).order_by('-updated_at').first()
             if possible_flow:
@@ -208,31 +187,25 @@ def try_execute_status_trigger(wamid, wa_id):
                 start_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
                 if start_node:
                     source_node_id = start_node.get('id')
-                    logger.info(f"Identified trigger template. Deduced source node ID: {source_node_id}")
 
         if not flow or not source_node_id:
-            logger.warning("Could not determine a flow or source node for this status trigger. Halting.")
             return False
         
         edges = flow.flow_data.get('edges', [])
         next_edge = next((e for e in edges if e.get('source') == source_node_id and e.get('sourceHandle') == 'onRead'), None)
 
         if not next_edge:
-            logger.info(f"No 'onRead' trigger found for node {source_node_id}.")
             return False
 
         nodes = flow.flow_data.get('nodes', [])
         target_node = next((n for n in nodes if n.get('id') == next_edge.get('target')), None)
 
         if not target_node:
-            logger.error(f"'onRead' edge points to a non-existent target node ID: {next_edge.get('target')}")
             return False
             
-        logger.info(f"Executing 'onRead' trigger from node {source_node_id} to {target_node.get('id')}.")
         return execute_flow_node(contact, flow, target_node)
-
     except (Message.DoesNotExist, ChatContact.DoesNotExist):
-        logger.warning(f"Could not find message or contact for status update (wamid: {wamid})")
+        pass
     except Exception as e:
         logger.error(f"CRITICAL STATUS TRIGGER ERROR: {e}", exc_info=True)
     return False
@@ -243,14 +216,12 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
     flow = session.flow if session else None
     current_node, next_edge = None, None
 
-    # Stage 1: Check current session
     if session:
         nodes, edges = flow.flow_data.get('nodes', []), flow.flow_data.get('edges', [])
         current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
         if current_node:
             next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
 
-    # Stage 2: Check historical context if no path from current session
     if not next_edge:
         try:
             original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound')
@@ -267,7 +238,6 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                         next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
         except Message.DoesNotExist: pass
 
-    # Stage 3: Check for new flow trigger if still no path
     if not next_edge:
         try:
             original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
@@ -281,149 +251,22 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
                     next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
         except Message.DoesNotExist: pass
     
-    # Final execution
-    if not flow or not current_node or not next_edge:
-            logger.error(f"After all checks, could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'. Halting execution.")
-            return False
-
-    nodes = flow.flow_data.get('nodes', [])
-    edges = flow.flow_data.get('edges', [])
-    target_node_id = next_edge.get('target')
-    target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
-        
-    if not target_node:
-            logger.error(f"FATAL: Edge points to a non-existent target node ID: '{target_node_id}'")
-            return False
-        # 3. CONSTRUCT AND SEND THE MESSAGE (This part remains the same)
-    node_type = target_node.get('type')
-    node_data = target_node.get('data', {})
-    payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
-    message_type_to_save = 'unknown'
-    text_content_to_save = f"Flow Step: {node_type}"
-        # ... (All your elif blocks for textNode, templateNode, imageNode, buttonsNode are correct and go here) ...
-    if node_type == 'textNode':
-            message_text = node_data.get('text', '...')
-            payload.update({"type": "text", "text": {"body": message_text}})
-            message_type_to_save = 'text'
-            text_content_to_save = message_text
-        
-    elif node_type == 'templateNode':
-            target_template_name = node_data.get('selectedTemplateName')
-            if not target_template_name:
-                logger.error("Flow Error: Target node is a template but no template name is selected.")
-                return False
-            components = []
-            if 'headerUrl' in node_data and node_data['headerUrl']:
-                components.append({
-                    "type": "header", "parameters": [{"type": "image", "image": { "link": node_data['headerUrl'] }}]
-                })
-            body_params = []
-            for i in range(1, 10):
-                var_key = f'bodyVar{i}'
-                if var_key in node_data and node_data[var_key]:
-                    body_params.append({ "type": "text", "text": node_data[var_key] })
-                else:
-                    break
-            if body_params:
-                components.append({ "type": "body", "parameters": body_params })
-            payload.update({
-                "type": "template",
-                "template": {"name": target_template_name, "language": { "code": "en" }, "components": components }
-            })
-            message_type_to_save = 'template'
-            text_content_to_save = f"Sent template: {target_template_name}"
-            
-    elif node_type == 'imageNode':
-            meta_media_id = node_data.get('metaMediaId') # We will now store the Meta Media ID
-            caption = node_data.get('caption')
-            if not meta_media_id:
-                logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
-                return False
-            payload.update({"type": "image", "image": {"id": meta_media_id, "caption": caption}})
-            message_type_to_save = 'image'
-            text_content_to_save = caption or "Sent an image"
-            
-    elif node_type == 'buttonsNode':
-            body_text = node_data.get('text')
-            buttons = node_data.get('buttons', [])
-            if not body_text or not buttons:
-                logger.error(f"Flow Error: Buttons node for contact {contact.wa_id} is missing text or buttons.")
-                return False
-            action = {"buttons": []}
-            for btn in buttons:
-                action["buttons"].append({"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}})
-            payload.update({
-                "type": "interactive",
-                "interactive": {"type": "button", "body": { "text": body_text }, "action": action}
-            })
-            message_type_to_save = 'interactive'
-            text_content_to_save = body_text
-    elif node_type == 'interactiveImageNode':
-        buttons = [{"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}} for btn in node_data.get('buttons', [])]
-        payload.update({"type": "interactive", "interactive": {"type": "button", "header": {"type": "image", "image": {"id": node_data.get('metaMediaId')}}, "body": {"text": node_data.get('bodyText')}, "action": {"buttons": buttons}}})
-        text_content_to_save = node_data.get('bodyText')
-
-    elif node_type == 'interactiveListNode':
-        sections_data = []
-        for section in node_data.get('sections', []):
-            rows_data = [{"id": row.get('id'), "title": row.get('title'), "description": row.get('description', '')} for row in section.get('rows', [])]
-            sections_data.append({"title": section.get('title'), "rows": rows_data})
-        payload.update({"type": "interactive", "interactive": {"type": "list", "header": {"type": "text", "text": node_data.get('header', '')}, "body": {"text": node_data.get('body', '')}, "footer": {"text": node_data.get('footer', '')}, "action": {"button": node_data.get('buttonText', 'Select'), "sections": sections_data}}})
-        text_content_to_save = node_data.get('body')
-
-    elif node_type == 'mediaNode':
-        media_type = node_data.get('mediaType', 'document')
-        media_payload = {"id": node_data.get('metaMediaId')}
-        if media_type != 'audio' and node_data.get('caption'):
-            media_payload['caption'] = node_data.get('caption')
-        if media_type == 'document' and node_data.get('filename'):
-            media_payload['filename'] = node_data.get('filename')
-        payload.update({"type": media_type, media_type: media_payload})
-        message_type_to_save = media_type
-        text_content_to_save = node_data.get('caption') or f"Sent a {media_type}"
-   
-    else:
-            return False
-            
-        # 4. SEND MESSAGE AND MANAGE SESSION
-    success, response_data = send_whatsapp_message(payload)
-        
-    if success:
-            save_outgoing_message(
-                contact=contact, 
-                wamid=response_data['messages'][0]['id'], 
-                message_type=message_type_to_save, 
-                text_content=text_content_to_save,
-                source_node_id=target_node_id  # <-- Pass the new ID
-            )
-            # --- MODIFIED LOGIC WITH DEBUG LOGS ---
-            target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
-            logger.info(f"DEBUG-SESSION: Checking for outputs from target_node_id: '{target_node_id}'. Has outputs: {target_has_outputs}")
-
-            if target_has_outputs:
-                UserFlowSession.objects.update_or_create(
-                    contact=contact,
-                    defaults={'flow': flow, 'current_node_id': target_node_id}
-                )
-                logger.info(f"Session for {contact.wa_id} updated to node '{target_node_id}'")
-            else:
-                if session:
-                    session.delete()
-                logger.info(f"Flow ended for {contact.wa_id} because node has no outputs. Session deleted.")
-            # --- END MODIFIED LOGIC ---
-            
-            return True
-    else:
-            logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
-            return False
-
-
+    if flow and current_node and next_edge:
+        target_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+        if target_node:
+            return execute_flow_node(contact, flow, target_node)
+    
+    logger.error(f"Could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'.")
+    return False
 
 # --- Webhook and API Views ---
 
 @csrf_exempt
 def whatsapp_webhook_view(request):
-    """Handles all incoming WhatsApp events."""
+    """
+    Handles all incoming WhatsApp events from Meta.
+    This version correctly processes both messages and status updates in any order.
+    """
     if request.method == 'POST':
         data = json.loads(request.body)
         logger.info(f"====== INCOMING WEBHOOK ======\n{json.dumps(data, indent=2)}")
@@ -432,6 +275,9 @@ def whatsapp_webhook_view(request):
                 for change in entry.get('changes', []):
                     value = change.get('value', {})
                     
+                    # --- CORRECTED LOGIC: Process messages and statuses independently ---
+                    
+                    # 1. Check for and process any incoming messages
                     if 'messages' in value:
                         for msg in value.get('messages', []):
                             contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
@@ -441,32 +287,28 @@ def whatsapp_webhook_view(request):
 
                             if message_type == 'text':
                                 user_input = msg.get('text', {}).get('body')
-                            elif message_type == 'button':
-                                user_input = msg.get('button', {}).get('text')
                             elif message_type == 'interactive':
                                 interactive = msg.get('interactive', {})
-                                if interactive.get('type') == 'list_reply': user_input = interactive.get('list_reply', {}).get('id')
-                                elif interactive.get('type') == 'button_reply': user_input = interactive.get('button_reply', {}).get('title')
-                            # elif message_type == 'text': user_input = msg.get('text', {}).get('body')
-                            logger.info(f"DEBUG-FLOW: Extracted user_input='{user_input}' and replied_to_wamid='{replied_to_wamid}'")
-                            flow_handled = False
+                                if interactive.get('type') == 'list_reply':
+                                    user_input = interactive.get('list_reply', {}).get('id')
+                                elif interactive.get('type') == 'button_reply':
+                                    user_input = interactive.get('button_reply', {}).get('title')
+                            
+                            logger.info(f"Parsed user input: '{user_input}'")
+                            
                             if user_input and replied_to_wamid:
-                                flow_handled = try_execute_flow_step(contact, user_input, replied_to_wamid)
-                            elif user_input:
-                                logger.info(f"User sent input '{user_input}' without replying to a flow message. No action taken.")
-                                pass
-                                # Go to the next message
-                            if flow_handled:
-                                logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
-                                continue
-                    elif 'statuses' in value:
+                                try_execute_flow_step(contact, user_input, replied_to_wamid)
+
+                    # 2. Check for and process any status updates
+                    if 'statuses' in value:
                         for status in value.get('statuses', []):
                             if status.get('status') == 'read':
                                 try_execute_status_trigger(status.get('id'), status.get('recipient_id'))
+
         except Exception as e:
             logger.error(f"Error in webhook: {e}", exc_info=True)
+            
     return JsonResponse({"status": "success"}, status=200)
-
 
 
 
