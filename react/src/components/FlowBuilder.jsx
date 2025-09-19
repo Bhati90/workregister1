@@ -10,7 +10,8 @@ import ReactFlow, {
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import FlowPreview from './nodes/FlowPreview'; // <-- Import the new preview component
+import FlowPreview from './nodes/FlowPreview';
+
 // Import all node types
 import TemplateNode from './nodes/TemplateNode';
 import TextNode from './nodes/TextNode';
@@ -20,7 +21,8 @@ import InteractiveImageNode from './nodes/ImageButton';
 import InteractiveListNode from './nodes/ListNode';
 import MediaNode from './nodes/MediaNode';
 
-// Register all node types for React Flow
+
+// REGISTER ALL NODE TYPES
 const nodeTypes = { 
   templateNode: TemplateNode, 
   textNode: TextNode,
@@ -44,13 +46,12 @@ const FlowBuilder = ({ initialData }) => {
     const [templates, setTemplates] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [flowName, setFlowName] = useState(initialData?.name || 'My New Flow');
+    const [isSidebarVisible, setIsSidebarVisible] = useState(true); // State for sidebar visibility
 
-    // Central function to update data within any node
     const updateNodeData = (nodeId, field, value) => {
         setNodes((nds) =>
           nds.map((node) => {
             if (node.id === nodeId) {
-              // Create a new data object to ensure re-rendering
               node.data = { ...node.data, [field]: value };
             }
             return node;
@@ -71,7 +72,6 @@ const FlowBuilder = ({ initialData }) => {
       }, []);
     
       const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
-      
       const onDragOver = useCallback((event) => {
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
@@ -93,7 +93,6 @@ const FlowBuilder = ({ initialData }) => {
           };
           
           let newNode;
-          // Define the initial data structure for each new node
           switch (type) {
             case 'templateNode':
               newNode = { id: newNodeId, type, position, data: { ...commonData, templates: templates } };
@@ -130,7 +129,7 @@ const FlowBuilder = ({ initialData }) => {
         const flow = reactFlowInstance.toObject();
         const templateNode = flow.nodes.find(n => n.type === 'templateNode');
         const triggerTemplateName = templateNode?.data.selectedTemplateName || null;
-
+    
         if (!templateNode || !triggerTemplateName) {
           alert("Error: A 'WhatsApp Template' node must exist and have a template selected to save the flow.");
           return;
@@ -140,7 +139,7 @@ const FlowBuilder = ({ initialData }) => {
           return;
         }
         const payload = { name: flowName, template_name: triggerTemplateName, flow: flow };
-
+    
         axios.post(`${API_URL}/api/flows/save/`, payload)
           .then(response => {
             alert(response.data.message);
@@ -154,9 +153,16 @@ const FlowBuilder = ({ initialData }) => {
 
     return (
         <div className="flow-builder-layout">
-            <div className="dndflow">
-                {!isLoading ? <Sidebar /> : <div className="sidebar loading-pane"><p>Loading...</p></div>}
+            <div className={`dndflow ${!isSidebarVisible ? 'sidebar-collapsed' : ''}`}>
+                {isSidebarVisible && 
+                    <Sidebar onHide={() => setIsSidebarVisible(false)} />
+                }
                 <div className="reactflow-wrapper">
+                {!isSidebarVisible && (
+                    <button className="show-sidebar-btn" onClick={() => setIsSidebarVisible(true)}>
+                        ☰
+                    </button>
+                )}
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
@@ -178,12 +184,8 @@ const FlowBuilder = ({ initialData }) => {
                         <Controls />
                         <Background />
                     </ReactFlow>
-                    
                 </div>
-                  
-                
             </div>
-            {/* Pass the current nodes and edges to the preview panel */}
             <FlowPreview nodes={nodes} edges={edges} />
         </div>
     );

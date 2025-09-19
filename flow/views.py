@@ -310,11 +310,13 @@ def whatsapp_webhook_view(request):
                             replied_to_wamid = msg.get('context', {}).get('id')
                             user_input = None
 
-                            if message_type == 'interactive':
+                            if message_type == 'text':
+                                user_input = msg.get('text', {}).get('body')
+                            elif message_type == 'interactive':
                                 interactive = msg.get('interactive', {})
                                 if interactive.get('type') == 'list_reply': user_input = interactive.get('list_reply', {}).get('id')
                                 elif interactive.get('type') == 'button_reply': user_input = interactive.get('button_reply', {}).get('title')
-                            elif message_type == 'text': user_input = msg.get('text', {}).get('body')
+                            # elif message_type == 'text': user_input = msg.get('text', {}).get('body')
                             
                             if user_input and replied_to_wamid:
                                 try_execute_flow_step(contact, user_input, replied_to_wamid)
@@ -328,67 +330,7 @@ def whatsapp_webhook_view(request):
     return JsonResponse({"status": "success"}, status=200)
 
 
-# Keep all your other existing views (get_whatsapp_templates_api, save_flow_api, etc.)
-# @csrf_exempt
-# def whatsapp_webhook_view(request):
-#     """Handles all incoming WhatsApp events, prioritizing dynamic flows."""
-#     # ** NEW LOG 1: Check if the view is being hit at all **
-#     logger.info("====== WEBHOOK URL HAS BEEN HIT ======")
-    
-#     if request.method == 'POST':
-#         # ** NEW LOG 2: Check if the request body is being read **
-#         logger.info("====== Webhook is a POST request. Attempting to read body. ======")
-        
-#         data = json.loads(request.body)
-#         logger.info(f"====== INCOMING WEBHOOK BODY ======\n{json.dumps(data, indent=2)}")
-#         try:
-#             for entry in data.get('entry', []):
-#                 for change in entry.get('changes', []):
-#                     value = change.get('value', {})
-#                     if 'messages' in value:
-#                         for msg in value.get('messages', []):
-#                             # ... (Your message saving logic remains the same) ...
-#                             contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
-#                             contact.last_contact_at = timezone.now()
-#                             contact.save()
-#                             message_type = msg.get('type')
-#                             # ... (The rest of your code to save the incoming message instance) ...
-                            
-#                             # --- START: FLOW ENGINE TRIGGER ---
-#                             replied_to_wamid = msg.get('context', {}).get('id')
-#                             user_input = None
-#                             if message_type == 'text':
-#                                 user_input = msg.get('text', {}).get('body')
 
-#                             elif message_type == 'button':
-#                                 user_input = msg.get('button', {}).get('text')
-#                             elif message_type == 'interactive' and msg.get('interactive', {}).get('type') == 'button_reply':
-#                                 user_input = msg.get('interactive', {}).get('button_reply', {}).get('title')
-                            
-#                             logger.info(f"DEBUG-FLOW: Extracted user_input='{user_input}' and replied_to_wamid='{replied_to_wamid}'")
-#                             flow_handled = False
-#                             if user_input and replied_to_wamid:
-#                                 flow_handled = try_execute_flow_step(contact, user_input, replied_to_wamid)
-#                             elif user_input:
-#                                 logger.info(f"User sent input '{user_input}' without replying to a flow message. No action taken.")
-#                                 pass
-#                                 # Go to the next message
-#                             if flow_handled:
-#                                 logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
-#                                 continue
-#                             # --- FALLBACK LOGIC ---
-#                             # ... (Your existing hardcoded command logic goes here) ...
-#                             # ... (It will run only if flow_handled is False) ...
-                            
-#                     elif 'statuses' in value:
-#                         # ... (Your status update logic) ...
-#                         pass
-#         except Exception as e:
-#             logger.error(f"Error in webhook: {e}", exc_info=True)
-#         return JsonResponse({"status": "success"}, status=200)
-
-
-# contact_app/views.py
 
 # ... (keep all your other imports: JsonResponse, csrf_exempt, models, etc.)
 import logging
