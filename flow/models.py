@@ -33,6 +33,8 @@ class UserFlowSessions(models.Model):
         null=True, 
         blank=True
     )
+    waiting_for_image_attribute = models.ForeignKey(Attribute, on_delete=models.SET_NULL, null=True, blank=True, related_name='image_sessions')
+
     is_waiting_for_location = models.BooleanField(default=False)
     longitude_attribute = models.ForeignKey(
         'Attribute', 
