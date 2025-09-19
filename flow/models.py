@@ -33,7 +33,21 @@ class UserFlowSessions(models.Model):
         null=True, 
         blank=True
     )
-    pass
+    is_waiting_for_location = models.BooleanField(default=False)
+    longitude_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='longitude_sessions'
+    )
+    latitude_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='latitude_sessions'
+    )
 
     class Meta:
         verbose_name_plural = "User Flow Sessions"

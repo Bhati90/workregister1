@@ -21,6 +21,8 @@ import InteractiveImageNode from './nodes/ImageButton';
 import InteractiveListNode from './nodes/ListNode';
 import MediaNode from './nodes/MediaNode';
 import AskQuestionNode from './nodes/AskQuestionNode';
+import AskLocationNode from './nodes/AskLocationNode';
+import AskImageNode from './nodes/AskImageNode';
 
 
 // REGISTER ALL NODE TYPES
@@ -28,11 +30,13 @@ const nodeTypes = {
   templateNode: TemplateNode, 
   textNode: TextNode,
   buttonsNode: ButtonsNode,
+  askLocationNode: AskLocationNode,
   imageNode: ImageNode,
   interactiveImageNode: InteractiveImageNode,
   interactiveListNode: InteractiveListNode,
   mediaNode: MediaNode,
   askQuestionNode: AskQuestionNode,
+  askForImageNode:AskImageNode
 };
 
 const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
@@ -60,7 +64,9 @@ const FlowBuilder = ({ initialData }) => {
           })
         );
     };
-
+    const onEdgeDelete = useCallback((edgeIdToDelete) => {
+        setEdges((currentEdges) => currentEdges.filter((edge) => edge.id !== edgeIdToDelete));
+    }, [setEdges]);
     const deleteNode = useCallback((nodeId) => {
         setNodes((nds) => nds.filter((node) => node.id !== nodeId));
         setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
@@ -117,6 +123,13 @@ const FlowBuilder = ({ initialData }) => {
             case 'mediaNode':
                 newNode = { id: newNodeId, type, position, data: { ...commonData, mediaType: 'document', metaMediaId: '', mediaUrl: '', caption: '', filename: '' }};
                 break;
+
+            case 'askLocationNode':
+            newNode = { id: newNodeId, type, position, data: { ...commonData, questionText: '', longitudeAttributeId: null, latitudeAttributeId: null }};
+            break;
+            case 'askForImageNode':
+            newNode = { id: newNodeId, type, position, data: { ...commonData, questionText: '', saveAttributeId: null }};
+            break;
             case 'askQuestionNode':
             newNode = { id: newNodeId, type, position, data: { ...commonData, questionText: '', saveAttributeId: null }};
             break;
@@ -191,7 +204,7 @@ const FlowBuilder = ({ initialData }) => {
                     </ReactFlow>
                 </div>
             </div>
-            <FlowPreview nodes={nodes} edges={edges} />
+            <FlowPreview nodes={nodes} edges={edges} onEdgeDelete={onEdgeDelete} />
         </div>
     );
 };

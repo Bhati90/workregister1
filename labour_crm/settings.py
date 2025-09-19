@@ -560,7 +560,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 # CORS_ALLOWED_ORIGINS = [
-#     "*",  # Your React development server
+#     "http://localhost:5173",  # Your React development server
 # ]
 
 # # This is needed to allow the frontend to send cookies (like sessionid)

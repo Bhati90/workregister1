@@ -27,10 +27,15 @@ const Sidebar = ({ onHide }) => {
       >
         Text Message
       </div>
+       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'askForImageNode')} draggable>
+        Ask for Image
+      </div>
        <div className="dndnode" onDragStart={(event) => onDragStart(event, 'mediaNode')} draggable>
         Media Message
       </div>
-
+       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'askLocationNode')} draggable>
+        Ask for Location
+      </div>
       {/* --- NEW ADVANCED NODE --- */}
       <div className="sidebar-divider">Advanced</div>
       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'askQuestionNode')} draggable>

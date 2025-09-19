@@ -34,6 +34,12 @@ const FlowPreview = ({ nodes, edges }) => {
                     return <ListMessagePreview data={node.data} />;
                 case 'mediaNode':
                     return <MediaMessagePreview data={node.data} />;
+                case 'askQuestionNode':
+                    return <AskQuestionPreview data={node.data} />;                
+                case 'askLocationNode':
+                    return <AskLocationPreview data={node.data} />;
+                case 'askForImageNode':
+                    return <AskForImagePreview data={node.data} />;
                 default:
                     return <div className="preview-bubble-unknown">Unknown Node</div>;
             }
@@ -158,6 +164,58 @@ const ImageMessagePreview = ({ data }) => (
         <p className="preview-caption">{data.caption}</p>
     </div>
 );
+const AskQuestionPreview = ({ data }) => (
+    <>
+        {/* The question sent by the bot */}
+        <div className="preview-bubble-outbound">
+            <p className="preview-text">{data.questionText || '...'}</p>
+        </div>
+        {/* A placeholder for the user's expected reply */}
+        <div className="preview-bubble-inbound">
+             <p className="preview-text-user-reply">
+                <em>User replies with text...</em><br/>
+                <small>(Saves to attribute)</small>
+            </p>
+        </div>
+    </>
+);
+
+const AskLocationPreview = ({ data }) => (
+    <>
+        {/* The request sent by the bot */}
+        <div className="preview-bubble-outbound">
+            <p className="preview-text">{data.questionText || 'Please share your location.'}</p>
+            <div className="preview-buttons-footer location-request">
+                <span className="location-icon">📍</span> Send Location
+            </div>
+        </div>
+        {/* A placeholder for the user's expected reply */}
+        <div className="preview-bubble-inbound-location">
+             <img src="https://placehold.co/200x100/e9edef/667781?text=Map+Location" alt="Map Preview" />
+             <p className="preview-text-user-reply">
+                <em>User shares their location...</em><br/>
+                <small>(Saves to attributes)</small>
+            </p>
+        </div>
+    </>
+);
+const AskForImagePreview = ({ data }) => (
+    <>
+        {/* The request sent by the bot */}
+        <div className="preview-bubble-outbound">
+            <p className="preview-text">{data.questionText || 'Please send an image.'}</p>
+        </div>
+        {/* A placeholder for the user's expected reply */}
+        <div className="preview-bubble-inbound-image">
+             <div className="image-placeholder">🖼️</div>
+             <p className="preview-text-user-reply">
+                <em>User sends an image...</em><br/>
+                <small>(Saves URL to attribute)</small>
+            </p>
+        </div>
+    </>
+);
+
 
 const InteractiveImagePreview = ({ data }) => (
      <div className="preview-bubble-outbound">

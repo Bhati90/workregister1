@@ -407,3 +407,72 @@
   margin-left: 16px;
 }
 
+.path-label-container {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between label and button */
+}
+
+.delete-edge-btn {
+    background: #f0f2f5;
+    border: 1px solid #d1d5db;
+    color: #9ca3af;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.delete-edge-btn:hover {
+    background-color: #fee2e2;
+    color: #ef4444;
+    border-color: #fca5a5;
+}
+
+
+
+.location-request {
+    color: #00a884; /* WhatsApp's interactive green color */
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.location-icon {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.preview-bubble-inbound-location {
+  background: #fff;
+  padding: 8px;
+  border-radius: 12px;
+  margin-right: auto;
+  margin-top: 8px; /* Add space after the bot's message */
+  max-width: 80%;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+  text-align: center;
+}
+
+.preview-bubble-inbound-location img {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+}
+
+.preview-bubble-inbound-location .preview-text-user-reply {
+    padding-top: 8px;
+    margin: 0;
+    font-size: 13px;
+    color: #667781;
+}
+
