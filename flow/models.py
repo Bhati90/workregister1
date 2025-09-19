@@ -92,38 +92,7 @@ class UserFlowSessionss(models.Model):
     flow = models.ForeignKey(Flowss, on_delete=models.CASCADE)
     current_node_id = models.CharField(max_length=255, help_text="The ID of the user's current node in the flow.")
     updated_at = models.DateTimeField(auto_now=True)
-    waiting_for_attributeewdwedw = models.ForeignKey(
-        'Attribute', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True
-    )
-
-    # For waiting for a location reply
-    is_waiting_for_locationgrwfewfwf = models.BooleanField(default=False)
-    longitude_attributeeqwdeed = models.ForeignKey(
-        'Attribute', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='longitude_sessions'
-    )
-    latitude_attributeewfewfew = models.ForeignKey(
-        'Attribute', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='latitude_sessions'
-    )
-
-    # For waiting for an image reply
-    waiting_for_image_attributeerwrfwfe = models.ForeignKey(
-        'Attribute', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='image_sessions'
-    )
+    
 
     def __str__(self):
         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
