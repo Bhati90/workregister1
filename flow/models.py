@@ -36,11 +36,38 @@ class UserFlowSessions(models.Model):
     current_node_id = models.CharField(max_length=255, help_text="The ID of the user's current node in the flow.")
     updated_at = models.DateTimeField(auto_now=True)
 
-    waiting_for_attribute = models.ForeignKey(Attribute, on_delete=models.SET_NULL, null=True, blank=True)
+    waiting_for_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
 
-    # New fields for waiting for specific media types
-    waiting_for_location_data = models.JSONField(null=True, blank=True, help_text="Stores which attributes to save lat/lon to.")
-    waiting_for_image_attribute = models.ForeignKey(Attribute, on_delete=models.SET_NULL, null=True, blank=True, related_name='image_sessions')
+    # For waiting for a location reply
+    is_waiting_for_location = models.BooleanField(default=False)
+    longitude_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='longitude_sessions'
+    )
+    latitude_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='latitude_sessions'
+    )
+
+    # For waiting for an image reply
+    waiting_for_image_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='image_sessions'
+    )
 
 
     class Meta:
@@ -65,6 +92,38 @@ class UserFlowSessionss(models.Model):
     flow = models.ForeignKey(Flowss, on_delete=models.CASCADE)
     current_node_id = models.CharField(max_length=255, help_text="The ID of the user's current node in the flow.")
     updated_at = models.DateTimeField(auto_now=True)
+    waiting_for_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+
+    # For waiting for a location reply
+    is_waiting_for_location = models.BooleanField(default=False)
+    longitude_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='longitude_sessions'
+    )
+    latitude_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='latitude_sessions'
+    )
+
+    # For waiting for an image reply
+    waiting_for_image_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='image_sessions'
+    )
 
     def __str__(self):
         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
@@ -81,4 +140,4 @@ class ContactAttributeValue(models.Model):
         unique_together = ('contact', 'attribute')
 
     def __str__(self):
-        return f"{self.contact.wa_id} -> {self.attribute.name}: {self.value}" [IsAuthenticated] # Optional: Add security
+        return f"{self.contact.wa_id} -> {self.attribute.name}: {self.value}" # Optional: Add security
