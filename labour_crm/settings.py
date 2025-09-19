@@ -412,7 +412,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 #     'django.contrib.staticfiles',
 #     # 'authentication',
 #     #        # PWA support
-#     'analytics',
+    
 #     'rest_framework',
 #     'corsheaders',
 #     'flow',
@@ -560,7 +560,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 # CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:5173",  # Your React development server
+#     "*",  # Your React development server
 # ]
 
 # # This is needed to allow the frontend to send cookies (like sessionid)

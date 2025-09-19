@@ -20,6 +20,7 @@ import ImageNode from './nodes/ImageNode';
 import InteractiveImageNode from './nodes/ImageButton';
 import InteractiveListNode from './nodes/ListNode';
 import MediaNode from './nodes/MediaNode';
+import AskQuestionNode from './nodes/AskQuestionNode';
 
 
 // REGISTER ALL NODE TYPES
@@ -31,6 +32,7 @@ const nodeTypes = {
   interactiveImageNode: InteractiveImageNode,
   interactiveListNode: InteractiveListNode,
   mediaNode: MediaNode,
+  askQuestionNode: AskQuestionNode,
 };
 
 const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
@@ -115,6 +117,9 @@ const FlowBuilder = ({ initialData }) => {
             case 'mediaNode':
                 newNode = { id: newNodeId, type, position, data: { ...commonData, mediaType: 'document', metaMediaId: '', mediaUrl: '', caption: '', filename: '' }};
                 break;
+            case 'askQuestionNode':
+            newNode = { id: newNodeId, type, position, data: { ...commonData, questionText: '', saveAttributeId: null }};
+            break;
             default:
                 return;
           }

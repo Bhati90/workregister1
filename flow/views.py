@@ -14,6 +14,8 @@ from django.shortcuts import render # Make sure render is imported
 from registration.models import ChatContact, Message
 from .models import Flows as Flow
 from .models import UserFlowSessions as UserFlowSession
+from .models import Attribute  # <-- Add this import for Attribute model
+from .models import ContactAttributeValue  # <-- Add this import for ContactAttributeValue model
 from registration.whats_app import send_whatsapp_message, save_outgoing_message, upload_media_for_template_handle
 from django.utils import timezone
 import os
@@ -116,6 +118,24 @@ def execute_flow_node(contact, flow, target_node):
         payload.update({"type": "image", "image": {"id": node_data.get('metaMediaId'), "caption": node_data.get('caption')}})
         message_type_to_save = 'image'
         text_content_to_save = node_data.get('caption') or "Sent an image"
+    
+    elif node_type == 'askQuestionNode':
+        # Send the question to the user
+        question_text = node_data.get('questionText')
+        payload.update({"type": "text", "text": {"body": question_text}})
+        message_type_to_save = 'text'
+        text_content_to_save = question_text
+        
+        # Set the session to a special "waiting" state
+        UserFlowSession.objects.update_or_create(
+            contact=contact,
+            defaults={
+                'flow': flow, 
+                'current_node_id': target_node_id,
+                'waiting_for_attribute_id': node_data.get('saveAttributeId')
+            }
+        )
+        logger.info(f"Session for {contact.wa_id} is now waiting for attribute ID {node_data.get('saveAttributeId')}")
 
     elif node_type == 'interactiveImageNode':
         buttons = [{"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}} for btn in node_data.get('buttons', [])]
@@ -152,16 +172,16 @@ def execute_flow_node(contact, flow, target_node):
         wamid = response_data['messages'][0]['id']
         save_outgoing_message(contact=contact, wamid=wamid, message_type=message_type_to_save, text_content=text_content_to_save, source_node_id=target_node_id)
         
-        edges = flow.flow_data.get('edges', [])
-        target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
-        
-        session = UserFlowSession.objects.filter(contact=contact).first()
-        if target_has_outputs:
-            UserFlowSession.objects.update_or_create(contact=contact, defaults={'flow': flow, 'current_node_id': target_node_id})
-            logger.info(f"Session for {contact.wa_id} set to node '{target_node_id}'")
-        elif session:
-            session.delete()
-            logger.info(f"Flow ended for {contact.wa_id}. Session deleted.")
+        if node_type != 'askQuestionNode':
+            edges = flow.flow_data.get('edges', [])
+            target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
+            if target_has_outputs:
+                UserFlowSession.objects.update_or_create(
+                    contact=contact,
+                    defaults={'flow': flow, 'current_node_id': target_node_id, 'waiting_for_attribute': None}
+                )
+            else:
+                 UserFlowSession.objects.filter(contact=contact).delete()
         return True
     
     logger.error(f"Failed to send message via WhatsApp API. Payload: {json.dumps(payload, indent=2)}")
@@ -213,6 +233,26 @@ def try_execute_status_trigger(wamid, wa_id):
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
     """Finds the correct next node and passes it to the executor function."""
     session = UserFlowSession.objects.filter(contact=contact).first()
+    if session and session.waiting_for_attribute_id:
+        try:
+            attribute = Attribute.objects.get(pk=session.waiting_for_attribute_id)
+            ContactAttributeValue.objects.update_or_create(contact=contact, attribute=attribute, defaults={'value': user_input})
+            
+            flow, current_node_id = session.flow, session.current_node_id
+            session.waiting_for_attribute = None
+            session.save()
+            
+            next_edge = next((e for e in flow.flow_data.get('edges', []) if e.get('source') == current_node_id and e.get('sourceHandle') == 'onAnswer'), None)
+            if next_edge:
+                next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+                if next_node:
+                    return execute_flow_node(contact, flow, next_node)
+            
+            session.delete()
+            return True
+        except Attribute.DoesNotExist:
+            session.delete()
+            return False
     flow = session.flow if session else None
     current_node, next_edge = None, None
 
@@ -258,6 +298,39 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
     
     logger.error(f"Could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'.")
     return False
+
+
+@csrf_exempt
+def attribute_list_create_view(request):
+    """ API for listing and creating Attributes. """
+    if request.method == 'GET':
+        attributes = Attribute.objects.all().order_by('name')
+        data = [{'id': attr.id, 'name': attr.name, 'description': attr.description} for attr in attributes]
+        return JsonResponse(data, safe=False)
+    
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        attr = Attribute.objects.create(name=data['name'], description=data.get('description', ''))
+        return JsonResponse({'id': attr.id, 'name': attr.name, 'description': attr.description}, status=201)
+
+@csrf_exempt
+def attribute_detail_view(request, pk):
+    """ API for updating or deleting a specific Attribute. """
+    try:
+        attr = Attribute.objects.get(pk=pk)
+    except Attribute.DoesNotExist:
+        return JsonResponse({'error': 'Attribute not found'}, status=404)
+
+    if request.method == 'PUT':
+        data = json.loads(request.body)
+        attr.name = data.get('name', attr.name)
+        attr.description = data.get('description', attr.description)
+        attr.save()
+        return JsonResponse({'id': attr.id, 'name': attr.name, 'description': attr.description})
+
+    if request.method == 'DELETE':
+        attr.delete()
+        return JsonResponse({}, status=204)
 
 # --- Webhook and API Views ---
 

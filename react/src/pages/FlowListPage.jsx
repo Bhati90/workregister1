@@ -68,6 +68,7 @@ const FlowListPage = () => {
       <main className="main-content">
         <header className="page-header">
           <h1>Flows</h1>
+          <Link to="/attributes" className="manage-attr-btn">Manage Attributes</Link>
           <Link to="/flow/new" className="create-flow-btn">
             + Create Flow
           </Link>

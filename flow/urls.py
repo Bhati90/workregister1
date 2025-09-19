@@ -10,6 +10,8 @@ urlpatterns = [
     path('api/flows/save/', views.save_flow_api, name='save_flow_api'),
     path('webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
     path('api/flows/list/', views.get_flows_list_api, name='api_list_flows'),
+    path('api/attributes/', views.attribute_list_create_view, name='attribute-list-create'),
+    path('api/attributes/<int:pk>/', views.attribute_detail_view, name='attribute-detail'),
 
     # --- ADD THESE NEW URLS ---
     path('api/flows/<int:flow_id>/', views.get_flow_detail_api, name='api_get_flow_detail'),

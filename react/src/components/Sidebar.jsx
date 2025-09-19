@@ -27,6 +27,15 @@ const Sidebar = ({ onHide }) => {
       >
         Text Message
       </div>
+       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'mediaNode')} draggable>
+        Media Message
+      </div>
+
+      {/* --- NEW ADVANCED NODE --- */}
+      <div className="sidebar-divider">Advanced</div>
+      <div className="dndnode" onDragStart={(event) => onDragStart(event, 'askQuestionNode')} draggable>
+        Ask a Question
+      </div>
       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'buttonsNode')} draggable>
         Text with Buttons
       </div>

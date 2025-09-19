@@ -1,6 +1,7 @@
 
 
 from django.db import models
+from django.contrib import admin
 from registration.models import ChatContact
 class Flows(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
@@ -51,3 +52,25 @@ class UserFlowSessionss(models.Model):
 
     def __str__(self):
         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
+
+class Attribute(models.Model):
+    """Represents a custom field, e.g., 'city', 'email', 'order_value'."""
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+class ContactAttributeValue(models.Model):
+    """Stores the actual value of an attribute for a specific contact."""
+    contact = models.ForeignKey(ChatContact, on_delete=models.CASCADE, related_name='attribute_values')
+    attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE, related_name='contact_values')
+    value = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('contact', 'attribute')
+
+    def __str__(self):
+        return f"{self.contact.wa_id} -> {self.attribute.name}: {self.value}" [IsAuthenticated] # Optional: Add security
