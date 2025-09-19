@@ -202,7 +202,10 @@ def execute_flow_node(contact, flow, target_node):
     node_type = target_node.get('type')
     node_data = target_node.get('data', {})
     
-    payload = {}
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": contact.wa_id
+    }
     message_type_to_save = node_type
     text_content_to_save = f"Flow Step: {node_type}"
 
@@ -279,16 +282,21 @@ def execute_flow_node(contact, flow, target_node):
         edges = flow.flow_data.get('edges', [])
         target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
         
+        session = UserFlowSession.objects.filter(contact=contact).first()
         if target_has_outputs:
             UserFlowSession.objects.update_or_create(
                 contact=contact,
                 defaults={'flow': flow, 'current_node_id': target_node_id}
             )
             logger.info(f"Session for {contact.wa_id} set to node '{target_node_id}'")
-        else:
-            UserFlowSession.objects.filter(contact=contact).delete()
+        elif session:
+            session.delete()
             logger.info(f"Flow ended for {contact.wa_id}. Session deleted.")
         return True
+    
+    # This part is important for debugging
+    logger.error(f"Failed to send message via WhatsApp API. Payload: {json.dumps(payload, indent=2)}")
+    logger.error(f"Meta API Response: {response_data}")
     return False
 
 
@@ -666,7 +674,7 @@ def debug_flow_data(flow_id):
 #     except Exception as e:
 #         logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
 #         return False
-
+r
 #            
 
 def get_whatsapp_templates_api(request):
