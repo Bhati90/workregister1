@@ -27,6 +27,14 @@ class UserFlowSessions(models.Model):
     current_node_id = models.CharField(max_length=255, help_text="The ID of the user's current node in the flow.")
     updated_at = models.DateTimeField(auto_now=True)
 
+    waiting_for_attribute = models.ForeignKey(
+        'Attribute', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    pass
+
     class Meta:
         verbose_name_plural = "User Flow Sessions"
 
