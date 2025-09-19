@@ -674,7 +674,7 @@ def debug_flow_data(flow_id):
 #     except Exception as e:
 #         logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
 #         return False
-r
+
 #            
 
 def get_whatsapp_templates_api(request):
