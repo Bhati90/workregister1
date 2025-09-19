@@ -282,13 +282,118 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
         except Message.DoesNotExist: pass
     
     # Final execution
-    if flow and current_node and next_edge:
-        target_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-        if target_node:
-            return execute_flow_node(contact, flow, target_node)
-    
-    logger.error(f"Could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'.")
-    return False
+    if not flow or not current_node or not next_edge:
+            logger.error(f"After all checks, could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'. Halting execution.")
+            return False
+
+    nodes = flow.flow_data.get('nodes', [])
+    edges = flow.flow_data.get('edges', [])
+    target_node_id = next_edge.get('target')
+    target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
+        
+    if not target_node:
+            logger.error(f"FATAL: Edge points to a non-existent target node ID: '{target_node_id}'")
+            return False
+        # 3. CONSTRUCT AND SEND THE MESSAGE (This part remains the same)
+    node_type = target_node.get('type')
+    node_data = target_node.get('data', {})
+    payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
+    message_type_to_save = 'unknown'
+    text_content_to_save = f"Flow Step: {node_type}"
+        # ... (All your elif blocks for textNode, templateNode, imageNode, buttonsNode are correct and go here) ...
+    if node_type == 'textNode':
+            message_text = node_data.get('text', '...')
+            payload.update({"type": "text", "text": {"body": message_text}})
+            message_type_to_save = 'text'
+            text_content_to_save = message_text
+        
+    elif node_type == 'templateNode':
+            target_template_name = node_data.get('selectedTemplateName')
+            if not target_template_name:
+                logger.error("Flow Error: Target node is a template but no template name is selected.")
+                return False
+            components = []
+            if 'headerUrl' in node_data and node_data['headerUrl']:
+                components.append({
+                    "type": "header", "parameters": [{"type": "image", "image": { "link": node_data['headerUrl'] }}]
+                })
+            body_params = []
+            for i in range(1, 10):
+                var_key = f'bodyVar{i}'
+                if var_key in node_data and node_data[var_key]:
+                    body_params.append({ "type": "text", "text": node_data[var_key] })
+                else:
+                    break
+            if body_params:
+                components.append({ "type": "body", "parameters": body_params })
+            payload.update({
+                "type": "template",
+                "template": {"name": target_template_name, "language": { "code": "en" }, "components": components }
+            })
+            message_type_to_save = 'template'
+            text_content_to_save = f"Sent template: {target_template_name}"
+            
+    elif node_type == 'imageNode':
+            meta_media_id = node_data.get('metaMediaId') # We will now store the Meta Media ID
+            caption = node_data.get('caption')
+            if not meta_media_id:
+                logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
+                return False
+            payload.update({"type": "image", "image": {"id": meta_media_id, "caption": caption}})
+            message_type_to_save = 'image'
+            text_content_to_save = caption or "Sent an image"
+            
+    elif node_type == 'buttonsNode':
+            body_text = node_data.get('text')
+            buttons = node_data.get('buttons', [])
+            if not body_text or not buttons:
+                logger.error(f"Flow Error: Buttons node for contact {contact.wa_id} is missing text or buttons.")
+                return False
+            action = {"buttons": []}
+            for btn in buttons:
+                action["buttons"].append({"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}})
+            payload.update({
+                "type": "interactive",
+                "interactive": {"type": "button", "body": { "text": body_text }, "action": action}
+            })
+            message_type_to_save = 'interactive'
+            text_content_to_save = body_text
+    else:
+            return False
+            
+        # 4. SEND MESSAGE AND MANAGE SESSION
+    success, response_data = send_whatsapp_message(payload)
+        
+    if success:
+            save_outgoing_message(
+                contact=contact, 
+                wamid=response_data['messages'][0]['id'], 
+                message_type=message_type_to_save, 
+                text_content=text_content_to_save,
+                source_node_id=target_node_id  # <-- Pass the new ID
+            )
+            # --- MODIFIED LOGIC WITH DEBUG LOGS ---
+            target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
+            logger.info(f"DEBUG-SESSION: Checking for outputs from target_node_id: '{target_node_id}'. Has outputs: {target_has_outputs}")
+
+            if target_has_outputs:
+                UserFlowSession.objects.update_or_create(
+                    contact=contact,
+                    defaults={'flow': flow, 'current_node_id': target_node_id}
+                )
+                logger.info(f"Session for {contact.wa_id} updated to node '{target_node_id}'")
+            else:
+                if session:
+                    session.delete()
+                logger.info(f"Flow ended for {contact.wa_id} because node has no outputs. Session deleted.")
+            # --- END MODIFIED LOGIC ---
+            
+            return True
+    else:
+            logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
+            return False
+
+
 
 # --- Webhook and API Views ---
 
@@ -312,15 +417,24 @@ def whatsapp_webhook_view(request):
 
                             if message_type == 'text':
                                 user_input = msg.get('text', {}).get('body')
+                            elif message_type == 'button':
+                                user_input = msg.get('button', {}).get('text')
                             elif message_type == 'interactive':
                                 interactive = msg.get('interactive', {})
                                 if interactive.get('type') == 'list_reply': user_input = interactive.get('list_reply', {}).get('id')
                                 elif interactive.get('type') == 'button_reply': user_input = interactive.get('button_reply', {}).get('title')
                             # elif message_type == 'text': user_input = msg.get('text', {}).get('body')
-                            
+                            logger.info(f"DEBUG-FLOW: Extracted user_input='{user_input}' and replied_to_wamid='{replied_to_wamid}'")
+                            flow_handled = False
                             if user_input and replied_to_wamid:
-                                try_execute_flow_step(contact, user_input, replied_to_wamid)
-
+                                flow_handled = try_execute_flow_step(contact, user_input, replied_to_wamid)
+                            elif user_input:
+                                logger.info(f"User sent input '{user_input}' without replying to a flow message. No action taken.")
+                                pass
+                                # Go to the next message
+                            if flow_handled:
+                                logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
+                                continue
                     elif 'statuses' in value:
                         for status in value.get('statuses', []):
                             if status.get('status') == 'read':
