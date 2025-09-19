@@ -27,29 +27,12 @@ class UserFlowSessions(models.Model):
     current_node_id = models.CharField(max_length=255, help_text="The ID of the user's current node in the flow.")
     updated_at = models.DateTimeField(auto_now=True)
 
-    waiting_for_attribute = models.ForeignKey(
-        'Attribute', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True
-    )
+    waiting_for_attribute = models.ForeignKey(Attribute, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # New fields for waiting for specific media types
+    waiting_for_location_data = models.JSONField(null=True, blank=True, help_text="Stores which attributes to save lat/lon to.")
     waiting_for_image_attribute = models.ForeignKey(Attribute, on_delete=models.SET_NULL, null=True, blank=True, related_name='image_sessions')
 
-    is_waiting_for_location = models.BooleanField(default=False)
-    longitude_attribute = models.ForeignKey(
-        'Attribute', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='longitude_sessions'
-    )
-    latitude_attribute = models.ForeignKey(
-        'Attribute', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='latitude_sessions'
-    )
 
     class Meta:
         verbose_name_plural = "User Flow Sessions"
