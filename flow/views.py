@@ -358,6 +358,30 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
             })
             message_type_to_save = 'interactive'
             text_content_to_save = body_text
+    elif node_type == 'interactiveImageNode':
+        buttons = [{"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}} for btn in node_data.get('buttons', [])]
+        payload.update({"type": "interactive", "interactive": {"type": "button", "header": {"type": "image", "image": {"id": node_data.get('metaMediaId')}}, "body": {"text": node_data.get('bodyText')}, "action": {"buttons": buttons}}})
+        text_content_to_save = node_data.get('bodyText')
+
+    elif node_type == 'interactiveListNode':
+        sections_data = []
+        for section in node_data.get('sections', []):
+            rows_data = [{"id": row.get('id'), "title": row.get('title'), "description": row.get('description', '')} for row in section.get('rows', [])]
+            sections_data.append({"title": section.get('title'), "rows": rows_data})
+        payload.update({"type": "interactive", "interactive": {"type": "list", "header": {"type": "text", "text": node_data.get('header', '')}, "body": {"text": node_data.get('body', '')}, "footer": {"text": node_data.get('footer', '')}, "action": {"button": node_data.get('buttonText', 'Select'), "sections": sections_data}}})
+        text_content_to_save = node_data.get('body')
+
+    elif node_type == 'mediaNode':
+        media_type = node_data.get('mediaType', 'document')
+        media_payload = {"id": node_data.get('metaMediaId')}
+        if media_type != 'audio' and node_data.get('caption'):
+            media_payload['caption'] = node_data.get('caption')
+        if media_type == 'document' and node_data.get('filename'):
+            media_payload['filename'] = node_data.get('filename')
+        payload.update({"type": media_type, media_type: media_payload})
+        message_type_to_save = media_type
+        text_content_to_save = node_data.get('caption') or f"Sent a {media_type}"
+   
     else:
             return False
             
