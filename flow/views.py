@@ -287,18 +287,24 @@ def whatsapp_webhook_view(request):
 
                             if message_type == 'text':
                                 user_input = msg.get('text', {}).get('body')
+                            elif message_type == 'button':
+                                user_input = msg.get('button', {}).get('text')
                             elif message_type == 'interactive':
                                 interactive = msg.get('interactive', {})
-                                if interactive.get('type') == 'list_reply':
-                                    user_input = interactive.get('list_reply', {}).get('id')
-                                elif interactive.get('type') == 'button_reply':
-                                    user_input = interactive.get('button_reply', {}).get('title')
-                            
-                            logger.info(f"Parsed user input: '{user_input}'")
-                            
+                                if interactive.get('type') == 'list_reply': user_input = interactive.get('list_reply', {}).get('id')
+                                elif interactive.get('type') == 'button_reply': user_input = interactive.get('button_reply', {}).get('title')
+                            # elif message_type == 'text': user_input = msg.get('text', {}).get('body')
+                            logger.info(f"DEBUG-FLOW: Extracted user_input='{user_input}' and replied_to_wamid='{replied_to_wamid}'")
+                            flow_handled = False
                             if user_input and replied_to_wamid:
-                                try_execute_flow_step(contact, user_input, replied_to_wamid)
-
+                                flow_handled = try_execute_flow_step(contact, user_input, replied_to_wamid)
+                            elif user_input:
+                                logger.info(f"User sent input '{user_input}' without replying to a flow message. No action taken.")
+                                pass
+                                # Go to the next message
+                            if flow_handled:
+                                logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
+                                continue
                     # 2. Check for and process any status updates
                     if 'statuses' in value:
                         for status in value.get('statuses', []):
