@@ -19,7 +19,16 @@ class Flows(models.Model):
 
     def __str__(self):
         return f"Flow '{self.name}' (Active: {self.is_active})"
-    
+
+class Attribute(models.Model):
+    """Represents a custom field, e.g., 'city', 'email', 'order_value'."""
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+ 
 class UserFlowSessions(models.Model):
     """Tracks the current position of a contact within a flow."""
     contact = models.OneToOneField(ChatContact, on_delete=models.CASCADE, primary_key=True)
@@ -60,14 +69,6 @@ class UserFlowSessionss(models.Model):
     def __str__(self):
         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
 
-class Attribute(models.Model):
-    """Represents a custom field, e.g., 'city', 'email', 'order_value'."""
-    name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
 
 class ContactAttributeValue(models.Model):
     """Stores the actual value of an attribute for a specific contact."""
