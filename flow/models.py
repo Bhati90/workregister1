@@ -92,7 +92,7 @@ class UserFlowSessionss(models.Model):
     flow = models.ForeignKey(Flowss, on_delete=models.CASCADE)
     current_node_id = models.CharField(max_length=255, help_text="The ID of the user's current node in the flow.")
     updated_at = models.DateTimeField(auto_now=True)
-    waiting_for_attribute = models.ForeignKey(
+    waiting_for_attributeewdwedw = models.ForeignKey(
         'Attribute', 
         on_delete=models.SET_NULL, 
         null=True, 
@@ -100,15 +100,15 @@ class UserFlowSessionss(models.Model):
     )
 
     # For waiting for a location reply
-    is_waiting_for_location = models.BooleanField(default=False)
-    longitude_attribute = models.ForeignKey(
+    is_waiting_for_locationgrwfewfwf = models.BooleanField(default=False)
+    longitude_attributeeqwdeed = models.ForeignKey(
         'Attribute', 
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True,
         related_name='longitude_sessions'
     )
-    latitude_attribute = models.ForeignKey(
+    latitude_attributeewfewfew = models.ForeignKey(
         'Attribute', 
         on_delete=models.SET_NULL, 
         null=True, 
@@ -117,7 +117,7 @@ class UserFlowSessionss(models.Model):
     )
 
     # For waiting for an image reply
-    waiting_for_image_attribute = models.ForeignKey(
+    waiting_for_image_attributeerwrfwfe = models.ForeignKey(
         'Attribute', 
         on_delete=models.SET_NULL, 
         null=True, 
