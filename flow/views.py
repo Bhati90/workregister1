@@ -278,73 +278,106 @@ def try_execute_status_trigger(wamid, wa_id):
         logger.error(f"CRITICAL STATUS TRIGGER ERROR: {e}", exc_info=True)
     return False
 
+
 def try_execute_flow_step(contact, user_input, replied_to_wamid):
-    """Finds the correct next node and passes it to the executor function."""
+    """
+    Finds and executes the next step in a flow, with extensive debugging at every stage.
+    """
+    logger.info(f"--- [START] --- Attempting to execute flow step for contact: {contact.wa_id}")
+    logger.info(f"                User Input: '{user_input}', Replied to WAMID: {replied_to_wamid}")
+
     session = UserFlowSession.objects.filter(contact=contact).first()
-    if session and session.waiting_for_attribute_id:
-        try:
-            attribute = Attribute.objects.get(pk=session.waiting_for_attribute_id)
-            ContactAttributeValue.objects.update_or_create(contact=contact, attribute=attribute, defaults={'value': user_input})
-            
-            flow, current_node_id = session.flow, session.current_node_id
-            session.waiting_for_attribute = None
-            session.save()
-            
-            next_edge = next((e for e in flow.flow_data.get('edges', []) if e.get('source') == current_node_id and e.get('sourceHandle') == 'onAnswer'), None)
-            if next_edge:
-                next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-                if next_node:
-                    return execute_flow_node(contact, flow, next_node)
-            
-            session.delete()
-            return True
-        except Attribute.DoesNotExist:
-            session.delete()
-            return False
     flow = session.flow if session else None
     current_node, next_edge = None, None
 
+    # --- Stage 1: Check for an active session ---
+    logger.info("[Stage 1] Checking for an active user session...")
     if session:
+        logger.info(f"  [PASS] Active session found. Flow: '{flow.name}', Current Node ID: '{session.current_node_id}'")
         nodes, edges = flow.flow_data.get('nodes', []), flow.flow_data.get('edges', [])
         current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
         if current_node:
+            logger.info(f"  Found current node in flow data. Type: '{current_node.get('type')}'")
             next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
+            if next_edge:
+                logger.info(f"  [SUCCESS] Found a valid next edge from current session: '{current_node.get('id')}' -> '{next_edge.get('target')}' via handle '{user_input}'")
+            else:
+                logger.warning(f"  [FAIL] No edge found from node '{current_node.get('id')}' with handle '{user_input}'.")
+        else:
+            logger.error(f"  [CRITICAL] Session points to node '{session.current_node_id}', but it was not found in the flow data!")
+    else:
+        logger.info("  [INFO] No active session found for this contact.")
 
+    # --- Stage 2: If no path, check historical context ---
     if not next_edge:
+        logger.info("[Stage 2] No path from session. Checking historical message context...")
         try:
             original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound')
+            logger.info(f"  Found replied-to message in DB. Source Node ID: '{original_message.source_node_id}'")
             if original_message.source_node_id:
                 if not flow:
+                    logger.info("  No flow loaded yet. Searching all active flows for the historical node...")
                     active_flows = Flow.objects.filter(is_active=True)
                     for f in active_flows:
                         if any(n.get('id') == original_message.source_node_id for n in f.flow_data.get('nodes', [])):
-                            flow = f; break
+                            flow = f
+                            logger.info(f"  [PASS] Found historical node in flow '{flow.name}'.")
+                            break
                 if flow:
                     nodes, edges = flow.flow_data.get('nodes', []), flow.flow_data.get('edges', [])
                     current_node = next((n for n in nodes if n.get('id') == original_message.source_node_id), None)
                     if current_node:
                         next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-        except Message.DoesNotExist: pass
+                        if next_edge:
+                             logger.info(f"  [SUCCESS] Found a valid historical path: '{current_node.get('id')}' -> '{next_edge.get('target')}' via handle '{user_input}'")
+                        else:
+                            logger.warning(f"  [FAIL] Found historical node, but no edge matches handle '{user_input}'.")
+                else:
+                    logger.warning("  [FAIL] Historical node ID found, but no active flow contains it.")
+            else:
+                logger.info("  [INFO] Replied-to message had no source node ID.")
+        except Message.DoesNotExist:
+            logger.warning("  [FAIL] The replied-to WAMID was not found in the Message database.")
 
+    # --- Stage 3: If still no path, check for a new flow trigger ---
     if not next_edge:
+        logger.info("[Stage 3] No historical path found. Checking if this is a trigger for a new flow...")
         try:
             original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
             template_name = original_message.text_content.replace("Sent template: ", "").strip()
+            logger.info(f"  Replied-to message is a template: '{template_name}'. Looking for matching flows...")
             possible_flow = Flow.objects.filter(template_name=template_name, is_active=True).order_by('-updated_at').first()
             if possible_flow:
                 flow = possible_flow
+                logger.info(f"  [PASS] Found matching active flow: '{flow.name}'")
                 nodes, edges = flow.flow_data.get('nodes', []), flow.flow_data.get('edges', [])
                 current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data',{}).get('selectedTemplateName') == template_name), None)
                 if current_node:
                     next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-        except Message.DoesNotExist: pass
+                    if next_edge:
+                         logger.info(f"  [SUCCESS] This is a new flow. Path found: '{current_node.get('id')}' -> '{next_edge.get('target')}' via handle '{user_input}'")
+                    else:
+                        logger.warning(f"  [FAIL] Found trigger template, but no edge matches handle '{user_input}'.")
+                else:
+                    logger.error("  [CRITICAL] Flow is supposed to be triggered by this template, but no matching start node was found in its data!")
+            else:
+                logger.info("  [INFO] No active flow is triggered by this template.")
+        except Message.DoesNotExist:
+            logger.info("  [INFO] Replied-to message is not a trigger template.")
     
+    # --- Stage 4: Final check and execution ---
+    logger.info("[Stage 4] Final check before execution...")
     if flow and current_node and next_edge:
+        logger.info("  [PASS] All components (flow, current_node, next_edge) are valid. Proceeding to execution.")
         target_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
         if target_node:
-            return execute_flow_node(contact, flow, target_node)
+            logger.info(f"  Target node found: '{target_node.get('id')}', Type: '{target_node.get('type')}'")
+            return execute_flow_node(contact, flow, target_node) # This is where the message is actually sent
+        else:
+            logger.error(f"  [CRITICAL] Execution failed. The edge points to a target node ID '{next_edge.get('target')}' that does not exist in the flow data.")
+            return False
     
-    logger.error(f"Could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'.")
+    logger.error(f"--- [HALT] --- After all checks, could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'. Flow is stopping.")
     return False
 
 def get_media_url_from_id(media_id):
@@ -457,6 +490,33 @@ def whatsapp_webhook_view(request):
                                     else:
                                         session.delete() # End flow if no path forward
                                 continue
+
+                            if message_type == 'image' and session and session.waiting_for_image_attribute_id:
+                                image_id = msg.get('image', {}).get('id')
+                                media_url = get_media_url_from_id(image_id)
+                                if media_url:
+                                    ContactAttributeValue.objects.update_or_create(
+                                        contact=contact, attribute_id=session.waiting_for_image_attribute_id,
+                                        defaults={'value': media_url}
+                                    )
+                                
+                                # Find next node from 'onImageReceived' handle
+                                flow = session.flow
+                                edges = flow.flow_data.get('edges', [])
+                                next_edge = next((e for e in edges if e.get('source') == session.current_node_id and e.get('sourceHandle') == 'onImageReceived'), None)
+                                
+                                # Clear the waiting state
+                                session.waiting_for_image_attribute = None
+                                session.save()
+                                
+                                if next_edge:
+                                    next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+                                    if next_node:
+                                        execute_flow_node(contact, flow, next_node)
+                                else:
+                                    session.delete()
+                                continue # Stop further processing
+    
                             if message_type == 'text':
                                 user_input = msg.get('text', {}).get('body')
                             elif message_type == 'button':
