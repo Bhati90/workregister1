@@ -13,6 +13,8 @@ export default memo(({ data, isConnectable }) => {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [headerComponent, setHeaderComponent] = useState(null);
   const [bodyVariables, setBodyVariables] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
 
   useEffect(() => {
     if (!data.templates) {
@@ -38,7 +40,33 @@ export default memo(({ data, isConnectable }) => {
 
   const handleTemplateChange = (e) => data.onUpdate('selectedTemplateName', e.target.value);
   const handleVariableChange = (e) => data.onUpdate(e.target.name, e.target.value);
+  
+  // --- NEW: UPLOAD HANDLER FOR MEDIA HEADERS ---
+  const handleMediaUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
+    setUploading(true);
+    setUploadError(null);
+    const formData = new FormData();
+    formData.append('media', file);
+
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/upload-media-to-meta/`, formData);
+        if (response.data.status === 'success') {
+            // Save the Meta Media ID needed for sending
+            data.onUpdate('metaMediaId', response.data.media_id);
+            // Save a temporary local URL for the preview panel
+            data.onUpdate('localPreviewUrl', URL.createObjectURL(file));
+        } else {
+            setUploadError(response.data.message || 'Upload failed.');
+        }
+    } catch (error) {
+        setUploadError(error.response?.data?.message || 'Upload failed.');
+    } finally {
+        setUploading(false);
+    }
+  };
   return (
     <div className="custom-node template-node">
         {/* Input connection point for the node */}
@@ -65,13 +93,16 @@ export default memo(({ data, isConnectable }) => {
                 ))}
             </select>
 
+            {/* --- REVISED: CONDITIONAL UI FOR MEDIA UPLOAD --- */}
             {headerComponent && (
                 <div className="variable-input">
-                    <label>Header {headerComponent.format} URL:</label>
-                    <input type="text" name="headerUrl" placeholder={`Enter URL for ${headerComponent.format.toLowerCase()}`} value={data.headerUrl || ''} onChange={handleVariableChange} />
+                    <label>Header {headerComponent.format}:</label>
+                    <input type="file" onChange={handleMediaUpload} disabled={uploading} />
+                    {uploading && <p>Uploading...</p>}
+                    {uploadError && <p style={{ color: 'red' }}>Error: {uploadError}</p>}
+                    {data.metaMediaId && <p style={{ color: 'green', fontSize: '0.8em' }}>Media ready (ID: {data.metaMediaId})</p>}
                 </div>
             )}
-
             {bodyVariables.map(variableNum => (
                 <div key={variableNum} className="variable-input">
                     <label>{`Body Variable {{${variableNum}}}`}:</label>

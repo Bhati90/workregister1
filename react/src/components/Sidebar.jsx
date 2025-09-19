@@ -1,7 +1,9 @@
 // src/components/Sidebar.jsx
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Sidebar = () => {
+      const navigate = useNavigate();
   const onDragStart = (event, nodeType) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
@@ -11,6 +13,9 @@ const Sidebar = () => {
     <aside className="sidebar">
       <div className="description">Drag nodes to the canvas to build your flow.</div>
       {/* --- ADD THIS BACK --- */}
+      <div className="back-to-list">
+                    <button onClick={() => navigate('/')}>← Back to Flows</button>
+                </div>
       <div 
         className="dndnode" 
         onDragStart={(event) => onDragStart(event, 'templateNode')} 

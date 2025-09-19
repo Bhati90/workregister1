@@ -89,7 +89,40 @@ def execute_flow_node(contact, flow, target_node):
     text_content_to_save = f"Flow Step: {node_type}"
 
     # Build the rest of the payload based on the node type
-    if node_type == 'textNode':
+    if node_type == 'templateNode':
+        components = []
+        
+        # NEW: Check if there's a media ID for the header
+        if 'metaMediaId' in node_data and node_data['metaMediaId']:
+            header_format = node_data.get('headerComponent', {}).get('format', 'IMAGE').lower()
+            components.append({
+                "type": "header", 
+                "parameters": [{
+                    "type": header_format, 
+                    header_format: { "id": node_data['metaMediaId'] }
+                }]
+            })
+
+        body_params = []
+        for i in range(1, 10):
+            var_key = f'bodyVar{i}'
+            if var_key in node_data and node_data[var_key]:
+                body_params.append({ "type": "text", "text": node_data[var_key] })
+        
+        if body_params:
+            components.append({ "type": "body", "parameters": body_params })
+        
+        payload.update({
+            "type": "template",
+            "template": {
+                "name": node_data.get('selectedTemplateName'),
+                "language": {"code": "en"}, # Or your desired language code
+                "components": components
+            }
+        })
+        message_type_to_save = 'template'
+        text_content_to_save = f"Sent template: {node_data.get('selectedTemplateName')}"
+    elif node_type == 'textNode':
         payload.update({"type": "text", "text": {"body": node_data.get('text', '...')}})
         message_type_to_save = 'text'
         text_content_to_save = node_data.get('text', '...')
