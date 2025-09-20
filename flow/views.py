@@ -132,7 +132,7 @@ def execute_flow_node(contact, flow, target_node):
             defaults={
                 'flow': flow, 
                 'current_node_id': target_node_id,
-                'waiting_for_attribute_id': node_data.get('saveAttributeId')
+                'waiting_for_attribute': node_data.get('saveAttributeId')
             }
         )
         logger.info(f"Session for {contact.wa_id} is now waiting for attribute ID {node_data.get('saveAttributeId')}")
@@ -205,9 +205,9 @@ def execute_flow_node(contact, flow, target_node):
             defaults={
                 'flow': flow,
                 'current_node_id': target_node_id,
-                'waiting_for_image_attribute_id': node_data.get('saveAttributeId'),
+                'waiting_for_image_attribute': node_data.get('saveAttributeId'),
                 'waiting_for_attribute': None,
-                'waiting_for_location_data': None
+                'is_waiting_for_location': None
             }
         )  
     else:
@@ -491,12 +491,12 @@ def whatsapp_webhook_view(request):
                                         session.delete() # End flow if no path forward
                                 continue
 
-                            if message_type == 'image' and session and session.waiting_for_image_attribute_id:
+                            if message_type == 'image' and session and session.waiting_for_image_attribute:
                                 image_id = msg.get('image', {}).get('id')
                                 media_url = get_media_url_from_id(image_id)
                                 if media_url:
                                     ContactAttributeValue.objects.update_or_create(
-                                        contact=contact, attribute_id=session.waiting_for_image_attribute_id,
+                                        contact=contact, attribute_id=session.waiting_for_image_attribute,
                                         defaults={'value': media_url}
                                     )
                                 
