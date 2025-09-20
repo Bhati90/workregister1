@@ -136,10 +136,22 @@ def execute_flow_node(contact, flow, target_node):
         text_content_to_save = f"Sent template: {node_data.get('selectedTemplateName')}"
 
     elif node_type == 'textNode':
-        payload.update({"type": "text", "text": {"body": node_data.get('text', '...')}})
+    # Get user attributes for substitution
+        user_attributes = {}
+        for attr_value in contact.attribute_values.all():
+            user_attributes[attr_value.attribute.name] = attr_value.value
+        user_attributes['contact_id'] = contact.wa_id
+        
+        # Get the original text and substitute placeholders
+        original_text = node_data.get('text', '...')
+        substituted_text = substitute_placeholders(original_text, user_attributes)
+        
+        logger.info(f"DEBUG-TEXT-NODE: Original: {original_text}")
+        logger.info(f"DEBUG-TEXT-NODE: After substitution: {substituted_text}")
+        
+        payload.update({"type": "text", "text": {"body": substituted_text}})
         message_type_to_save = 'text'
-        text_content_to_save = node_data.get('text', '...')
-
+        text_content_to_save = substituted_text
     elif node_type == 'buttonsNode':
         buttons = [{"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}} for btn in node_data.get('buttons', [])]
         payload.update({"type": "interactive", "interactive": {"type": "button", "body": {"text": node_data.get('text')}, "action": {"buttons": buttons}}})
