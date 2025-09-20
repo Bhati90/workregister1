@@ -429,25 +429,48 @@ def whatsapp_webhook_view(request):
                             message_type = msg.get('type')
                             session = UserFlowSession.objects.filter(contact=contact).first()
                             # --- Prioritized handlers for waiting states ---
-                            if message_type == 'location' and session and session.is_waiting_for_location:
+                            if message_type == 'location':
                                 location = msg.get('location', {})
-                                longitude, latitude = location.get('longitude'), location.get('latitude')
-                                if session.longitude_attribute_id:
-                                    ContactAttributeValue.objects.update_or_create(contact=contact, attribute_id=session.longitude_attribute_id, defaults={'value': str(longitude)})
-                                if session.latitude_attribute_id:
-                                    ContactAttributeValue.objects.update_or_create(contact=contact, attribute_id=session.latitude_attribute_id, defaults={'value': str(latitude)})
+                                longitude = location.get('longitude')
+                                latitude = location.get('latitude')
                                 
-                                flow, current_node_id = session.flow, session.current_node_id
-                                session.is_waiting_for_location = False; session.save()
-                                
-                                next_edge = next((e for e in flow.flow_data.get('edges', []) if e.get('source') == current_node_id and e.get('sourceHandle') == 'onLocationReceived'), None)
-                                if next_edge:
-                                    next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-                                    if next_node: execute_flow_node(contact, flow, next_node)
-                                else: session.delete()
+                                logger.info(f"Received location from {contact.wa_id}: Long={longitude}, Lat={latitude}")
+
+                                # Check if a session is waiting for this location
+                                session = UserFlowSession.objects.filter(contact=contact, is_waiting_for_location=True).first()
+                                if session:
+                                    # Save longitude attribute
+                                    if session.longitude_attribute_id and longitude is not None:
+                                        ContactAttributeValue.objects.update_or_create(
+                                            contact=contact, attribute_id=session.longitude_attribute_id,
+                                            defaults={'value': str(longitude)}
+                                        )
+                                    # Save latitude attribute
+                                    if session.latitude_attribute_id and latitude is not None:
+                                        ContactAttributeValue.objects.update_or_create(
+                                            contact=contact, attribute_id=session.latitude_attribute_id,
+                                            defaults={'value': str(latitude)}
+                                        )
+                                    
+                                    # Find the next node from the 'onLocationReceived' handle
+                                    flow = session.flow
+                                    current_node_id = session.current_node_id
+                                    edges = flow.flow_data.get('edges', [])
+                                    next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onLocationReceived'), None)
+                                    
+                                    # Clear the waiting state
+                                    session.is_waiting_for_location = False
+                                    session.save()
+                                    
+                                    if next_edge:
+                                        next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+                                        if next_node:
+                                            execute_flow_node(contact, flow, next_node)
+                                    else:
+                                        session.delete() # End flow if no path forward
                                 continue
 
-                            if message_type == 'image' and session and session.waiting_for_image_attribute_id:
+                            if message_type == 'image' and session.waiting_for_image_attribute_id:
                                 image_id = msg.get('image', {}).get('id')
                                 media_url = get_media_url_from_id(image_id)
                                 if media_url:
