@@ -254,7 +254,7 @@ def execute_flow_node(contact, flow, target_node):
         )
         logger.info(f"DEBUG-IMAGE-NODE: Session for {contact.wa_id} is now waiting for image. Attr: {image_attr}")
     
-    elif node_type == 'apiNode':
+    elif node_type == 'askApiNode':
         # This is now clean and simple: just trigger the background task
         process_api_request_node.delay(contact.id, flow.id, target_node)
         logger.info(f"Queued API request for contact {contact.id}")
