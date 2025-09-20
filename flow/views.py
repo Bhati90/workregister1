@@ -702,18 +702,6 @@ def try_execute_flow_step(contact, user_input, replied_to_wamid):
     logger.error(f"--- [HALT] --- After all checks, could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'. Flow is stopping.")
     return False
 
-def get_media_url_from_id(media_id):
-    """Uses the Meta API to get a permanent URL for a media object."""
-    url = f"{META_API_URL}/{media_id}/"
-    headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json().get('url')
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Could not retrieve media URL for ID {media_id}: {e}")
-        return None
-    
 
 @csrf_exempt
 def attribute_list_create_view(request):
@@ -946,19 +934,23 @@ def whatsapp_webhook_view(request):
                                     logger.info(f"DEBUG-IMAGE: No session waiting for image for contact {contact.wa_id}")
 
                             # 5. ADD TEXT PROCESSING FOR askQuestionNode (INSERT BEFORE EXISTING FLOW LOGIC):
-                            if message_type == 'text' and user_input:
-                                # Check if there's a session waiting for text input
+                            if message_type == 'text':
+                                user_input = msg.get('text', {}).get('body')
+                                logger.info(f"DEBUG-TEXT: Received text message: '{user_input}' from {contact.wa_id}")
+                                
+                                # FIRST: Check if there's a session waiting for text input (askQuestionNode)
                                 session = UserFlowSession.objects.filter(contact=contact, waiting_for_attribute__isnull=False).first()
                                 
                                 if session and session.waiting_for_attribute:
-                                    logger.info(f"DEBUG-QUESTION: Received text answer '{user_input}' from {contact.wa_id}")
+                                    logger.info(f"DEBUG-QUESTION: Found session waiting for text input. Attribute: {session.waiting_for_attribute.name}")
                                     
                                     # Save the answer to the specified attribute
                                     ContactAttributeValue.objects.update_or_create(
-                                        contact=contact, attribute=session.waiting_for_attribute,
+                                        contact=contact, 
+                                        attribute=session.waiting_for_attribute,
                                         defaults={'value': user_input}
                                     )
-                                    logger.info(f"DEBUG-QUESTION: Saved answer '{user_input}' to attribute {session.waiting_for_attribute.name}")
+                                    logger.info(f"DEBUG-QUESTION: Successfully saved answer '{user_input}' to attribute '{session.waiting_for_attribute.name}'")
                                     
                                     # Find next node from 'onAnswer' handle
                                     flow = session.flow
@@ -970,19 +962,25 @@ def whatsapp_webhook_view(request):
                                     # Clear the waiting state
                                     session.waiting_for_attribute = None
                                     session.save()
+                                    logger.info(f"DEBUG-QUESTION: Cleared waiting_for_attribute state")
                                     
                                     if next_edge:
                                         next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-                                        logger.info(f"DEBUG-QUESTION: Found next node: {next_node}")
+                                        logger.info(f"DEBUG-QUESTION: Found next node: {next_node.get('id') if next_node else 'None'}")
                                         if next_node:
                                             execute_flow_node(contact, flow, next_node)
+                                        else:
+                                            logger.error(f"DEBUG-QUESTION: Next node not found for target: {next_edge.get('target')}")
+                                            session.delete()
                                     else:
                                         logger.info("DEBUG-QUESTION: No next edge found, ending flow")
                                         session.delete()
-                                    continue  # Stop further processing
+                                    continue  # Important: Skip further processing for this message
+                                
+                                else:
+                                    logger.info(f"DEBUG-QUESTION: No session waiting for text input from {contact.wa_id}")
+ # Stop further processing
     
-                            if message_type == 'text':
-                                user_input = msg.get('text', {}).get('body')
                             elif message_type == 'button':
                                 user_input = msg.get('button', {}).get('text')
                             elif message_type == 'interactive':
@@ -1012,6 +1010,18 @@ def whatsapp_webhook_view(request):
             
     return JsonResponse({"status": "success"}, status=200)
 
+def get_media_url_from_id(media_id):
+    """Uses the Meta API to get a permanent URL for a media object."""
+    url = f"{META_API_URL}/{media_id}/"
+    headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json().get('url')
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Could not retrieve media URL for ID {media_id}: {e}")
+        return None
+    
 
 
 
