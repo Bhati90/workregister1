@@ -87,7 +87,15 @@ def execute_flow_node(contact, flow, target_node):
     payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
     message_type_to_save = node_type
     text_content_to_save = f"Flow Step: {node_type}"
-
+    session_defaults = {
+        'flow': flow,
+        'current_node_id': target_node_id,
+        'waiting_for_attribute_id': None,
+        'is_waiting_for_location': False,
+        'waiting_for_image_attribute_id': None,
+        'longitude_attribute_id': None,
+        'latitude_attribute_id': None
+    }
     if node_type == 'templateNode':
         components = []
         if 'metaMediaId' in node_data and node_data['metaMediaId']:
@@ -127,14 +135,7 @@ def execute_flow_node(contact, flow, target_node):
         text_content_to_save = question_text
         
         # Set the session to a special "waiting" state
-        UserFlowSession.objects.update_or_create(
-            contact=contact,
-            defaults={
-                'flow': flow, 
-                'current_node_id': target_node_id,
-                'waiting_for_attribute': node_data.get('saveAttributeId')
-            }
-        )
+        session_defaults['waiting_for_attribute_id'] = node_data.get('saveAttributeId')
         logger.info(f"Session for {contact.wa_id} is now waiting for attribute ID {node_data.get('saveAttributeId')}")
 
     elif node_type == 'interactiveImageNode':
@@ -172,17 +173,9 @@ def execute_flow_node(contact, flow, target_node):
         text_content_to_save = question_text
         
         # Set the session to a special "waiting for location" state
-        UserFlowSession.objects.update_or_create(
-            contact=contact,
-            defaults={
-                'flow': flow, 
-                'current_node_id': target_node_id,
-                'is_waiting_for_location': True,
-                'longitude_attribute_id': node_data.get('longitudeAttributeId'),
-                'latitude_attribute_id': node_data.get('latitudeAttributeId'),
-                'waiting_for_attribute': None # Clear any text attribute waiting state
-            }
-        )
+        session_defaults['is_waiting_for_location'] = True
+        session_defaults['longitude_attribute_id'] = node_data.get('longitudeAttributeId')
+        session_defaults['latitude_attribute_id'] = node_data.get('latitudeAttributeId')
         logger.info(f"Session for {contact.wa_id} is now waiting for location.")
 
     elif node_type == 'mediaNode':
@@ -200,16 +193,7 @@ def execute_flow_node(contact, flow, target_node):
         payload.update({"type": "text", "text": {"body": question_text or "Please send an image."}})
         message_type_to_save = 'text'
         text_content_to_save = question_text
-        UserFlowSession.objects.update_or_create(
-            contact=contact,
-            defaults={
-                'flow': flow,
-                'current_node_id': target_node_id,
-                'waiting_for_image_attribute': node_data.get('saveAttributeId'),
-                'waiting_for_attribute': None,
-                'is_waiting_for_location': None
-            }
-        )  
+        session_defaults['waiting_for_image_attribute_id'] = node_data.get('imageAttributeId') 
     else:
         logger.error(f"Message construction for node type '{node_type}' is not implemented.")
         return False
@@ -220,16 +204,11 @@ def execute_flow_node(contact, flow, target_node):
         wamid = response_data['messages'][0]['id']
         save_outgoing_message(contact=contact, wamid=wamid, message_type=message_type_to_save, text_content=text_content_to_save, source_node_id=target_node_id)
         
-        if node_type != 'askQuestionNode':
-            edges = flow.flow_data.get('edges', [])
-            target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
-            if target_has_outputs:
-                UserFlowSession.objects.update_or_create(
-                    contact=contact,
-                    defaults={'flow': flow, 'current_node_id': target_node_id, 'waiting_for_attribute': None}
-                )
-            else:
-                 UserFlowSession.objects.filter(contact=contact).delete()
+        edges = flow.flow_data.get('edges', [])
+        target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
+        if not target_has_outputs and node_type not in ['askQuestionNode', 'askLocationNode', 'askForImageNode']:
+            UserFlowSession.objects.filter(contact=contact).delete()
+            
         return True
     
     logger.error(f"Failed to send message via WhatsApp API. Payload: {json.dumps(payload, indent=2)}")
@@ -448,75 +427,57 @@ def whatsapp_webhook_view(request):
                         for msg in value.get('messages', []):
                             contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
                             message_type = msg.get('type')
-                            replied_to_wamid = msg.get('context', {}).get('id')
-                            user_input = None
-                            if message_type == 'location':
+                            session = UserFlowSession.objects.filter(contact=contact).first()
+                            # --- Prioritized handlers for waiting states ---
+                            if message_type == 'location' and session and session.is_waiting_for_location:
                                 location = msg.get('location', {})
-                                longitude = location.get('longitude')
-                                latitude = location.get('latitude')
+                                longitude, latitude = location.get('longitude'), location.get('latitude')
+                                if session.longitude_attribute_id:
+                                    ContactAttributeValue.objects.update_or_create(contact=contact, attribute_id=session.longitude_attribute_id, defaults={'value': str(longitude)})
+                                if session.latitude_attribute_id:
+                                    ContactAttributeValue.objects.update_or_create(contact=contact, attribute_id=session.latitude_attribute_id, defaults={'value': str(latitude)})
                                 
-                                logger.info(f"Received location from {contact.wa_id}: Long={longitude}, Lat={latitude}")
-
-                                # Check if a session is waiting for this location
-                                session = UserFlowSession.objects.filter(contact=contact, is_waiting_for_location=True).first()
-                                if session:
-                                    # Save longitude attribute
-                                    if session.longitude_attribute_id and longitude is not None:
-                                        ContactAttributeValue.objects.update_or_create(
-                                            contact=contact, attribute_id=session.longitude_attribute_id,
-                                            defaults={'value': str(longitude)}
-                                        )
-                                    # Save latitude attribute
-                                    if session.latitude_attribute_id and latitude is not None:
-                                        ContactAttributeValue.objects.update_or_create(
-                                            contact=contact, attribute_id=session.latitude_attribute_id,
-                                            defaults={'value': str(latitude)}
-                                        )
-                                    
-                                    # Find the next node from the 'onLocationReceived' handle
-                                    flow = session.flow
-                                    current_node_id = session.current_node_id
-                                    edges = flow.flow_data.get('edges', [])
-                                    next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onLocationReceived'), None)
-                                    
-                                    # Clear the waiting state
-                                    session.is_waiting_for_location = False
-                                    session.save()
-                                    
-                                    if next_edge:
-                                        next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-                                        if next_node:
-                                            execute_flow_node(contact, flow, next_node)
-                                    else:
-                                        session.delete() # End flow if no path forward
+                                flow, current_node_id = session.flow, session.current_node_id
+                                session.is_waiting_for_location = False; session.save()
+                                
+                                next_edge = next((e for e in flow.flow_data.get('edges', []) if e.get('source') == current_node_id and e.get('sourceHandle') == 'onLocationReceived'), None)
+                                if next_edge:
+                                    next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+                                    if next_node: execute_flow_node(contact, flow, next_node)
+                                else: session.delete()
                                 continue
 
-                            if message_type == 'image' and session and session.waiting_for_image_attribute:
+                            if message_type == 'image' and session and session.waiting_for_image_attribute_id:
                                 image_id = msg.get('image', {}).get('id')
                                 media_url = get_media_url_from_id(image_id)
                                 if media_url:
-                                    ContactAttributeValue.objects.update_or_create(
-                                        contact=contact, attribute_id=session.waiting_for_image_attribute,
-                                        defaults={'value': media_url}
-                                    )
+                                    ContactAttributeValue.objects.update_or_create(contact=contact, attribute_id=session.waiting_for_image_attribute_id, defaults={'value': media_url})
                                 
-                                # Find next node from 'onImageReceived' handle
-                                flow = session.flow
-                                edges = flow.flow_data.get('edges', [])
-                                next_edge = next((e for e in edges if e.get('source') == session.current_node_id and e.get('sourceHandle') == 'onImageReceived'), None)
-                                
-                                # Clear the waiting state
-                                session.waiting_for_image_attribute = None
-                                session.save()
-                                
+                                flow, current_node_id = session.flow, session.current_node_id
+                                session.waiting_for_image_attribute = None; session.save()
+
+                                next_edge = next((e for e in flow.flow_data.get('edges', []) if e.get('source') == current_node_id and e.get('sourceHandle') == 'onImageReceived'), None)
                                 if next_edge:
                                     next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-                                    if next_node:
-                                        execute_flow_node(contact, flow, next_node)
-                                else:
-                                    session.delete()
-                                continue # Stop further processing
-    
+                                    if next_node: execute_flow_node(contact, flow, next_node)
+                                else: session.delete()
+                                continue
+                            
+                            if message_type == 'text' and session and session.waiting_for_attribute_id:
+                                user_input = msg.get('text', {}).get('body')
+                                ContactAttributeValue.objects.update_or_create(contact=contact, attribute_id=session.waiting_for_attribute_id, defaults={'value': user_input})
+                                
+                                flow, current_node_id = session.flow, session.current_node_id
+                                session.waiting_for_attribute = None; session.save()
+
+                                next_edge = next((e for e in flow.flow_data.get('edges', []) if e.get('source') == current_node_id and e.get('sourceHandle') == 'onAnswer'), None)
+                                if next_edge:
+                                    next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+                                    if next_node: execute_flow_node(contact, flow, next_node)
+                                else: session.delete()
+                                continue
+                            replied_to_wamid = msg.get('context', {}).get('id')
+                            user_input = None
                             if message_type == 'text':
                                 user_input = msg.get('text', {}).get('body')
                             elif message_type == 'button':
