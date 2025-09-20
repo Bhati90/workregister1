@@ -263,7 +263,7 @@ def execute_flow_node(contact, flow, target_node):
         wamid = response_data['messages'][0]['id']
         save_outgoing_message(contact=contact, wamid=wamid, message_type=message_type_to_save, text_content=text_content_to_save, source_node_id=target_node_id)
         
-        if node_type != 'askQuestionNode':
+        if node_type not in ['askQuestionNode', 'askLocationNode', 'askForImageNode']:
             edges = flow.flow_data.get('edges', [])
             target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
             if target_has_outputs:
