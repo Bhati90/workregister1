@@ -76,6 +76,35 @@ WABA_ID = "1477047197063313" # Replace with your WABA ID
 
 # --- Core Flow Execution Logic ---
 
+def substitute_placeholders(text, user_data):
+    """Replace {{variable}} with actual values"""
+    if not text:
+        return text
+    
+    import re
+    
+    def replace_placeholder(match):
+        key = match.group(1).strip()
+        value = user_data.get(key, f"{{{{ {key} }}}}")
+        logger.info(f"DEBUG-SUBSTITUTION: Replacing {{{{ {key} }}}} with '{value}'")
+        return str(value)
+    
+    return re.sub(r'\{\{\s*([^}]+)\s*\}\}', replace_placeholder, text)
+
+def extract_json_path(data, path):
+    """Extract value from JSON using dot notation"""
+    try:
+        current = data
+        parts = path.split('.')
+        for part in parts:
+            if part.isdigit():
+                current = current[int(part)]
+            else:
+                current = current[part]
+        return current
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None
+    
 
 def execute_flow_node(contact, flow, target_node):
     """
@@ -255,9 +284,153 @@ def execute_flow_node(contact, flow, target_node):
         logger.info(f"DEBUG-IMAGE-NODE: Session for {contact.wa_id} is now waiting for image. Attr: {image_attr}")
     
     elif node_type == 'askApiNode':
-        # This is now clean and simple: just trigger the background task
-        process_api_request_node.delay(contact.id, flow.id, target_node)
-        logger.info(f"Queued API request for contact {contact.id}")
+   
+        api_url = node_data.get('apiUrl')
+        method = node_data.get('method', 'GET').upper()
+        headers = node_data.get('headers', '{}')
+        request_body = node_data.get('requestBody', '{}')
+        response_mappings = node_data.get('responseMappings', [])
+        status_code_attr_id = node_data.get('statusCodeAttributeId')
+        
+        logger.info(f"DEBUG-API-REQUEST: Making {method} request to {api_url}")
+        
+        # Get user attributes
+        user_attributes = {}
+        for attr_value in contact.attribute_values.all():
+            user_attributes[attr_value.attribute.name] = attr_value.value
+        user_attributes['contact_id'] = contact.wa_id
+        
+        logger.info(f"DEBUG-API-REQUEST: Available data: {user_attributes}")
+        
+        # Replace placeholders
+        api_url = substitute_placeholders(api_url, user_attributes)
+        headers = substitute_placeholders(headers, user_attributes) 
+        request_body = substitute_placeholders(request_body, user_attributes)
+        
+        logger.info(f"DEBUG-API-REQUEST: URL after substitution: {api_url}")
+        logger.info(f"DEBUG-API-REQUEST: Body after substitution: {request_body}")
+        
+        # Prepare request
+        request_config = {
+            'method': method,
+            'url': api_url,
+            'timeout': 8
+        }
+        
+        # Parse headers
+        try:
+            if headers and headers != '{}':
+                request_config['headers'] = json.loads(headers)
+            else:
+                request_config['headers'] = {}
+        except json.JSONDecodeError:
+            logger.error(f"DEBUG-API-REQUEST: Invalid headers JSON: {headers}")
+            request_config['headers'] = {}
+        
+        # Parse body for non-GET requests
+        if method != 'GET' and request_body and request_body != '{}':
+            try:
+                request_config['json'] = json.loads(request_body)
+            except json.JSONDecodeError:
+                logger.error(f"DEBUG-API-REQUEST: Invalid body JSON, sending as text")
+                request_config['data'] = request_body
+        
+        # Make API request
+        api_success = False
+        response_data = None
+        status_code = 0
+        
+        try:
+            logger.info(f"DEBUG-API-REQUEST: Sending request...")
+            response = requests.request(**request_config)
+            status_code = response.status_code
+            
+            # Try to parse response as JSON
+            try:
+                response_data = response.json()
+            except:
+                response_data = response.text
+            
+            api_success = 200 <= status_code < 300
+            logger.info(f"DEBUG-API-REQUEST: Response - Status: {status_code}, Success: {api_success}")
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"DEBUG-API-REQUEST: Request timed out")
+            status_code = 408
+            response_data = {"error": "Request timed out"}
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"DEBUG-API-REQUEST: Connection error")
+            status_code = 0
+            response_data = {"error": "Connection error"}
+            
+        except Exception as e:
+            logger.error(f"DEBUG-API-REQUEST: Request failed: {e}")
+            status_code = 0
+            response_data = {"error": str(e)}
+        
+        # Save status code if specified
+        if status_code_attr_id:
+            try:
+                status_attr = Attribute.objects.get(id=status_code_attr_id)
+                ContactAttributeValue.objects.update_or_create(
+                    contact=contact, 
+                    attribute=status_attr,
+                    defaults={'value': str(status_code)}
+                )
+                logger.info(f"DEBUG-API-REQUEST: Saved status code {status_code}")
+            except Attribute.DoesNotExist:
+                logger.error(f"DEBUG-API-REQUEST: Status code attribute not found")
+        
+        # Process response mappings
+        if api_success and response_mappings and isinstance(response_data, dict):
+            for mapping in response_mappings:
+                json_path = mapping.get('jsonPath')
+                attribute_id = mapping.get('attributeId')
+                
+                if not json_path or not attribute_id:
+                    continue
+                
+                try:
+                    value = extract_json_path(response_data, json_path)
+                    if value is not None:
+                        attribute = Attribute.objects.get(id=attribute_id)
+                        ContactAttributeValue.objects.update_or_create(
+                            contact=contact, 
+                            attribute=attribute,
+                            defaults={'value': str(value)}
+                        )
+                        logger.info(f"DEBUG-API-REQUEST: Saved '{value}' from '{json_path}' to '{attribute.name}'")
+                except Attribute.DoesNotExist:
+                    logger.error(f"DEBUG-API-REQUEST: Attribute {attribute_id} not found")
+                except Exception as e:
+                    logger.error(f"DEBUG-API-REQUEST: Error processing mapping: {e}")
+        
+        # Find next node
+        edges = flow.flow_data.get('edges', [])
+        next_handle = 'onSuccess' if api_success else 'onError'
+        next_edge = next((e for e in edges if e.get('source') == target_node_id and e.get('sourceHandle') == next_handle), None)
+        
+        logger.info(f"DEBUG-API-REQUEST: Looking for '{next_handle}' edge: {next_edge}")
+        
+        # Continue flow
+        if next_edge:
+            next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+            if next_node:
+                logger.info(f"DEBUG-API-REQUEST: Continuing to next node: {next_node.get('id')}")
+                UserFlowSession.objects.update_or_create(
+                    contact=contact,
+                    defaults={'flow': flow, 'current_node_id': target_node_id}
+                )
+                execute_flow_node(contact, flow, next_node)
+            else:
+                logger.error(f"DEBUG-API-REQUEST: Next node not found")
+                UserFlowSession.objects.filter(contact=contact).delete()
+        else:
+            logger.info(f"DEBUG-API-REQUEST: No next edge found, ending flow")
+            UserFlowSession.objects.filter(contact=contact).delete()
+        
+        # Don't send WhatsApp message for API node
         return True
     
     else:
