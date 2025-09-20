@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
         
 # WABA_ID = "1477047197063313"
 # contact_app/views.py
-from utils import extract_json_path
+# from .utils import extract_json_path
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
