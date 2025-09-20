@@ -271,7 +271,7 @@ def execute_flow_node(contact, flow, target_node):
         request_config = {
             'method': method,
             'url': api_url,
-            'timeout': 30  # 30 second timeout
+            'timeout': 300  # 30 second timeout
         }
         
         # Parse headers
