@@ -36,6 +36,9 @@ const Sidebar = ({ onHide }) => {
        <div className="dndnode" onDragStart={(event) => onDragStart(event, 'askLocationNode')} draggable>
         Ask for Location
       </div>
+       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'askApiNode')} draggable>
+        Api request
+      </div>
       {/* --- NEW ADVANCED NODE --- */}
       <div className="sidebar-divider">Advanced</div>
       <div className="dndnode" onDragStart={(event) => onDragStart(event, 'askQuestionNode')} draggable>

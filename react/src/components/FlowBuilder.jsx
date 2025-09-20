@@ -23,6 +23,7 @@ import MediaNode from './nodes/MediaNode';
 import AskQuestionNode from './nodes/AskQuestionNode';
 import AskLocationNode from './nodes/AskLocationNode';
 import AskImageNode from './nodes/AskImageNode';
+import ApiNode from './nodes/ApiNode';
 
 
 // REGISTER ALL NODE TYPES
@@ -36,7 +37,8 @@ const nodeTypes = {
   interactiveListNode: InteractiveListNode,
   mediaNode: MediaNode,
   askQuestionNode: AskQuestionNode,
-  askForImageNode:AskImageNode
+  askForImageNode:AskImageNode,
+  askApiNode:ApiNode
 };
 
 const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
@@ -123,6 +125,22 @@ const FlowBuilder = ({ initialData }) => {
             case 'mediaNode':
                 newNode = { id: newNodeId, type, position, data: { ...commonData, mediaType: 'document', metaMediaId: '', mediaUrl: '', caption: '', filename: '' }};
                 break;
+            case 'askApiNode': // <-- START REPLACING HERE
+        newNode = { 
+          id: newNodeId, 
+          type, 
+          position, 
+          data: { 
+            ...commonData, 
+            method: 'GET',
+            apiUrl: '',
+            headers: '{\n  "Content-Type": "application/json"\n}',
+            requestBody: '',
+            responseMappings: [], // Start with an empty array
+            statusCodeAttributeId: ''
+          }
+        };
+        break; 
 
             case 'askLocationNode':
             newNode = { id: newNodeId, type, position, data: { ...commonData, questionText: '', longitudeAttributeId: null, latitudeAttributeId: null }};

@@ -40,7 +40,10 @@ const FlowPreview = ({ nodes, edges }) => {
                     return <AskLocationPreview data={node.data} />;
                 case 'askForImageNode':
                     return <AskForImagePreview data={node.data} />;
-                default:
+                case 'askApiNode':
+                    return <ApiRequestPreview data={node.data} />;
+                
+                    default:
                     return <div className="preview-bubble-unknown">Unknown Node</div>;
             }
         };
@@ -148,7 +151,16 @@ const TextMessagePreview = ({ data }) => (
         <p className="preview-text">{data.text || '...'}</p>
     </div>
 );
-
+const ApiRequestPreview = ({ data }) => (
+  <div className="preview-bubble-system">
+    <span className="system-icon">⚙️</span>
+    <div className="system-text">
+      <strong>API Request</strong>
+      <span>{data.method || 'GET'}: {data.apiUrl || 'No URL specified'}</span>
+      <small>(Data is fetched and saved to attributes)</small>
+    </div>
+  </div>
+);
 const ButtonsMessagePreview = ({ data }) => (
     <div className="preview-bubble-outbound">
         <p className="preview-text">{data.text || '...'}</p>
