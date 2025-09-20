@@ -344,12 +344,21 @@ def execute_flow_node(contact, flow, target_node):
             logger.info(f"DEBUG-API-REQUEST: Sending request...")
             response = requests.request(**request_config)
             status_code = response.status_code
-            
+             # Log the raw response
+            # Log the raw response
+            logger.info(f"DEBUG-API-REQUEST: Raw response status: {status_code}")
+            logger.info(f"DEBUG-API-REQUEST: Raw response headers: {dict(response.headers)}")
+            logger.info(f"DEBUG-API-REQUEST: Raw response text: {response.text[:500]}...")  # First 500 chars
+                
             # Try to parse response as JSON
             try:
                 response_data = response.json()
+                logger.info(f"DEBUG-API-REQUEST: Parsed JSON response: {json.dumps(response_data, indent=2)}")
+      
             except:
                 response_data = response.text
+                logger.info(f"DEBUG-API-REQUEST: Response is not JSON, using text")
+        
             
             api_success = 200 <= status_code < 300
             logger.info(f"DEBUG-API-REQUEST: Response - Status: {status_code}, Success: {api_success}")
