@@ -15,11 +15,7 @@ class Migration(migrations.Migration):
             model_name='userflowsessions',
             name='waiting_for_location_data',
         ),
-        migrations.AddField(
-            model_name='userflowsessions',
-            name='is_waiting_for_location',
-            field=models.BooleanField(default=False),
-        ),
+       
         migrations.AddField(
             model_name='userflowsessions',
             name='latitude_attribute',
