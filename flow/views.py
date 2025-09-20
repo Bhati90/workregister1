@@ -283,6 +283,8 @@ def execute_flow_node(contact, flow, target_node):
         except json.JSONDecodeError:
             logger.error(f"DEBUG-API-REQUEST: Invalid headers JSON: {headers}")
             request_config['headers'] = {}
+
+
         
         # Parse request body for non-GET requests
         if method != 'GET' and request_body:
@@ -485,13 +487,7 @@ def test_api_request(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 def extract_json_path(data, path):
-    """
-    Extract value from nested JSON using dot notation.
-    Examples: 
-    - "name" -> data["name"]
-    - "user.email" -> data["user"]["email"]
-    - "items.0.title" -> data["items"][0]["title"]
-    """
+   
     try:
         current = data
         parts = path.split('.')
@@ -699,6 +695,81 @@ def attribute_detail_view(request, pk):
         return JsonResponse({}, status=204)
 
 # --- Webhook and API Views ---
+# Add this to your Django views.py file
+
+from django.utils import timezone
+import json
+
+@csrf_exempt
+def test_echo_endpoint(request):
+    """Echo endpoint for testing API requests - returns exactly what it receives"""
+    
+    # Log the incoming request
+    logger.info(f"ECHO-ENDPOINT: Received {request.method} request")
+    logger.info(f"ECHO-ENDPOINT: Headers: {dict(request.headers)}")
+    
+    if request.method == 'POST':
+        try:
+            # Parse the request body
+            raw_body = request.body.decode('utf-8')
+            logger.info(f"ECHO-ENDPOINT: Raw body: {raw_body}")
+            
+            data = json.loads(raw_body)
+            logger.info(f"ECHO-ENDPOINT: Parsed JSON: {data}")
+            
+            # Return comprehensive response
+            response_data = {
+                "success": True,
+                "message": "Echo endpoint received your request",
+                "received_data": data,
+                "request_info": {
+                    "method": request.method,
+                    "content_type": request.headers.get('Content-Type', 'not specified'),
+                    "timestamp": str(timezone.now()),
+                    "body_length": len(raw_body)
+                },
+                "headers_received": dict(request.headers),
+                "echo_test": "This confirms your API request node is working!"
+            }
+            
+            logger.info(f"ECHO-ENDPOINT: Sending response: {response_data}")
+            return JsonResponse(response_data, status=200)
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"ECHO-ENDPOINT: Invalid JSON: {e}")
+            return JsonResponse({
+                "success": False,
+                "error": "Invalid JSON in request body",
+                "received_raw": request.body.decode('utf-8')
+            }, status=400)
+            
+        except Exception as e:
+            logger.error(f"ECHO-ENDPOINT: Unexpected error: {e}")
+            return JsonResponse({
+                "success": False,
+                "error": f"Unexpected error: {str(e)}"
+            }, status=500)
+    
+    elif request.method == 'GET':
+        # Handle GET requests for basic testing
+        return JsonResponse({
+            "success": True,
+            "message": "Echo endpoint is working",
+            "method": "GET",
+            "timestamp": str(timezone.now()),
+            "test_url": request.build_absolute_uri()
+        })
+    
+    else:
+        # Handle other HTTP methods
+        return JsonResponse({
+            "success": False,
+            "error": f"Method {request.method} not supported",
+            "supported_methods": ["GET", "POST"]
+        }, status=405)
+
+# Add this to your urls.py file (in the urlpatterns list):
+# path('echo/', test_echo_endpoint, name='test_echo'),
 
 @csrf_exempt
 def whatsapp_webhook_view(request):
