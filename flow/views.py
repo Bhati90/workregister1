@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt # Import csrf_exempt
 # from corsheaders.decorators import cors_exempt       # Import cors_exempt
 import json
-
+from .tasks import process_api_request_node
 from django.shortcuts import render # Make sure render is imported
 
 # def home_page(request):
@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
         
 # WABA_ID = "1477047197063313"
 # contact_app/views.py
+from utils import extract_json_path
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -252,155 +253,163 @@ def execute_flow_node(contact, flow, target_node):
             }
         )
         logger.info(f"DEBUG-IMAGE-NODE: Session for {contact.wa_id} is now waiting for image. Attr: {image_attr}")
-    elif node_type == 'askApiNode':
-    # This node makes an HTTP request and processes the response
-        api_url = node_data.get('apiUrl')
-        method = node_data.get('method', 'GET').upper()
-        headers = node_data.get('headers', '{}')
-        request_body = node_data.get('requestBody', '{}')
-        response_mappings = node_data.get('responseMappings', [])
-        status_code_attr_id = node_data.get('statusCodeAttributeId')
+    # elif node_type == 'askApiNode':
+    # # This node makes an HTTP request and processes the response
+    #     api_url = node_data.get('apiUrl')
+    #     method = node_data.get('method', 'GET').upper()
+    #     headers = node_data.get('headers', '{}')
+    #     request_body = node_data.get('requestBody', '{}')
+    #     response_mappings = node_data.get('responseMappings', [])
+    #     status_code_attr_id = node_data.get('statusCodeAttributeId')
         
-        logger.info(f"DEBUG-API-REQUEST: Making {method} request to {api_url}")
+    #     logger.info(f"DEBUG-API-REQUEST: Making {method} request to {api_url}")
         
-        # Don't send a WhatsApp message for this node type
-        message_type_to_save = 'api_request'
-        text_content_to_save = f"API Request: {method} {api_url}"
+    #     # Don't send a WhatsApp message for this node type
+    #     message_type_to_save = 'api_request'
+    #     text_content_to_save = f"API Request: {method} {api_url}"
         
-        # Prepare request configuration
-        request_config = {
-            'method': method,
-            'url': api_url,
-            'timeout': 300  # 30 second timeout
-        }
+    #     # Prepare request configuration
+    #     request_config = {
+    #         'method': method,
+    #         'url': api_url,
+    #         'timeout': 300  # 30 second timeout
+    #     }
         
-        # Parse headers
-        try:
-            if headers:
-                request_config['headers'] = json.loads(headers)
-            else:
-                request_config['headers'] = {}
-        except json.JSONDecodeError:
-            logger.error(f"DEBUG-API-REQUEST: Invalid headers JSON: {headers}")
-            request_config['headers'] = {}
+    #     # Parse headers
+    #     try:
+    #         if headers:
+    #             request_config['headers'] = json.loads(headers)
+    #         else:
+    #             request_config['headers'] = {}
+    #     except json.JSONDecodeError:
+    #         logger.error(f"DEBUG-API-REQUEST: Invalid headers JSON: {headers}")
+    #         request_config['headers'] = {}
 
 
         
-        # Parse request body for non-GET requests
-        if method != 'GET' and request_body:
-            try:
-                request_config['json'] = json.loads(request_body)
-            except json.JSONDecodeError:
-                logger.error(f"DEBUG-API-REQUEST: Invalid request body JSON: {request_body}")
-                # Try to send as raw data if JSON parsing fails
-                request_config['data'] = request_body
+    #     # Parse request body for non-GET requests
+    #     if method != 'GET' and request_body:
+    #         try:
+    #             request_config['json'] = json.loads(request_body)
+    #         except json.JSONDecodeError:
+    #             logger.error(f"DEBUG-API-REQUEST: Invalid request body JSON: {request_body}")
+    #             # Try to send as raw data if JSON parsing fails
+    #             request_config['data'] = request_body
         
-        # Make the HTTP request
-        api_success = False
-        response_data = None
-        status_code = 0
+    #     # Make the HTTP request
+    #     api_success = False
+    #     response_data = None
+    #     status_code = 0
         
-        try:
-            response = requests.request(**request_config)
-            status_code = response.status_code
-            response_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
+    #     try:
+    #         response = requests.request(**request_config)
+    #         status_code = response.status_code
+    #         response_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
             
-            # Consider 2xx status codes as success
-            api_success = 200 <= status_code < 300
+    #         # Consider 2xx status codes as success
+    #         api_success = 200 <= status_code < 300
             
-            logger.info(f"DEBUG-API-REQUEST: API call completed. Status: {status_code}, Success: {api_success}")
+    #         logger.info(f"DEBUG-API-REQUEST: API call completed. Status: {status_code}, Success: {api_success}")
             
-        except requests.exceptions.Timeout:
-            logger.error(f"DEBUG-API-REQUEST: API request timed out")
-            response_data = {"error": "Request timed out"}
-            status_code = 0
+    #     except requests.exceptions.Timeout:
+    #         logger.error(f"DEBUG-API-REQUEST: API request timed out")
+    #         response_data = {"error": "Request timed out"}
+    #         status_code = 0
             
-        except requests.exceptions.ConnectionError:
-            logger.error(f"DEBUG-API-REQUEST: API connection error")
-            response_data = {"error": "Connection error"}
-            status_code = 0
+    #     except requests.exceptions.ConnectionError:
+    #         logger.error(f"DEBUG-API-REQUEST: API connection error")
+    #         response_data = {"error": "Connection error"}
+    #         status_code = 0
             
-        except requests.exceptions.RequestException as e:
-            logger.error(f"DEBUG-API-REQUEST: API request failed: {e}")
-            response_data = {"error": str(e)}
-            status_code = 0
+    #     except requests.exceptions.RequestException as e:
+    #         logger.error(f"DEBUG-API-REQUEST: API request failed: {e}")
+    #         response_data = {"error": str(e)}
+    #         status_code = 0
             
-        except Exception as e:
-            logger.error(f"DEBUG-API-REQUEST: Unexpected error: {e}")
-            response_data = {"error": "Unexpected error occurred"}
-            status_code = 0
+    #     except Exception as e:
+    #         logger.error(f"DEBUG-API-REQUEST: Unexpected error: {e}")
+    #         response_data = {"error": "Unexpected error occurred"}
+    #         status_code = 0
         
-        # Save status code to attribute if specified
-        if status_code_attr_id:
-            try:
-                status_attr = Attribute.objects.get(id=status_code_attr_id)
-                ContactAttributeValue.objects.update_or_create(
-                    contact=contact, attribute=status_attr,
-                    defaults={'value': str(status_code)}
-                )
-                logger.info(f"DEBUG-API-REQUEST: Saved status code {status_code} to attribute {status_attr.name}")
-            except Attribute.DoesNotExist:
-                logger.error(f"DEBUG-API-REQUEST: Status code attribute ID {status_code_attr_id} not found")
+    #     # Save status code to attribute if specified
+    #     if status_code_attr_id:
+    #         try:
+    #             status_attr = Attribute.objects.get(id=status_code_attr_id)
+    #             ContactAttributeValue.objects.update_or_create(
+    #                 contact=contact, attribute=status_attr,
+    #                 defaults={'value': str(status_code)}
+    #             )
+    #             logger.info(f"DEBUG-API-REQUEST: Saved status code {status_code} to attribute {status_attr.name}")
+    #         except Attribute.DoesNotExist:
+    #             logger.error(f"DEBUG-API-REQUEST: Status code attribute ID {status_code_attr_id} not found")
         
-        # Process response mappings if API call was successful
-        if api_success and response_mappings and isinstance(response_data, dict):
-            for mapping in response_mappings:
-                json_path = mapping.get('jsonPath')
-                attribute_id = mapping.get('attributeId')
+    #     # Process response mappings if API call was successful
+    #     if api_success and response_mappings and isinstance(response_data, dict):
+    #         for mapping in response_mappings:
+    #             json_path = mapping.get('jsonPath')
+    #             attribute_id = mapping.get('attributeId')
                 
-                if not json_path or not attribute_id:
-                    continue
+    #             if not json_path or not attribute_id:
+    #                 continue
                     
-                try:
-                    # Extract value using JSON path
-                    value = extract_json_path(response_data, json_path)
+    #             try:
+    #                 # Extract value using JSON path
+    #                 value = extract_json_path(response_data, json_path)
                     
-                    if value is not None:
-                        # Get attribute object
-                        attribute = Attribute.objects.get(id=attribute_id)
+    #                 if value is not None:
+    #                     # Get attribute object
+    #                     attribute = Attribute.objects.get(id=attribute_id)
                         
-                        # Save the extracted value
-                        ContactAttributeValue.objects.update_or_create(
-                            contact=contact, attribute=attribute,
-                            defaults={'value': str(value)}
-                        )
-                        logger.info(f"DEBUG-API-REQUEST: Saved '{value}' from path '{json_path}' to attribute '{attribute.name}'")
-                    else:
-                        logger.warning(f"DEBUG-API-REQUEST: Could not extract value from path '{json_path}'")
+    #                     # Save the extracted value
+    #                     ContactAttributeValue.objects.update_or_create(
+    #                         contact=contact, attribute=attribute,
+    #                         defaults={'value': str(value)}
+    #                     )
+    #                     logger.info(f"DEBUG-API-REQUEST: Saved '{value}' from path '{json_path}' to attribute '{attribute.name}'")
+    #                 else:
+    #                     logger.warning(f"DEBUG-API-REQUEST: Could not extract value from path '{json_path}'")
                         
-                except Attribute.DoesNotExist:
-                    logger.error(f"DEBUG-API-REQUEST: Attribute ID {attribute_id} not found")
-                except Exception as e:
-                    logger.error(f"DEBUG-API-REQUEST: Error processing mapping {json_path} -> {attribute_id}: {e}")
+    #             except Attribute.DoesNotExist:
+    #                 logger.error(f"DEBUG-API-REQUEST: Attribute ID {attribute_id} not found")
+    #             except Exception as e:
+    #                 logger.error(f"DEBUG-API-REQUEST: Error processing mapping {json_path} -> {attribute_id}: {e}")
         
-        # Determine next node based on success/failure
-        edges = flow.flow_data.get('edges', [])
-        next_handle = 'onSuccess' if api_success else 'onError'
-        next_edge = next((e for e in edges if e.get('source') == target_node_id and e.get('sourceHandle') == next_handle), None)
+    #     # Determine next node based on success/failure
+    #     edges = flow.flow_data.get('edges', [])
+    #     next_handle = 'onSuccess' if api_success else 'onError'
+    #     next_edge = next((e for e in edges if e.get('source') == target_node_id and e.get('sourceHandle') == next_handle), None)
         
-        logger.info(f"DEBUG-API-REQUEST: Looking for next edge with handle '{next_handle}': {next_edge}")
+    #     logger.info(f"DEBUG-API-REQUEST: Looking for next edge with handle '{next_handle}': {next_edge}")
         
-        # Update session and continue flow
-        if next_edge:
-            next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-            if next_node:
-                logger.info(f"DEBUG-API-REQUEST: Continuing to next node: {next_node.get('id')}")
-                # Update session to point to the API request node
-                UserFlowSession.objects.update_or_create(
-                    contact=contact,
-                    defaults={'flow': flow, 'current_node_id': target_node_id, 'waiting_for_attribute': None}
-                )
-                # Execute the next node
-                execute_flow_node(contact, flow, next_node)
-            else:
-                logger.error(f"DEBUG-API-REQUEST: Next node {next_edge.get('target')} not found")
-                UserFlowSession.objects.filter(contact=contact).delete()
-        else:
-            logger.info(f"DEBUG-API-REQUEST: No next edge found with handle '{next_handle}', ending flow")
-            UserFlowSession.objects.filter(contact=contact).delete()
+    #     # Update session and continue flow
+    #     if next_edge:
+    #         next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+    #         if next_node:
+    #             logger.info(f"DEBUG-API-REQUEST: Continuing to next node: {next_node.get('id')}")
+    #             # Update session to point to the API request node
+    #             UserFlowSession.objects.update_or_create(
+    #                 contact=contact,
+    #                 defaults={'flow': flow, 'current_node_id': target_node_id, 'waiting_for_attribute': None}
+    #             )
+    #             # Execute the next node
+    #             execute_flow_node(contact, flow, next_node)
+    #         else:
+    #             logger.error(f"DEBUG-API-REQUEST: Next node {next_edge.get('target')} not found")
+    #             UserFlowSession.objects.filter(contact=contact).delete()
+    #     else:
+    #         logger.info(f"DEBUG-API-REQUEST: No next edge found with handle '{next_handle}', ending flow")
+    #         UserFlowSession.objects.filter(contact=contact).delete()
         
-        # Don't send WhatsApp message for API request node
+    #     # Don't send WhatsApp message for API request node
+    #     return True
+    
+
+    if node_type == 'apiNode':
+        # This is now clean and simple: just trigger the background task
+        process_api_request_node.delay(contact.id, flow.id, target_node)
+        logger.info(f"Queued API request for contact {contact.id}")
         return True
+    
     else:
         logger.error(f"Message construction for node type '{node_type}' is not implemented.")
         return False
@@ -486,23 +495,23 @@ def test_api_request(request):
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-def extract_json_path(data, path):
+# def extract_json_path(data, path):
    
-    try:
-        current = data
-        parts = path.split('.')
+#     try:
+#         current = data
+#         parts = path.split('.')
         
-        for part in parts:
-            if part.isdigit():
-                # Handle array index
-                current = current[int(part)]
-            else:
-                # Handle object key
-                current = current[part]
+#         for part in parts:
+#             if part.isdigit():
+#                 # Handle array index
+#                 current = current[int(part)]
+#             else:
+#                 # Handle object key
+#                 current = current[part]
                 
-        return current
-    except (KeyError, IndexError, TypeError, ValueError):
-        return None
+#         return current
+#     except (KeyError, IndexError, TypeError, ValueError):
+#         return None
 
 
 def try_execute_status_trigger(wamid, wa_id):
