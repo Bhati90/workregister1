@@ -1242,11 +1242,20 @@ def handle_flow_completion(contact, response_data):
     """
     Parses the submitted Flow data and saves it to the contact's attributes.
     """
-    logger.info(f"Handling flow completion for contact: {contact.wa_id}")
+    logger.info(f"=== FLOW COMPLETION DEBUG START ===")
+    logger.info(f"Contact: {contact.wa_id}")
+    logger.info(f"Response data: {response_data}")
     
     # Find the user's current session to know which flow was just completed
     session = UserFlowSession.objects.filter(contact=contact, waiting_for_flow_completion=True).first()
-    if not session :
+    logger.info(f"Session found: {session}")
+    
+    if session:
+        logger.info(f"Session flow_form_id: {session.flow_form_id}")
+        logger.info(f"Session current_node_id: {session.current_node_id}")
+        logger.info(f"Session flow name: {session.flow.name if session.flow else 'None'}")
+    
+    if not session:
         logger.warning("No session found waiting for flow completion. Cannot map attributes.")
         return
 
@@ -1256,7 +1265,14 @@ def handle_flow_completion(contact, response_data):
         # This is where we create the mapping. We'll map the component LABEL to the attribute NAME.
         # This is more readable than using component_id.
         attribute_map = {}
-        for screen in flow_form.screens_data.get('screens_data', []):
+        # Handle both possible data structures
+        screens_data = flow_form.screens_data
+        if isinstance(screens_data, dict) and 'screens_data' in screens_data:
+            screens_list = screens_data['screens_data']
+        else:
+            screens_list = screens_data if isinstance(screens_data, list) else []
+
+        for screen in screens_list:
             for component in screen.get('components', []):
                 # For now, let's assume the component label is the same as the attribute name
                 # e.g., A component labeled "Full Name" saves to an attribute named "Full Name"
@@ -1286,13 +1302,19 @@ def handle_flow_completion(contact, response_data):
                 logger.warning(f"Attribute '{attribute_name}' not found in database. Cannot save value.")
                 
         # The flow is complete, so we can now find the next node in the visual flow
+        # The flow is complete, so we can now find the next node in the visual flow
         flow = session.flow
         current_node_id = session.current_node_id
         edges = flow.flow_data.get('edges', [])
-        
+
+        logger.info(f"=== LOOKING FOR NEXT NODE ===")
+        logger.info(f"Current node ID: {current_node_id}")
+        logger.info(f"Total edges in flow: {len(edges)}")
+        logger.info(f"All edges from current node: {[e for e in edges if e.get('source') == current_node_id]}")
+
         # First, try to find an edge specifically from the 'onSuccess' handle
         next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onSuccess'), None)
-        
+        logger.info(f"Found 'onSuccess' edge: {next_edge}")
         # If not found, and there's only ONE possible exit, take that path as a fallback.
         if not next_edge:
             source_edges = [e for e in edges if e.get('source') == current_node_id]
