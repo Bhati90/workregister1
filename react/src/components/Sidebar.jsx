@@ -27,6 +27,10 @@ const Sidebar = ({ onHide }) => {
       >
         Text Message
       </div>
+      <div className="dndnode" onDragStart={(event) => onDragStart(event, 'flowFormNode')} draggable>
+      
+        Form Flow
+      </div>
        <div className="dndnode" onDragStart={(event) => onDragStart(event, 'askForImageNode')} draggable>
         Ask for Image
       </div>

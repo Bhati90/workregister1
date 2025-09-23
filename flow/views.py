@@ -1384,46 +1384,57 @@ def process_flow_data_in_webhook(value, contact):
 
 
 def get_whatsapp_forms_api(request):
-    """
-    API endpoint to get all available WhatsApp Flow Forms for the ReactFlow builder.
-    """
-    try:
-        forms = WhatsAppFlowForm.objects.all().values(
-            'id', 'name', 'template_body', 'template_button_text', 
-            'template_category', 'screens_data', 'meta_flow_id'
-        )
-        
-        forms_list = []
-        for form in forms:
-            # Parse screens_data if it's stored as JSON string
-            screens_data = form['screens_data']
-            if isinstance(screens_data, str):
-                try:
-                    screens_data = json.loads(screens_data)
-                except:
-                    screens_data = []
+   
+        try:
+            headers = {
+                "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+                "Content-Type": "application/json"
+            }
             
-            forms_list.append({
-                'id': form['id'],
-                'name': form['name'],
-                'template_body': form['template_body'],
-                'template_button_text': form['template_button_text'],
-                'template_category': form['template_category'],
-                'screens_data': screens_data,
-                'meta_flow_id': form['meta_flow_id']
-            })
-        
-        return JsonResponse({
-            'status': 'success',
-            'forms': forms_list
-        })
-        
-    except Exception as e:
-        logger.error(f"Error fetching forms: {e}")
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
+            # Get message templates
+            # Ensure WABA_ID is defined, likely same as WHATSAPP_BUSINESS_ACCOUNT_ID
+            # WABA_ID = os.environ.get("WHATSAPP_BUSINESS_ACCOUNT_ID")
+            templates_url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,status,category,language,components"
+            response = requests.get(templates_url, headers=headers)
+            
+            if response.status_code == 200:
+                templates_data = response.json()
+                
+                # Filter for flow templates (templates with FLOW buttons)
+                flow_templates = []
+                for template in templates_data.get('data', []):
+                    components = template.get('components', [])
+                    for component in components:
+                        # The component type from Meta is uppercase 'BUTTONS'
+                        if component.get('type') == 'BUTTONS':
+                            buttons = component.get('buttons', [])
+                            for button in buttons:
+                                if button.get('type') == 'FLOW':
+                                    flow_templates.append({
+                                        'name': template.get('name'),
+                                        'status': template.get('status'),
+                                        'flow_id': button.get('flow_id'),
+                                        'button_text': button.get('text'),
+                                        # Pass components to the frontend for better preview
+                                        'components': template.get('components')
+                                    })
+                                    break # Found the FLOW button, move to next template
+                
+                return JsonResponse({
+                    'status': 'success',
+                    'flow_templates': flow_templates
+                })
+            else:
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': 'Failed to fetch templates',
+                    'response': response.json()
+                }, status=response.status_code)
+            
+        except Exception as e:
+            logger.error(f"Error getting flow templates: {e}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
 
 
 # ... (keep all your other imports: JsonResponse, csrf_exempt, models, etc.)
