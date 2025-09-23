@@ -1282,7 +1282,7 @@ def send_standard_template_api_view(request):
             contact = get_object_or_404(ChatContact, wa_id=wa_id)
             payload = {
                 "messaging_product": "whatsapp", "to": wa_id, "type": "template",
-                "template": {"name": template_name, "language": {"code": "en_US"}, "components": []}
+                "template": {"name": template_name, "language": {"code": "en"}, "components": []}
             }
             
             if header_media_id:

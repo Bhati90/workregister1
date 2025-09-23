@@ -42,8 +42,9 @@ const FlowPreview = ({ nodes, edges }) => {
                     return <AskForImagePreview data={node.data} />;
                 case 'askApiNode':
                     return <ApiRequestPreview data={node.data} />;
-                
-                    default:
+                case 'flowFormNode':
+                    return <FormFlowPreview data={node.data} />;
+                default:
                     return <div className="preview-bubble-unknown">Unknown Node</div>;
             }
         };
@@ -228,6 +229,31 @@ const AskForImagePreview = ({ data }) => (
     </>
 );
 
+// --- ADD THIS NEW COMPONENT TO THE BOTTOM OF YOUR FlowPreview.js FILE ---
+
+const FormFlowPreview = ({ data }) => {
+  // If no flow has been selected in the node yet, show a placeholder.
+  if (!data.selectedFormId) {
+    return (
+      <div className="preview-bubble-outbound">
+        <p className="preview-text"><em>A Flow trigger message will appear here once a flow is selected.</em></p>
+      </div>
+    );
+  }
+
+  // Once a flow is selected, show its body and button text.
+  return (
+    <div className="preview-bubble-outbound">
+      <p className="preview-text" style={{ whiteSpace: 'pre-wrap' }}>
+        {data.templateBody || '...'}
+      </p>
+      {/* This div mimics the appearance of a WhatsApp Flow button */}
+      <div className="preview-buttons-footer flow-button">
+        <span className="flow-icon">➔</span> {data.templateButtonText || 'Open Form'}
+      </div>
+    </div>
+  );
+};
 
 const InteractiveImagePreview = ({ data }) => (
      <div className="preview-bubble-outbound">
@@ -291,6 +317,8 @@ const MediaMessagePreview = ({ data }) => {
         </div>
     );
 };
+
+
 
 
 export default FlowPreview;

@@ -80,22 +80,22 @@ const FlowBuilder = ({ initialData }) => {
 // In FlowBuilder.js
 // In FlowBuilder.js
 
+// In FlowBuilder.js
+
 useEffect(() => {
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            
-            // This part can remain the same
             const templatesResponse = await axios.get(`${API_URL}/api/templates/`);
             setTemplates(templatesResponse.data);
             
-            // This is the API call for your flow forms
+            // This API call fetches your list of flows
             const formsResponse = await axios.get(`${API_URL}/api/whatsapp-forms/`);
 
-            // --- FIX IS HERE ---
-            // Change 'formsResponse.data.forms' to 'formsResponse.data.flow_templates'
+            // --- THIS IS THE FIX ---
+            // Ensure you are reading from 'formsResponse.data.forms'
             if (formsResponse.data.status === 'success') {
-                setFlowForms(formsResponse.data.flow_templates);
+                setFlowForms(formsResponse.data.forms);
             }
             // --- END OF FIX ---
 
@@ -107,7 +107,7 @@ useEffect(() => {
     };
     
     fetchData();
-}, []); // The dependency array should be empty to run once on mount
+}, []); // The empty array ensures this runs only once when the component loads // The dependency array should be empty to run once on mount
 
     // Update existing flow form nodes when forms data is loaded
     // useEffect(() => {

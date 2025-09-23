@@ -1,14 +1,25 @@
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 
-const FormFlowNode = ({ id, data }) => {
+// Helper to map component types to an emoji for better visuals
+const componentIcons = {
+  'heading': '📰',
+  'text': '📝',
+  'text-input': '⌨️',
+  'textarea': '📄',
+  'dropdown': '📋',
+  'radio-group': '🔘',
+  'checkbox-group': '✅',
+  'date-picker': '📅',
+};
 
+const FormFlowNode = ({ id, data }) => {
+  // The handleSelectChange function remains the same
   const handleSelectChange = (event) => {
     const selectedFlowId = event.target.value;
     const selectedFlow = data.forms.find(form => form.flow_id == selectedFlowId);
 
     if (selectedFlow) {
-      // --- UPDATE THIS SECTION TO STORE ALL THE NEW DATA ---
       data.onUpdate('selectedFormId', selectedFlowId);
       data.onUpdate('selectedFormName', selectedFlow.name);
       data.onUpdate('flowStructure', selectedFlow.structure || null);
@@ -20,17 +31,13 @@ const FormFlowNode = ({ id, data }) => {
       data.onUpdate('templateStatus', selectedFlow.template_status);
       data.onUpdate('createdAt', selectedFlow.created_at);
     } else {
-      // Clear all data if nothing is selected
-      data.onUpdate('selectedFormId', '');
-      data.onUpdate('selectedFormName', '');
+      // Clear all data
+      Object.keys(data).forEach(key => {
+        if (!['onUpdate', 'onDelete', 'forms'].includes(key)) {
+          data.onUpdate(key, '');
+        }
+      });
       data.onUpdate('flowStructure', null);
-      data.onUpdate('templateCategory', '');
-      data.onUpdate('templateBody', '');
-      data.onUpdate('templateButtonText', '');
-      data.onUpdate('flowStatus', '');
-      data.onUpdate('templateName', '');
-      data.onUpdate('templateStatus', '');
-      data.onUpdate('createdAt', '');
     }
   };
 
@@ -55,36 +62,32 @@ const FormFlowNode = ({ id, data }) => {
           ))}
         </select>
         
-        {/* This section now displays everything */}
         {data.selectedFormId && (
-          <div className="flow-content-preview">
-            
-            {/* --- NEW: Display all the database fields --- */}
+          <>
             <div className="flow-details">
-                <p><strong>Flow Name:</strong> {data.selectedFormName}</p>
-                <p><strong>Flow Status:</strong> {data.flowStatus}</p>
-                <p><strong>Template Name:</strong> {data.templateName}</p>
-                <p><strong>Template Status:</strong> {data.templateStatus}</p>
-                <p><strong>Category:</strong> {data.templateCategory}</p>
-                <p><strong>Created At:</strong> {data.createdAt}</p>
+                <div className="detail-item"><strong>Flow Name:</strong> <span>{data.selectedFormName}</span></div>
+                <div className="detail-item"><strong>Flow Status:</strong> <span>{data.flowStatus}</span></div>
+                <div className="detail-item"><strong>Template:</strong> <span>{data.templateName}</span></div>
+                <div className="detail-item"><strong>Category:</strong> <span>{data.templateCategory}</span></div>
+                <div className="detail-item"><strong>Created:</strong> <span>{data.createdAt}</span></div>
             </div>
-            
-            <hr />
 
-            <h5>Flow Structure Preview:</h5>
-            {data.flowStructure?.screens_data?.map((screen, index) => (
-              <div key={screen.id || index} className="screen-preview">
-                <strong>Screen: {screen.title}</strong>
-                <ul>
-                  {screen.components?.map((component, compIndex) => (
-                    <li key={compIndex}>
-                      {component.type}: "{component.label}"
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+            <div className="flow-structure-preview">
+                <h5>Flow Structure Preview:</h5>
+                {data.flowStructure?.screens_data?.map((screen, index) => (
+                <div key={screen.id || index} className="screen-preview">
+                    <strong>Screen: {screen.title}</strong>
+                    <div className="component-list">
+                    {screen.components?.map((component, compIndex) => (
+                        <div key={compIndex} className="component-item">
+                            {componentIcons[component.type] || '▫️'} {component.label}
+                        </div>
+                    ))}
+                    </div>
+                </div>
+                ))}
+            </div>
+          </>
         )}
       </div>
 
