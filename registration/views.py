@@ -815,6 +815,8 @@ import re # Make sure to import the 're' module at the top of your file
 import json
 import logging
 
+from flow.models import WhatsAppFlowForm
+
 logger = logging.getLogger(__name__)
 
 def map_component_to_flow_json(component):
@@ -1097,7 +1099,27 @@ def submit_form_and_template_view(request):
                     'flow_response': flow_response_data,
                     'template_response': template_response_data
                 }, status=template_response.status_code)
+        template_name_generated = f"{form_name}_flow_trigger"
 
+    # --- NEW: Save everything to your database ---
+        try:
+        # Use update_or_create to save the form details
+            form_instance, created = WhatsAppFlowForm.objects.update_or_create(
+                name=form_name,
+                defaults={
+                    'meta_flow_id': flow_id,
+                    'screens_data': {'screens_data': screens_data}, # Save the original builder structure
+                    'template_category': data.get('template_category', 'UTILITY'),
+                    'template_body': data.get('template_body'),
+                    'template_button_text': data.get('template_button_text'),
+                    'flow_status': 'PUBLISHED', # You can update this later after publishing
+                    'template_name': template_name_generated,
+                }
+            )
+            logger.info(f"Successfully saved/updated form '{form_name}' in the database.")
+        except Exception as e:
+            logger.error(f"Database Error: Failed to save form '{form_name}'. Reason: {e}")
+    # --- END OF NEW CODE ---
         logger.info(f"Successfully submitted template '{template_name}' to Meta.")
         return JsonResponse({
             'status': 'success',
@@ -1472,6 +1494,8 @@ def get_flow_templates(request):
     except Exception as e:
         logger.error(f"Error getting flow templates: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
 def send_flow_view(request):
     """
     Renders the page for sending a Flow template.

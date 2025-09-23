@@ -1444,40 +1444,23 @@ def get_flow_details_api_view(request, flow_id):
     API endpoint that fetches the full details of a single WhatsApp Flow from Meta.
     """
     try:
-        if not flow_id:
-            return JsonResponse({'status': 'error', 'message': 'Flow ID is required.'}, status=400)
-
-        api_url = f"https://graph.facebook.com/v19.0/{flow_id}"
-        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        # Query your new model
+        forms = WhatsAppFlowForm.objects.all().order_by('-created_at')
         
-        # --- FIX IS HERE ---
-        # Remove the 'params' dictionary completely.
-        # This asks Meta for the default full object, which includes the 'body'.
-        response = requests.get(api_url, headers=headers)
-        # --- END OF FIX ---
+        forms_data = []
+        for form in forms:
+            # We map the model fields to the keys the React frontend expects
+            forms_data.append({
+                'name': form.name,
+                'flow_id': form.meta_flow_id,
+                'structure': form.screens_data, # This now contains the full structure
+            })
 
-        response_data = response.json()
-
-        if response.status_code >= 400:
-            logger.error(f"Meta API Error fetching flow {flow_id}: {response_data}")
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Failed to fetch flow details from Meta.',
-                'meta_response': response_data
-            }, status=response.status_code)
-
-        # The rest of the logic is still correct.
-        # The default response contains a 'body' key with the stringified JSON.
-        if 'body' in response_data:
-            response_data['flow_json'] = json.loads(response_data['body'])
-            del response_data['body']
-
-        return JsonResponse({'status': 'success', 'data': response_data})
-
+        # The key here is "forms" which your React FlowBuilder expects
+        return JsonResponse({'status': 'success', 'forms': forms_data})
+    
     except Exception as e:
-        logger.error(f"Error in get_flow_details_api_view: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
 # ... (keep all your other imports: JsonResponse, csrf_exempt, models, etc.)
 import logging
 logger = logging.getLogger(__name__)
