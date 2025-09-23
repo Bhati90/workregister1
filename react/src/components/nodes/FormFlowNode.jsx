@@ -1,18 +1,17 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 
+// Define the absolute base URL for your API at the top of the file
+const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
+
 const FormFlowNode = ({ id, data }) => {
-  // Add a loading state for the second API call
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   const handleSelectChange = async (event) => {
     const selectedFlowId = event.target.value;
-    
-    // First, clear any old data
     data.onUpdate('flowStructure', null);
     
     if (!selectedFlowId) {
-      // If the user selected the placeholder, clear everything
       data.onUpdate('selectedFormId', '');
       data.onUpdate('selectedFormName', '');
       return;
@@ -20,28 +19,29 @@ const FormFlowNode = ({ id, data }) => {
 
     const selectedFlow = data.forms.find(form => form.flow_id == selectedFlowId);
     if (selectedFlow) {
-      // Update the name immediately
       data.onUpdate('selectedFormId', selectedFlowId);
       data.onUpdate('selectedFormName', selectedFlow.name);
-      
-      setIsLoadingDetails(true); // Set loading to true
+      setIsLoadingDetails(true);
 
       try {
-        // --- NEW: Fetch the detailed structure from your new backend endpoint ---
-        const response = await fetch(`/register/whatsapp/api/get-flow-details/${selectedFlowId}/`);
-        const result = await response.json();
+        // --- FIX IS HERE ---
+        // Use the full, absolute API_URL
+        const response = await fetch(`${API_URL}/api/get-flow-details/${selectedFlowId}/`);
+        // --- END OF FIX ---
+        
+        // This line was causing the error because the response was HTML
+        const result = await response.json(); 
 
         if (result.status === 'success' && result.data.flow_json) {
-          // Update the node with the full structure
           data.onUpdate('flowStructure', result.data.flow_json);
         } else {
           console.error("Failed to fetch flow details:", result);
         }
-
       } catch (error) {
+        // The error you saw was caught here
         console.error("Error fetching flow details:", error);
       } finally {
-        setIsLoadingDetails(false); // Set loading to false
+        setIsLoadingDetails(false);
       }
     }
   };

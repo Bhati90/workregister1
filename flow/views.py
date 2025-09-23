@@ -1436,6 +1436,7 @@ def get_whatsapp_forms_api(request):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 # In your views.py
+# In your views.py
 
 def get_flow_details_api_view(request, flow_id):
     """
@@ -1445,16 +1446,15 @@ def get_flow_details_api_view(request, flow_id):
         if not flow_id:
             return JsonResponse({'status': 'error', 'message': 'Flow ID is required.'}, status=400)
 
-        # The Meta Graph API endpoint for fetching a specific flow's details
         api_url = f"https://graph.facebook.com/v19.0/{flow_id}"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
         
-        headers = {
-            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
-        }
-        
+        # --- FIX IS HERE ---
+        # The correct field name is 'body', not 'flow_json'.
         params = {
-            'fields': 'flow_json' # We only need the flow_json field
+            'fields': 'body'
         }
+        # --- END OF FIX ---
 
         response = requests.get(api_url, headers=headers, params=params)
         response_data = response.json()
@@ -1466,15 +1466,16 @@ def get_flow_details_api_view(request, flow_id):
                 'meta_response': response_data
             }, status=response.status_code)
 
-        # The flow_json from Meta is a STRING, so we need to parse it into a real JSON object
-        if 'flow_json' in response_data:
-            response_data['flow_json'] = json.loads(response_data['flow_json'])
+        # The 'body' from Meta is a STRING, so we need to parse it into a real JSON object.
+        # We then rename it to 'flow_json' so the frontend doesn't need to change.
+        if 'body' in response_data:
+            response_data['flow_json'] = json.loads(response_data['body'])
+            del response_data['body'] # Remove the original 'body' key
 
         return JsonResponse({'status': 'success', 'data': response_data})
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
 # ... (keep all your other imports: JsonResponse, csrf_exempt, models, etc.)
 import logging
 logger = logging.getLogger(__name__)
