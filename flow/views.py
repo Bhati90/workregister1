@@ -454,6 +454,69 @@ def execute_flow_node(contact, flow, target_node):
         # Don't send WhatsApp message for API node
         return True
     
+    elif node_type == 'flowFormNode':
+        form_id = node_data.get('selectedFormId')
+        template_body = node_data.get('templateBody', '')
+        button_text = node_data.get('buttonText', 'Open Form')
+        
+        if not form_id:
+            logger.error(f"No form selected for flowFormNode {target_node_id}")
+            return False
+        
+        try:
+            # Get the form from your database
+            from .models import WhatsAppFlowForm  # Adjust import as needed
+            flow_form = WhatsAppFlowForm.objects.get(id=form_id)
+            
+            # Create the Flow message payload
+            payload.update({
+                "type": "interactive",
+                "interactive": {
+                    "type": "flow",
+                    "header": {
+                        "type": "text",
+                        "text": "Complete Form"
+                    },
+                    "body": {
+                        "text": template_body or flow_form.template_body
+                    },
+                    "action": {
+                        "name": "flow",
+                        "parameters": {
+                            "flow_message_version": "3",
+                            "flow_token": f"flow_{contact.wa_id}_{target_node_id}_{int(time.time())}",
+                            "flow_id": flow_form.meta_flow_id,  # The Meta Flow ID
+                            "flow_cta": button_text,
+                            "flow_action": "navigate",
+                            "flow_action_payload": {
+                                "screen": flow_form.screens_data[0]['id'] if flow_form.screens_data else "SCREEN_0"
+                            }
+                        }
+                    }
+                }
+            })
+            
+            message_type_to_save = 'interactive'
+            text_content_to_save = f"Sent Flow Form: {flow_form.name}"
+            
+            # Set session to wait for flow completion
+            UserFlowSession.objects.update_or_create(
+                contact=contact,
+                defaults={
+                    'flow': flow, 
+                    'current_node_id': target_node_id,
+                    'waiting_for_flow_completion': True,
+                    'flow_form_id': form_id
+                }
+            )
+            
+        except WhatsAppFlowForm.DoesNotExist:
+            logger.error(f"Flow form with id {form_id} not found")
+            return False
+        except Exception as e:
+            logger.error(f"Error creating flow form message: {e}")
+            return False
+    
     else:
         logger.error(f"Message construction for node type '{node_type}' is not implemented.")
         return False
@@ -479,6 +542,141 @@ def execute_flow_node(contact, flow, target_node):
     logger.error(f"Failed to send message via WhatsApp API. Payload: {json.dumps(payload, indent=2)}")
     logger.error(f"Meta API Response: {response_data}")
     return False
+
+
+def handle_flow_response(request_body):
+    """
+    Handle incoming Flow responses from Meta.
+    This is called when a user completes or cancels a Flow form.
+    """
+    try:
+        data = json.loads(request_body)
+        
+        # Flow responses come in a different format
+        flow_token = data.get('flow_token', '')
+        response_json = data.get('response_json', {})
+        action = data.get('action', '')
+        
+        logger.info(f"DEBUG-FLOW-RESPONSE: Received flow response")
+        logger.info(f"Flow token: {flow_token}")
+        logger.info(f"Action: {action}")
+        logger.info(f"Response data: {json.dumps(response_json, indent=2)}")
+        
+        # Extract contact info from flow_token
+        # Format: flow_{wa_id}_{node_id}_{timestamp}
+        token_parts = flow_token.split('_')
+        if len(token_parts) >= 4:
+            wa_id = token_parts[1]
+            node_id = token_parts[2]
+            
+            try:
+                contact = ChatContact.objects.get(wa_id=wa_id)
+                session = UserFlowSession.objects.filter(
+                    contact=contact,
+                    waiting_for_flow_completion=True
+                ).first()
+                
+                if not session:
+                    logger.warning(f"No session found waiting for flow completion for {wa_id}")
+                    return
+                
+                flow = session.flow
+                current_node_id = session.current_node_id
+                
+                # Determine the outcome
+                next_handle = None
+                if action == 'COMPLETE':
+                    next_handle = 'onComplete'
+                    # Save form data to attributes
+                    save_flow_form_data(contact, session.flow_form_id, response_json)
+                elif action == 'CANCEL':
+                    next_handle = 'onError'
+                elif action == 'TIMEOUT':
+                    next_handle = 'onTimeout'
+                else:
+                    next_handle = 'onError'
+                
+                logger.info(f"DEBUG-FLOW-RESPONSE: Using handle '{next_handle}'")
+                
+                # Clear the waiting state
+                session.waiting_for_flow_completion = False
+                session.flow_form_id = None
+                session.save()
+                
+                # Find next node
+                edges = flow.flow_data.get('edges', [])
+                next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == next_handle), None)
+                
+                if next_edge:
+                    next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+                    if next_node:
+                        logger.info(f"DEBUG-FLOW-RESPONSE: Continuing to next node: {next_node.get('id')}")
+                        execute_flow_node(contact, flow, next_node)
+                    else:
+                        logger.error(f"DEBUG-FLOW-RESPONSE: Next node not found")
+                        session.delete()
+                else:
+                    logger.info(f"DEBUG-FLOW-RESPONSE: No next edge found, ending flow")
+                    session.delete()
+                    
+            except ChatContact.DoesNotExist:
+                logger.error(f"Contact {wa_id} not found")
+            except Exception as e:
+                logger.error(f"Error processing flow response: {e}")
+        else:
+            logger.error(f"Invalid flow token format: {flow_token}")
+            
+    except Exception as e:
+        logger.error(f"Error handling flow response: {e}")
+
+def save_flow_form_data(contact, flow_form_id, response_data):
+    """
+    Save the flow form response data to contact attributes.
+    """
+    try:
+        from .models import WhatsAppFlowForm
+        flow_form = WhatsAppFlowForm.objects.get(id=flow_form_id)
+        
+        logger.info(f"DEBUG-FLOW-SAVE: Saving form data for {contact.wa_id}")
+        logger.info(f"Response data: {json.dumps(response_data, indent=2)}")
+        
+        # The response_data contains the user's answers
+        # Format is typically: {"component_id": "value", ...}
+        
+        for screen in flow_form.screens_data:
+            for component in screen.get('components', []):
+                component_id = component.get('id')
+                component_label = component.get('label', '')
+                
+                if component_id in response_data:
+                    value = response_data[component_id]
+                    
+                    # Create or get attribute based on component label/id
+                    attribute_name = f"form_{flow_form.name}_{component_label}".lower().replace(' ', '_')
+                    attribute, created = Attribute.objects.get_or_create(
+                        name=attribute_name,
+                        defaults={'description': f'Form field: {component_label}'}
+                    )
+                    
+                    # Handle different value types
+                    if isinstance(value, list):
+                        value_str = ', '.join(str(v) for v in value)
+                    else:
+                        value_str = str(value)
+                    
+                    # Save the value
+                    ContactAttributeValue.objects.update_or_create(
+                        contact=contact,
+                        attribute=attribute,
+                        defaults={'value': value_str}
+                    )
+                    
+                    logger.info(f"DEBUG-FLOW-SAVE: Saved '{value_str}' to attribute '{attribute_name}'")
+        
+        logger.info(f"DEBUG-FLOW-SAVE: Successfully saved all form data")
+        
+    except Exception as e:
+        logger.error(f"Error saving flow form data: {e}")
 
 # OPTIONAL: Add a test endpoint for the API Request node
 @csrf_exempt
@@ -737,7 +935,7 @@ def attribute_detail_view(request, pk):
 
 # --- Webhook and API Views ---
 # Add this to your Django views.py file
-
+from .models import WhatsAppFlowForm
 from django.utils import timezone
 import json
 
@@ -1000,6 +1198,24 @@ def whatsapp_webhook_view(request):
                                 logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
                                 continue
                     # 2. Check for and process any status updates
+                    if 'flows' in value:
+                        for flow_data in value.get('flows', []):
+                            logger.info(f"DEBUG-FLOW: Received flow data: {flow_data}")
+                            # Handle flow completion inline
+                            try:
+                                flow_token = flow_data.get('flow_token', '')
+                                response_json = flow_data.get('response_json', {})
+                                
+                                # Extract contact ID from the flow data
+                                if 'from' in flow_data:
+                                    contact_wa_id = flow_data['from']
+                                    contact, _ = ChatContact.objects.get_or_create(wa_id=contact_wa_id)
+                                    
+                                    # Process the flow completion
+                                    handle_flow_completion(contact, flow_token, response_json)
+                            except Exception as e:
+                                logger.error(f"Error processing flow data: {e}")
+
                     if 'statuses' in value:
                         for status in value.get('statuses', []):
                             if status.get('status') == 'read':
@@ -1022,7 +1238,192 @@ def get_media_url_from_id(media_id):
         logger.error(f"Could not retrieve media URL for ID {media_id}: {e}")
         return None
     
+def handle_flow_completion(contact, flow_token, response_json):
+    """
+    Handle when a user completes a Flow form.
+    """
+    try:
+        logger.info(f"DEBUG-FLOW-COMPLETION: Processing completion for {contact.wa_id}")
+        
+        session = UserFlowSession.objects.filter(
+            contact=contact,
+            waiting_for_flow_completion=True
+        ).first()
+        
+        if not session:
+            logger.warning(f"No session found waiting for flow completion for {contact.wa_id}")
+            return
+        
+        flow = session.flow
+        current_node_id = session.current_node_id
+        
+        # Save form data to attributes
+        if session.flow_form_id and response_json:
+            save_flow_form_data(contact, session.flow_form_id, response_json)
+        
+        # Clear the waiting state
+        session.waiting_for_flow_completion = False
+        session.flow_form_id = None
+        session.save()
+        
+        # Find next node (onComplete handle)
+        edges = flow.flow_data.get('edges', [])
+        next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onComplete'), None)
+        
+        if next_edge:
+            next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+            if next_node:
+                logger.info(f"DEBUG-FLOW-COMPLETION: Continuing to next node: {next_node.get('id')}")
+                execute_flow_node(contact, flow, next_node)
+            else:
+                logger.error(f"DEBUG-FLOW-COMPLETION: Next node not found")
+                session.delete()
+        else:
+            logger.info(f"DEBUG-FLOW-COMPLETION: No next edge found, ending flow")
+            session.delete()
+            
+    except Exception as e:
+        logger.error(f"Error handling flow completion: {e}")
 
+# API endpoint to fetch available forms for the fronten
+from django.shortcuts import get_object_or_404
+def flow_form_detail_api(request, form_id):
+    """
+    Get detailed information about a specific form.
+    """
+    try:
+        form = get_object_or_404(WhatsAppFlowForm, id=form_id)
+        
+        screens_data = form.screens_data
+        if isinstance(screens_data, str):
+            try:
+                screens_data = json.loads(screens_data)
+            except:
+                screens_data = []
+        
+        form_data = {
+            'id': str(form.id),
+            'name': form.name,
+            'template_body': form.template_body,
+            'template_button_text': form.template_button_text,
+            'template_category': form.template_category,
+            'screens_data': screens_data,
+            'meta_flow_id': form.meta_flow_id,
+            'flow_status': form.flow_status,
+            'template_status': form.template_status,
+            'created_at': form.created_at.isoformat() if form.created_at else None,
+            'updated_at': form.updated_at.isoformat() if form.updated_at else None
+        }
+        
+        return JsonResponse({
+            'status': 'success',
+            'form': form_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching form detail: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@csrf_exempt
+def whatsapp_flow_webhook_view(request):
+    """
+    Separate webhook endpoint specifically for WhatsApp Flow responses.
+    Meta sends Flow completion data to this endpoint.
+    """
+    if request.method == 'GET':
+        # Handle webhook verification
+        mode = request.GET.get('hub.mode')
+        token = request.GET.get('hub.verify_token')
+        challenge = request.GET.get('hub.challenge')
+        
+        # Replace with your actual verify token
+        VERIFY_TOKEN = 'your_flow_verify_token'
+        
+        if mode == 'subscribe' and token == VERIFY_TOKEN:
+            return HttpResponse(challenge)
+        else:
+            return HttpResponse('Forbidden', status=403)
+    
+    elif request.method == 'POST':
+        try:
+            body = request.body.decode('utf-8')
+            logger.info(f"Flow webhook received: {body}")
+            
+            handle_flow_response(body)
+            return JsonResponse({"status": "success"}, status=200)
+            
+        except Exception as e:
+            logger.error(f"Error in flow webhook: {e}")
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    
+    return JsonResponse({"status": "method not allowed"}, status=405)
+
+# Add this to your existing webhook view to handle flow data inline
+def process_flow_data_in_webhook(value, contact):
+    """
+    Process flow data that comes through the main webhook.
+    """
+    if 'flows' in value:
+        for flow_data in value.get('flows', []):
+            try:
+                flow_token = flow_data.get('flow_token', '')
+                response_json = flow_data.get('response_json', {})
+                
+                logger.info(f"DEBUG-FLOW-INLINE: Processing flow completion for {contact.wa_id}")
+                logger.info(f"Flow token: {flow_token}")
+                logger.info(f"Response data: {json.dumps(response_json, indent=2)}")
+                
+                # Handle the flow completion
+                handle_flow_completion(contact, flow_token, response_json)
+                
+            except Exception as e:
+                logger.error(f"Error processing inline flow data: {e}")
+
+
+def get_whatsapp_forms_api(request):
+    """
+    API endpoint to get all available WhatsApp Flow Forms for the ReactFlow builder.
+    """
+    try:
+        forms = WhatsAppFlowForm.objects.all().values(
+            'id', 'name', 'template_body', 'template_button_text', 
+            'template_category', 'screens_data', 'meta_flow_id'
+        )
+        
+        forms_list = []
+        for form in forms:
+            # Parse screens_data if it's stored as JSON string
+            screens_data = form['screens_data']
+            if isinstance(screens_data, str):
+                try:
+                    screens_data = json.loads(screens_data)
+                except:
+                    screens_data = []
+            
+            forms_list.append({
+                'id': form['id'],
+                'name': form['name'],
+                'template_body': form['template_body'],
+                'template_button_text': form['template_button_text'],
+                'template_category': form['template_category'],
+                'screens_data': screens_data,
+                'meta_flow_id': form['meta_flow_id']
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'forms': forms_list
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching forms: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 
 # ... (keep all your other imports: JsonResponse, csrf_exempt, models, etc.)
@@ -1079,196 +1480,7 @@ def debug_flow_data(flow_id):
             
     except Flow.DoesNotExist:
         print(f"Error: Flow with ID {flow_id} not found.")
-# def try_execute_flow_step(contact, user_input, replied_to_wamid):
-#     """
-#     Finds and executes the next step in a flow using a session-based approach.
-#     This version only triggers flows marked as active.
-#     """
-#     try:
-#         session = UserFlowSession.objects.filter(contact=contact).first()
-#         flow = session.flow if session else None
-#         current_node = None
-#         next_edge = None
-
-#         # --- Stage 1: Try to find the next step based on the current session ---
-#         if session:
-#             logger.info(f"Found active session for contact {contact.wa_id} in flow '{flow.name}' at node '{session.current_node_id}'.")
-#             nodes = flow.flow_data.get('nodes', [])
-#             current_node = next((n for n in nodes if n.get('id') == session.current_node_id), None)
-#             if current_node:
-#                 edges = flow.flow_data.get('edges', [])
-#                 next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-
-#         # --- Stage 2: If no path found, try to branch from a historical message ---
-#         if not next_edge:
-#             logger.warning(f"No valid path from current session. Attempting to branch from historical context of replied message...")
-#             try:
-#                 original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound')
-#                 historical_node_id = original_message.source_node_id
-
-#                 if historical_node_id:
-#                     # If we don't know the flow (because the session was deleted), we must find it.
-#                     if not flow:
-#                         logger.info("No active flow. Searching all active flows for historical node...")
-#                         # This is the new, robust fallback logic
-#                         active_flows = Flow.objects.filter(is_active=True)
-#                         for f in active_flows:
-#                             # Check if the historical node exists in this flow's data
-#                             if any(n.get('id') == historical_node_id for n in f.flow_data.get('nodes', [])):
-#                                 flow = f
-#                                 logger.info(f"Found historical node in flow '{flow.name}'.")
-#                                 break
-                    
-#                     if flow:
-#                         nodes = flow.flow_data.get('nodes', [])
-#                         current_node = next((n for n in nodes if n.get('id') == historical_node_id), None)
-#                         if current_node:
-#                             edges = flow.flow_data.get('edges', [])
-#                             next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-#                             if next_edge:
-#                                 logger.info(f"SUCCESS: Found a valid historical path. Branching from node '{historical_node_id}'.")
-#             except Message.DoesNotExist:
-#                 logger.debug("Replied-to message not found in DB for historical check.")
-#                 pass
-        
-#         # --- Stage 3: If still no path, try to start a brand new flow ---
-#         if not next_edge:
-#             logger.warning(f"No historical path found. Attempting to start a new flow from a trigger template...")
-#             try:
-#                 original_message = Message.objects.get(wamid=replied_to_wamid, direction='outbound', message_type='template')
-#                 template_name = original_message.text_content.replace("Sent template: ", "").strip()
-#                 possible_flows = Flow.objects.filter(template_name=template_name, is_active=True).order_by('-updated_at')
-                
-#                 if possible_flows.exists():
-#                     flow = possible_flows.first()
-#                     nodes = flow.flow_data.get('nodes', [])
-#                     current_node = next((n for n in nodes if n.get('type') == 'templateNode' and n.get('data', {}).get('selectedTemplateName') == template_name), None)
-#                     if current_node:
-#                         edges = flow.flow_data.get('edges', [])
-#                         next_edge = next((e for e in edges if e.get('source') == current_node.get('id') and e.get('sourceHandle') == user_input), None)
-#                         if next_edge:
-#                             logger.info(f"SUCCESS: Starting new session for contact {contact.wa_id} with flow '{flow.name}'")
-#             except Message.DoesNotExist:
-#                 logger.debug("Replied-to message is not a trigger template.")
-#                 pass
-
-#         # --- Stage 4: Final check and execution ---
-#         if not flow or not current_node or not next_edge:
-#             logger.error(f"After all checks, could not determine a valid next step for contact {contact.wa_id} with input '{user_input}'. Halting execution.")
-#             return False
-
-#         nodes = flow.flow_data.get('nodes', [])
-#         edges = flow.flow_data.get('edges', [])
-#         target_node_id = next_edge.get('target')
-#         target_node = next((n for n in nodes if n.get('id') == target_node_id), None)
-        
-#         if not target_node:
-#             logger.error(f"FATAL: Edge points to a non-existent target node ID: '{target_node_id}'")
-#             return False
-#         # 3. CONSTRUCT AND SEND THE MESSAGE (This part remains the same)
-#         node_type = target_node.get('type')
-#         node_data = target_node.get('data', {})
-#         payload = {"messaging_product": "whatsapp", "to": contact.wa_id}
-#         message_type_to_save = 'unknown'
-#         text_content_to_save = f"Flow Step: {node_type}"
-#         # ... (All your elif blocks for textNode, templateNode, imageNode, buttonsNode are correct and go here) ...
-#         if node_type == 'textNode':
-#             message_text = node_data.get('text', '...')
-#             payload.update({"type": "text", "text": {"body": message_text}})
-#             message_type_to_save = 'text'
-#             text_content_to_save = message_text
-        
-#         elif node_type == 'templateNode':
-#             target_template_name = node_data.get('selectedTemplateName')
-#             if not target_template_name:
-#                 logger.error("Flow Error: Target node is a template but no template name is selected.")
-#                 return False
-#             components = []
-#             if 'headerUrl' in node_data and node_data['headerUrl']:
-#                 components.append({
-#                     "type": "header", "parameters": [{"type": "image", "image": { "link": node_data['headerUrl'] }}]
-#                 })
-#             body_params = []
-#             for i in range(1, 10):
-#                 var_key = f'bodyVar{i}'
-#                 if var_key in node_data and node_data[var_key]:
-#                     body_params.append({ "type": "text", "text": node_data[var_key] })
-#                 else:
-#                     break
-#             if body_params:
-#                 components.append({ "type": "body", "parameters": body_params })
-#             payload.update({
-#                 "type": "template",
-#                 "template": {"name": target_template_name, "language": { "code": "en" }, "components": components }
-#             })
-#             message_type_to_save = 'template'
-#             text_content_to_save = f"Sent template: {target_template_name}"
-            
-#         elif node_type == 'imageNode':
-#             meta_media_id = node_data.get('metaMediaId') # We will now store the Meta Media ID
-#             caption = node_data.get('caption')
-#             if not meta_media_id:
-#                 logger.error(f"Flow Error: Image node for contact {contact.wa_id} has no URL.")
-#                 return False
-#             payload.update({"type": "image", "image": {"id": meta_media_id, "caption": caption}})
-#             message_type_to_save = 'image'
-#             text_content_to_save = caption or "Sent an image"
-            
-#         elif node_type == 'buttonsNode':
-#             body_text = node_data.get('text')
-#             buttons = node_data.get('buttons', [])
-#             if not body_text or not buttons:
-#                 logger.error(f"Flow Error: Buttons node for contact {contact.wa_id} is missing text or buttons.")
-#                 return False
-#             action = {"buttons": []}
-#             for btn in buttons:
-#                 action["buttons"].append({"type": "reply", "reply": {"id": btn.get('text'), "title": btn.get('text')}})
-#             payload.update({
-#                 "type": "interactive",
-#                 "interactive": {"type": "button", "body": { "text": body_text }, "action": action}
-#             })
-#             message_type_to_save = 'interactive'
-#             text_content_to_save = body_text
-#         else:
-#             return False
-            
-#         # 4. SEND MESSAGE AND MANAGE SESSION
-#         success, response_data = send_whatsapp_message(payload)
-        
-#         if success:
-#             save_outgoing_message(
-#                 contact=contact, 
-#                 wamid=response_data['messages'][0]['id'], 
-#                 message_type=message_type_to_save, 
-#                 text_content=text_content_to_save,
-#                 source_node_id=target_node_id  # <-- Pass the new ID
-#             )
-#             # --- MODIFIED LOGIC WITH DEBUG LOGS ---
-#             target_has_outputs = any(e for e in edges if e.get('source') == target_node_id)
-#             logger.info(f"DEBUG-SESSION: Checking for outputs from target_node_id: '{target_node_id}'. Has outputs: {target_has_outputs}")
-
-#             if target_has_outputs:
-#                 UserFlowSession.objects.update_or_create(
-#                     contact=contact,
-#                     defaults={'flow': flow, 'current_node_id': target_node_id}
-#                 )
-#                 logger.info(f"Session for {contact.wa_id} updated to node '{target_node_id}'")
-#             else:
-#                 if session:
-#                     session.delete()
-#                 logger.info(f"Flow ended for {contact.wa_id} because node has no outputs. Session deleted.")
-#             # --- END MODIFIED LOGIC ---
-            
-#             return True
-#         else:
-#             logger.error(f"Flow step failed for contact {contact.wa_id}. API Response: {response_data}")
-#             return False
-
-#     except Exception as e:
-#         logger.error(f"CRITICAL FLOW ERROR: {e}", exc_info=True)
-#         return False
-
-#            
+         
 
 def get_whatsapp_templates_api(request):
     """API endpoint to fetch approved WhatsApp templates for the React frontend."""

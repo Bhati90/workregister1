@@ -673,6 +673,566 @@ def template_sender_view(request):
         "error": error,
     })
 
+from django.views.decorators.http import require_http_methods
+META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+WABA_ID ="1477047197063313"
+
+# # --- NEW: Helper function to map builder components to Meta's Flow JSON format ---
+# def map_component_to_flow_json(component):
+#     """Converts a single component from the builder's format to Meta's format."""
+#     comp_type = component.get('type')
+#     label = component.get('label')
+#     # Generate a unique name for the component based on its ID
+#     name = component.get('id', f"{comp_type}_{label.lower().replace(' ', '_')}")
+
+#     if comp_type == 'text-input':
+#         return {
+#             "type": "TextInput",
+#             "label": label,
+#             "name": name,
+#             "placeholder": component.get('properties', {}).get('placeholder', ''),
+#             "required": True  # Assuming all fields are required for simplicity
+#         }
+#     elif comp_type == 'textarea':
+#         return {
+#             "type": "TextArea",
+#             "label": label,
+#             "name": name,
+#             "placeholder": component.get('properties', {}).get('placeholder', ''),
+#             "required": True
+#         }
+#     elif comp_type == 'dropdown':
+#         options = component.get('properties', {}).get('options', [])
+#         return {
+#             "type": "Dropdown",
+#             "label": label,
+#             "name": name,
+#             "required": True,
+#             "data-source": [{"id": opt.lower().replace(" ", "_"), "title": opt} for opt in options]
+#         }
+#     elif comp_type == 'radio-group':
+#         options = component.get('properties', {}).get('options', [])
+#         return {
+#             "type": "RadioButtonsGroup",
+#             "label": label,
+#             "name": name,
+#             "required": True,
+#             "data-source": [{"id": opt.lower().replace(" ", "_"), "title": opt} for opt in options]
+#         }
+#     elif comp_type == 'date-picker':
+#         return {
+#             "type": "DatePicker",
+#             "label": label,
+#             "name": name,
+#             "required": True
+#         }
+#     elif comp_type == 'heading':
+#         return {
+#             "type": "TextHeading",
+#             "text": label
+#         }
+#     elif comp_type == 'text':
+#         return {
+#             "type": "TextBody",
+#             "text": component.get('properties', {}).get('content', '')
+#         }
+#     return None # Return None for unhandled component types
+
+
+# # --- REWRITTEN: Function to generate multi-screen Flow JSON ---
+# def generate_multi_screen_flow_json(screens_data):
+#     """
+#     Converts the multi-screen structure from the builder into a valid Flow JSON.
+#     """
+#     flow_screens = []
+#     num_screens = len(screens_data)
+
+#     for i, screen in enumerate(screens_data):
+#         is_last_screen = (i == num_screens - 1)
+        
+#         # 1. Convert all components for the current screen
+#         children = []
+#         for component in screen.get('components', []):
+#             mapped_comp = map_component_to_flow_json(component)
+#             if mapped_comp:
+#                 children.append(mapped_comp)
+        
+#         # 2. Add the navigation footer
+#         if is_last_screen:
+#             # The final screen completes the flow
+#             footer_action = {
+#                 "name": "complete",
+#                 "payload": {}
+#             }
+#             footer_label = "Submit"
+#         else:
+#             # Intermediate screens navigate to the next one
+#             next_screen_id = screens_data[i + 1].get('id', f'SCREEN_{i+1}')
+#             footer_action = {
+#                 "name": "navigate",
+#                 "payload": {
+#                     "screen": next_screen_id
+#                 }
+#             }
+#             footer_label = "Next"
+
+#         children.append({
+#             "type": "Footer",
+#             "label": footer_label,
+#             "on-click-action": footer_action
+#         })
+        
+#         # 3. Build the screen object
+#         flow_screen = {
+#             "id": screen.get('id', f'SCREEN_{i}'),
+#             "title": screen.get('title', f'Screen {i+1}'),
+#             "terminal": is_last_screen,
+#             "layout": {
+#                 "type": "SingleColumnLayout",
+#                 "children": children
+#             }
+#         }
+#         flow_screens.append(flow_screen)
+
+#     return {
+#         "version": "5.1", # Using a recent, supported version
+#         "screens": flow_screens
+#     }
+
+
+import json
+import logging
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+# Assuming other necessary imports like requests, settings, models are present
+
+logger = logging.getLogger(__name__)
+
+# --- NEW: Helper function to map builder components to Meta's Flow JSON format ---
+import re # Make sure to import the 're' module at the top of your file
+
+#import re
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+def map_component_to_flow_json(component):
+    """Converts a single component from the builder's format to Meta's format."""
+    comp_type = component.get('type')
+    label = component.get('label')
+    name = component.get('id')  # Using the unique ID from the frontend
+
+    if comp_type == 'text-input':
+        # Create a list to potentially include instruction text
+        components = []
+        
+        # Add instruction text if placeholder exists
+        placeholder = component.get('properties', {}).get('placeholder', '')
+        if placeholder:
+            components.append({
+                "type": "TextBody",
+                "text": placeholder
+            })
+        
+        # Add the actual input
+        input_component = {
+            "type": "TextInput",
+            "label": label,
+            "name": name,
+            "required": True
+        }
+        
+        # If we have instruction text, return both components
+        if components:
+            components.append(input_component)
+            return components
+        else:
+            return input_component
+        
+    elif comp_type == 'checkbox-group': # Add this block
+        options = component.get('properties', {}).get('options', [])
+        return {
+            "type": "CheckboxGroup",
+            "label": component.get('label'),
+            "name": component.get('id'),
+            "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
+        }
+    
+    elif comp_type == 'textarea':
+        # Create a list to potentially include instruction text
+        components = []
+        
+        # Add instruction text if placeholder exists
+        placeholder = component.get('properties', {}).get('placeholder', '')
+        if placeholder:
+            components.append({
+                "type": "TextBody",
+                "text": placeholder
+            })
+        
+        # Add the actual textarea
+        textarea_component = {
+            "type": "TextArea",
+            "label": label,
+            "name": name,
+            "required": True
+        }
+        
+        # If we have instruction text, return both components
+        if components:
+            components.append(textarea_component)
+            return components
+        else:
+            return textarea_component
+    elif comp_type == 'dropdown':
+        options = component.get('properties', {}).get('options', [])
+        return {
+            "type": "Dropdown",
+            "label": label,
+            "name": name,
+            "required": True,
+            "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
+        }
+    elif comp_type == 'radio-group':
+        options = component.get('properties', {}).get('options', [])
+        return {
+            "type": "RadioButtonsGroup",
+            "label": label,
+            "name": name,
+            "required": True,
+            "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
+        }
+    elif comp_type == 'date-picker':
+        return {
+            "type": "DatePicker",
+            "label": label,
+            "name": name,
+            "required": True
+        }
+    elif comp_type == 'heading':
+        return {
+            "type": "TextHeading",
+            "text": label
+        }
+    elif comp_type == 'text':
+        return {
+            "type": "TextBody",
+            "text": component.get('properties', {}).get('content', '')
+        }
+    return None
+
+def generate_multi_screen_flow_json(screens_data):
+    """
+    Converts the multi-screen structure from the builder into a valid Flow JSON.
+    """
+    flow_screens = []
+    
+    # Pre-process screen data to sanitize IDs
+    sanitized_screens = []
+    for i, screen in enumerate(screens_data):
+        original_id = screen.get('id', f'SCREEN_{i}')
+        # Replace any non-alphabetic or non-underscore characters with an underscore
+        sanitized_id = re.sub(r'[^a-zA-Z_]', '_', original_id.upper())
+        screen['sanitized_id'] = sanitized_id
+        sanitized_screens.append(screen)
+
+    num_screens = len(sanitized_screens)
+    for i, screen in enumerate(sanitized_screens):
+        is_last_screen = (i == num_screens - 1)
+        
+        children = []
+        for component in screen.get('components', []):
+            mapped_component = map_component_to_flow_json(component)
+            if mapped_component:
+                # Handle case where component returns multiple elements (like text-input with instructions)
+                if isinstance(mapped_component, list):
+                    children.extend(mapped_component)
+                else:
+                    children.append(mapped_component)
+        
+        if is_last_screen:
+            # For the last screen, use complete action
+            footer_action = {
+                "name": "complete", 
+                "payload": {}
+            }
+            footer_label = "Submit"
+        else:
+            # For navigation, ensure we have the 'next' property
+            next_screen_id = sanitized_screens[i + 1]['sanitized_id']
+            footer_action = {
+                "name": "navigate",
+                "next": {
+                    "type": "screen",
+                    "name": next_screen_id
+                },
+                "payload": {}
+            }
+            footer_label = "Next"
+
+        children.append({
+            "type": "Footer",
+            "label": footer_label,
+            "on-click-action": footer_action
+        })
+        
+        flow_screen = {
+            "id": screen['sanitized_id'],
+            "title": screen.get('title', f'Screen {i+1}'),
+            "terminal": is_last_screen,
+            "layout": {
+                "type": "SingleColumnLayout",
+                "children": children
+            }
+        }
+        flow_screens.append(flow_screen)
+
+    return {
+        "version": "5.1",
+        "screens": flow_screens
+    }
+@require_http_methods(["POST"])
+def submit_form_and_template_view(request):
+    """
+    Handles the 2-step process for creating and submitting a multi-screen WhatsApp Flow and its trigger template to Meta.
+    """
+    try:
+        # --- Step 1: Load and Validate Data from the Frontend ---
+        data = json.loads(request.body)
+        form_name = data.get('form_name')
+        screens_data = data.get('screens_data')
+
+        if not form_name or not screens_data:
+            return JsonResponse({'status': 'error', 'message': 'Form name and screen data are required.'}, status=400)
+
+        # --- Step 2: Generate the Multi-Screen Flow JSON ---
+        # This function should be defined as in the previous answer
+        flow_json_data = generate_multi_screen_flow_json(screens_data)
+        flow_json_string = json.dumps(flow_json_data)
+        
+        logger.info(f"Submitting Flow '{form_name}' to Meta...")
+        
+        if not META_ACCESS_TOKEN or not WABA_ID or "YOUR_" in WABA_ID:
+            raise ValueError("Meta API credentials (WABA_ID, META_ACCESS_TOKEN) are not configured on the server.")
+
+        # --- Step 3: Create the Flow via Meta API (First API Call) ---
+        flow_api_url = f"https://graph.facebook.com/v19.0/{WABA_ID}/flows"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
+        
+        flow_payload = {
+            "name": f"{form_name}_flow",
+            "flow_json": flow_json_string,
+            "categories": ["LEAD_GENERATION"] # e.g., CUSTOMER_SUPPORT, MARKETING, LEAD_GENERATION
+        }
+        
+        flow_response = requests.post(flow_api_url, headers=headers, json=flow_payload)
+        flow_response_data = flow_response.json()
+
+        if flow_response.status_code >= 400:
+            logger.error(f"Meta API Error (Flow Creation): {flow_response_data}")
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Failed to create Flow.', 
+                'meta_response': flow_response_data
+            }, status=flow_response.status_code)
+        
+        flow_id = flow_response_data.get("id")
+        logger.info(f"Successfully created Flow with ID: {flow_id}")
+
+        # --- Step 4: Publish the Flow ---
+        publish_url = f"https://graph.facebook.com/v19.0/{flow_id}/publish"
+        publish_response = requests.post(publish_url, headers=headers, json={})
+        publish_response_data = publish_response.json()
+        
+        flow_published = publish_response.status_code < 400
+        if flow_published:
+            logger.info(f"Successfully published Flow with ID: {flow_id}")
+        else:
+            logger.warning(f"Meta API Warning (Flow Publishing failed): {publish_response_data}")
+            logger.info("Continuing to create template with unpublished flow (might be rejected).")
+
+        # --- Step 5: Create the Message Template to trigger the Flow (Second API Call) ---
+        template_name = f"{form_name}_flow_trigger"
+        template_api_url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates"
+        
+        template_payload = {
+            "name": template_name,
+            "language": "en_US",
+            "category": data.get('template_category', 'UTILITY'),
+            "components": [
+                {"type": "BODY", "text": data.get('template_body', 'Tap below to start.')},
+                {
+                    "type": "BUTTONS",
+                    "buttons": [{
+                        "type": "FLOW",
+                        "text": data.get('template_button_text', 'Start Form'),
+                        "flow_id": flow_id,
+                    }]
+                }
+            ]
+        }
+        
+        logger.info(f"Submitting Template to Meta with payload:\n{json.dumps(template_payload, indent=2)}")
+        template_response = requests.post(template_api_url, headers=headers, json=template_payload)
+        template_response_data = template_response.json()
+
+        if template_response.status_code >= 400:
+            logger.error(f"Meta API Error (Template Creation): {template_response_data}")
+            
+            # Provide a more helpful response if the template fails because the flow isn't published
+            if not flow_published:
+                return JsonResponse({
+                    'status': 'partial_success',
+                    'message': 'Flow created but not published. Template creation failed as expected.',
+                    'flow_response': flow_response_data,
+                    'publish_response': publish_response_data,
+                    'template_response': template_response_data,
+                    'note': 'You can test with the flow_id, but templates require published flows.'
+                })
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Flow was published, but failed to submit the trigger template.',
+                    'flow_response': flow_response_data,
+                    'template_response': template_response_data
+                }, status=template_response.status_code)
+
+        logger.info(f"Successfully submitted template '{template_name}' to Meta.")
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Flow and trigger template submitted to Meta successfully!',
+            'flow_response': flow_response_data,
+            'template_response': template_response_data,
+            'flow_published': flow_published
+        })
+
+    except ValueError as ve:
+        logger.error(f"Configuration error: {ve}")
+        return JsonResponse({'status': 'error', 'message': str(ve)}, status=500)
+    except Exception as e:
+        logger.error(f"An unexpected error occurred in submit_form_and_template_view: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': f'An unexpected server error occurred: {e}'}, status=500)
+
+
+import json
+import logging
+import requests
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.conf import settings # Best practice to store credentials in settings
+
+# --- Assume you have helper functions defined elsewhere in the file ---
+# from .utils import generate_multi_screen_flow_json 
+
+logger = logging.getLogger(__name__)
+
+# --- Place your Meta credentials here or in your Django settings.py ---
+# It's highly recommended to use settings or environment variables for security.
+WABA_ID = getattr(settings, 'WHATSAPP_BUSINESS_ACCOUNT_ID', 'YOUR_WABA_ID_HERE')
+META_ACCESS_TOKEN = getattr(settings, 'META_PERMANENT_ACCESS_TOKEN', 'YOUR_META_TOKEN_HERE')
+
+
+
+def create_call_template_page_view(request):
+    """Renders the HTML page with the form to create a call template."""
+    return render(request, 'registration/chat/create_call_template.html')
+
+
+@require_http_methods(["POST"])
+def create_call_template_api_view(request):
+    """
+    Receives data from the frontend form and makes an API call to Meta
+    to create and submit a message template for approval.
+    """
+    try:
+        data = json.loads(request.body)
+        template_name = data.get('template_name')
+        body_text = data.get('body_text')
+        button_text = data.get('button_text')
+        phone_number = data.get('phone_number')
+
+        if not all([template_name, body_text, button_text, phone_number]):
+            return JsonResponse({'status': 'error', 'message': 'Missing required fields.'}, status=400)
+
+        api_url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates"
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "name": template_name,
+            "language": "en_US",
+            "category": "UTILITY",
+            "components": [
+                {"type": "BODY", "text": body_text},
+                {
+                    "type": "BUTTONS",
+                    "buttons": [{
+                        "type": "PHONE_NUMBER",
+                        "text": button_text,
+                        "phone_number": phone_number
+                    }]
+                }
+            ]
+        }
+        
+        response = requests.post(api_url, headers=headers, json=payload)
+        response_data = response.json()
+
+        if response.status_code >= 400:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to submit template to Meta.',
+                'meta_response': response_data
+            }, status=response.status_code)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Template submitted successfully for approval!',
+            'meta_response': response_data
+        })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@csrf_exempt # Use this for simplicity, or implement proper CSRF handling in JS fetch
+@require_http_methods(["GET", "POST"])
+def whatsapp_form_builder_view(request):
+    """
+    Handles the creation and editing of WhatsApp forms.
+    GET: Renders the form builder page.
+    POST: Saves the form structure as JSON.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            form_name = data.get('name')
+            form_structure = data.get('structure')
+
+            if not form_name or not form_structure:
+                return JsonResponse({'status': 'error', 'message': 'Form name and structure are required.'}, status=400)
+
+            # Use update_or_create to save the form
+            form_obj, created = WhatsAppForm.objects.update_or_create(
+                name=form_name,
+                defaults={'structure': form_structure}
+            )
+            
+            message = f"Form '{form_name}' was created successfully." if created else f"Form '{form_name}' was updated."
+            logger.info(message)
+            return JsonResponse({'status': 'success', 'message': message, 'form_id': form_obj.id})
+
+        except json.JSONDecodeError:
+            logger.error("Failed to decode JSON from form builder request.")
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON format.'}, status=400)
+        except Exception as e:
+            logger.error(f"Error saving WhatsApp form: {e}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+    # For a GET request, just render the builder page.
+    return render(request, 'registration/chat/whatsapp_form.html')
 
 @csrf_exempt
 @login_required
@@ -700,7 +1260,7 @@ def send_standard_template_api_view(request):
             contact = get_object_or_404(ChatContact, wa_id=wa_id)
             payload = {
                 "messaging_product": "whatsapp", "to": wa_id, "type": "template",
-                "template": {"name": template_name, "language": {"code": "en"}, "components": []}
+                "template": {"name": template_name, "language": {"code": "en_US"}, "components": []}
             }
             
             if header_media_id:
@@ -720,6 +1280,208 @@ def send_standard_template_api_view(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
+
+@csrf_exempt  
+@login_required
+def send_interactive_flow_message(request):
+    """Alternative: Send Flow as an interactive message (if template doesn't work)"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        recipients = request.POST.getlist('recipients[]')
+        flow_id = request.POST.get('flow_id')
+        flow_text = request.POST.get('flow_text', 'Please fill out this form')
+        button_text = request.POST.get('button_text', 'Start Form')
+        
+        if not recipients or not flow_id:
+            return JsonResponse({'status': 'error', 'message': 'Recipients and Flow ID are required.'}, status=400)
+
+        results = []
+        for wa_id in recipients:
+            contact = get_object_or_404(ChatContact, wa_id=wa_id)
+            
+            # Interactive Flow message structure
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": wa_id,
+                "type": "interactive",
+                "interactive": {
+                    "type": "flow",
+                    "header": {
+                        "type": "text",
+                        "text": "Form Request"
+                    },
+                    "body": {
+                        "text": flow_text
+                    },
+                    "footer": {
+                        "text": "Tap the button below to start"
+                    },
+                    "action": {
+                        "name": "flow",
+                        "parameters": {
+                            "flow_message_version": "5.1",
+                            "flow_id": flow_id,
+                            "flow_cta": button_text,
+                            "flow_action": "navigate",
+                            "flow_action_payload": {
+                                "screen": "FORM_SCREEN"
+                            }
+                        }
+                    }
+                }
+            }
+            
+            logger.info(f"Sending interactive Flow message: {json.dumps(payload, indent=2)}")
+            
+            success, response_data = send_whatsapp_message(payload)
+            if success:
+                save_outgoing_message(
+                    contact=contact, 
+                    wamid=response_data['messages'][0]['id'], 
+                    message_type='interactive_flow', 
+                    text_content=f"Sent interactive flow: {flow_id}"
+                )
+                results.append({"wa_id": wa_id, "status": "success"})
+            else:
+                logger.error(f"Failed to send interactive flow to {wa_id}: {response_data}")
+                results.append({"wa_id": wa_id, "status": "error", "response": response_data})
+                
+        return JsonResponse({"results": results})
+        
+    except Exception as e:
+        logger.error(f"Error in send_interactive_flow_message: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@csrf_exempt
+@login_required
+def send_flow_template_api_view(request):
+    """Send WhatsApp Flow templates (forms) to recipients"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        recipients = request.POST.getlist('recipients[]')
+        if not recipients:
+            return JsonResponse({'status': 'error', 'message': 'No recipients selected.'}, status=400)
+        
+        template_name = request.POST.get('template_name')
+        if not template_name:
+            return JsonResponse({'status': 'error', 'message': 'Template name is required.'}, status=400)
+        
+        results = []
+        for wa_id in recipients:
+            contact = get_object_or_404(ChatContact, wa_id=wa_id)
+            
+            # --- THIS IS THE FIX ---
+            # For Flow templates, Meta requires an explicit components structure,
+            # even if there are no dynamic variables to fill.
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": wa_id,
+                "type": "template",
+                "template": {
+                    "name": template_name,
+                    "language": {"code": "en_US"},
+                    "components": [
+                        # We must include a component object for the button.
+                        # Since the template defines the button at index 0, we specify that.
+                        {
+                            "type": "button",
+                            "sub_type": "flow",
+                            "index": "0",
+                            "parameters": [] # No parameters are needed as the flow_id is in the template.
+                        }
+                    ]
+                }
+            }
+            
+            logger.info(f"Sending Flow template payload: {json.dumps(payload, indent=2)}")
+            
+            success, response_data = send_whatsapp_message(payload)
+            if success:
+                save_outgoing_message(
+                    contact=contact, 
+                    wamid=response_data['messages'][0]['id'], 
+                    message_type='flow_template', 
+                    text_content=f"Sent flow template: {template_name}"
+                )
+                results.append({"wa_id": wa_id, "status": "success"})
+            else:
+                logger.error(f"Failed to send flow template to {wa_id}: {response_data}")
+                results.append({"wa_id": wa_id, "status": "error", "response": response_data})
+                
+        return JsonResponse({"results": results})
+        
+    except Exception as e:
+        logger.error(f"Error in send_flow_template_api_view: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@csrf_exempt
+@login_required
+def get_flow_templates(request):
+    """Get list of available flow templates for the frontend"""
+    try:
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        # Get message templates
+        # Ensure WABA_ID is defined, likely same as WHATSAPP_BUSINESS_ACCOUNT_ID
+        # WABA_ID = os.environ.get("WHATSAPP_BUSINESS_ACCOUNT_ID")
+        templates_url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,status,category,language,components"
+        response = requests.get(templates_url, headers=headers)
+        
+        if response.status_code == 200:
+            templates_data = response.json()
+            
+            # Filter for flow templates (templates with FLOW buttons)
+            flow_templates = []
+            for template in templates_data.get('data', []):
+                components = template.get('components', [])
+                for component in components:
+                    # The component type from Meta is uppercase 'BUTTONS'
+                    if component.get('type') == 'BUTTONS':
+                        buttons = component.get('buttons', [])
+                        for button in buttons:
+                            if button.get('type') == 'FLOW':
+                                flow_templates.append({
+                                    'name': template.get('name'),
+                                    'status': template.get('status'),
+                                    'flow_id': button.get('flow_id'),
+                                    'button_text': button.get('text'),
+                                    # Pass components to the frontend for better preview
+                                    'components': template.get('components')
+                                })
+                                break # Found the FLOW button, move to next template
+            
+            return JsonResponse({
+                'status': 'success',
+                'flow_templates': flow_templates
+            })
+        else:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Failed to fetch templates',
+                'response': response.json()
+            }, status=response.status_code)
+            
+    except Exception as e:
+        logger.error(f"Error getting flow templates: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+def send_flow_view(request):
+    """
+    Renders the page for sending a Flow template.
+    It fetches all contacts to populate the recipient dropdown.
+    """
+    contacts = ChatContact.objects.all().order_by('name')
+    context = {
+        'contacts': contacts
+    }
+    return render(request, 'registration/chat/send_flow.html', context)
 # VIEW 2: Specifically for sending CAROUSEL templates
 # registration/views.py
 
@@ -917,6 +1679,54 @@ def create_template_api_view(request):
 from datetime import datetime
 from django.core.files.storage import default_storage
 # from .tasks import send_scheduled_template_campaign
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+import json
+import logging
+from .models import WhatsAppForm # Import the new model
+
+logger = logging.getLogger(__name__)
+
+# ... (keep your other views)
+
+@csrf_exempt # Use this for simplicity, or implement proper CSRF handling in JS fetch
+@require_http_methods(["GET", "POST"])
+def whatsapp_form_builder_view(request):
+    """
+    Handles the creation and editing of WhatsApp forms.
+    GET: Renders the form builder page.
+    POST: Saves the form structure as JSON.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            form_name = data.get('name')
+            form_structure = data.get('structure')
+
+            if not form_name or not form_structure:
+                return JsonResponse({'status': 'error', 'message': 'Form name and structure are required.'}, status=400)
+
+            # Use update_or_create to save the form
+            form_obj, created = WhatsAppForm.objects.update_or_create(
+                name=form_name,
+                defaults={'structure': form_structure}
+            )
+            
+            message = f"Form '{form_name}' was created successfully." if created else f"Form '{form_name}' was updated."
+            logger.info(message)
+            return JsonResponse({'status': 'success', 'message': message, 'form_id': form_obj.id})
+
+        except json.JSONDecodeError:
+            logger.error("Failed to decode JSON from form builder request.")
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON format.'}, status=400)
+        except Exception as e:
+            logger.error(f"Error saving WhatsApp form: {e}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+    # For a GET request, just render the builder page.
+    return render(request, 'registration/chat/whatsapp_form.html')
 
 @csrf_exempt
 @login_required
@@ -1047,6 +1857,8 @@ def chat_detail_view(request, wa_id):
         logger.error(f"Could not query WhatsAppLog: {e}")
     return render(request, 'registration/chat/chat_detail.html', {'contact': contact, 'messages': conversation_messages})
 
+
+
 # registration/views.py
 import json # Make sure json is imported at the top
 
@@ -1170,7 +1982,9 @@ import json
 from django.http import HttpResponse
 # ...
 
-
+META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
+WABA_ID = "1477047197063313"
+#        
 # def get_whatsapp_templates_api(request):
 #     """API endpoint to fetch approved WhatsApp templates for the React frontend."""
 #     # This logic is copied from your `template_sender_view`

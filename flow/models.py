@@ -68,6 +68,11 @@ class UserFlowSessions(models.Model):
         blank=True, 
         related_name='image_sessions'
     )
+    waiting_for_flow_completion = models.BooleanField(default=False)
+    flow_form_id = models.CharField(max_length=255, null=True, blank=True)
+    
+    # created_at = models.DateTimeField(auto_now_add=True)
+    # updated_at = models.DateTimeField(auto_now=True)
 
 
     class Meta:
@@ -76,6 +81,46 @@ class UserFlowSessions(models.Model):
     def __str__(self):
         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.name}"
 
+class WhatsAppFlowForm(models.Model):
+    """
+    Model to store WhatsApp Flow Forms created via the form builder.
+    """
+    name = models.CharField(max_length=255, unique=True)
+    meta_flow_id = models.CharField(max_length=255, null=True, blank=True)  # Meta's Flow ID
+    template_category = models.CharField(max_length=50, default='UTILITY')
+    template_body = models.TextField()
+    template_button_text = models.CharField(max_length=20, default='Open Form')
+    screens_data = models.JSONField()  # Store the screen configuration
+    
+    # Meta API response data
+    flow_status = models.CharField(max_length=50, null=True, blank=True)
+    template_name = models.CharField(max_length=255, null=True, blank=True)
+    template_status = models.CharField(max_length=50, null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        verbose_name = "WhatsApp Flow Form"
+        verbose_name_plural = "WhatsApp Flow Forms"
+
+
+class ContactAttributeValue(models.Model):
+    """Stores the actual value of an attribute for a specific contact."""
+    contact = models.ForeignKey(ChatContact, on_delete=models.CASCADE, related_name='attribute_values')
+    attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE, related_name='contact_values')
+    value = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('contact', 'attribute')
+
+    def __str__(self):
+        return f"{self.contact.wa_id} -> {self.attribute.name}: {self.value}" # Optional: Add security
+    
 class Flowss(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
     template_name = models.CharField(max_length=250, unique=False, help_text="The template that triggers this flow. Other templates can be used inside.")
@@ -97,16 +142,3 @@ class UserFlowSessionss(models.Model):
     def __str__(self):
         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
 
-
-class ContactAttributeValue(models.Model):
-    """Stores the actual value of an attribute for a specific contact."""
-    contact = models.ForeignKey(ChatContact, on_delete=models.CASCADE, related_name='attribute_values')
-    attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE, related_name='contact_values')
-    value = models.TextField()
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('contact', 'attribute')
-
-    def __str__(self):
-        return f"{self.contact.wa_id} -> {self.attribute.name}: {self.value}" # Optional: Add security

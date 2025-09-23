@@ -13,6 +13,16 @@ urlpatterns = [
     path('api/attributes/', views.attribute_list_create_view, name='attribute-list-create'),
     path('api/attributes/<int:pk>/', views.attribute_detail_view, name='attribute-detail'),
     
+   
+   path('api/whatsapp-forms/', views.get_whatsapp_forms_api, name='get_whatsapp_forms'),
+    path('api/whatsapp-forms/<int:form_id>/', views.flow_form_detail_api, name='flow_form_detail'),
+    
+    # Webhook endpoints
+    path('webhook/whatsapp/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
+    path('webhook/whatsapp-flows/', views.whatsapp_flow_webhook_view, name='whatsapp_flow_webhook'),
+    path('api/save-flow/', views.save_flow_api, name='save_flow'),
+    # path('flow-builder/', views.flow_builder_view, name='flow_builder'),
+    # 
 
     # In your urls.py file, add this to urlpatterns:
     path('echo/', views.test_echo_endpoint, name='test_echo'),

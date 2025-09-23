@@ -58,7 +58,15 @@ class Flow(models.Model):
     def __str__(self):
         return f"Flow for template: {self.template_names}"
 
+class WhatsAppForm(models.Model):
+    """Stores the structure of a dynamically created WhatsApp form."""
+    name = models.CharField(max_length=100, unique=True, help_text="A unique name for the form.")
+    structure = models.JSONField(help_text="The JSON structure of the form fields.")
+    created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.name
+    
 class Message(models.Model):
     """ Represents a single message, either incoming or outgoing. """
     

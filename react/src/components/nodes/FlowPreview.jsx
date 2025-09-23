@@ -42,8 +42,9 @@ const FlowPreview = ({ nodes, edges }) => {
                     return <AskForImagePreview data={node.data} />;
                 case 'askApiNode':
                     return <ApiRequestPreview data={node.data} />;
-                
-                    default:
+                case 'flowFormNode':
+                    return <FlowFormPreview data={node.data} />;
+                default:
                     return <div className="preview-bubble-unknown">Unknown Node</div>;
             }
         };
@@ -293,4 +294,514 @@ const MediaMessagePreview = ({ data }) => {
 };
 
 
-export default FlowPreview;
+const FlowFormPreview = ({ data }) => {
+  const [showFlowModal, setShowFlowModal] = useState(false);
+  const [currentScreenIndex, setCurrentScreenIndex] = useState(0);
+  const [formData, setFormData] = useState({});
+
+  const selectedForm = data.forms?.find(f => f.id === data.selectedFormId);
+
+  if (!selectedForm) {
+    return (
+      <div className="preview-bubble-outbound">
+        <p className="preview-text"><em>Select a form to see its preview.</em></p>
+      </div>
+    );
+  }
+
+  const templateBody = data.templateBody || selectedForm.template_body || '';
+  const buttonText = data.buttonText || selectedForm.template_button_text || 'Open Form';
+  const screens = selectedForm.screens_data || [];
+  const currentScreen = screens[currentScreenIndex];
+
+  const handleInputChange = (componentId, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [componentId]: value
+    }));
+  };
+
+  const nextScreen = () => {
+    if (currentScreenIndex < screens.length - 1) {
+      setCurrentScreenIndex(prev => prev + 1);
+    }
+  };
+
+  const prevScreen = () => {
+    if (currentScreenIndex > 0) {
+      setCurrentScreenIndex(prev => prev - 1);
+    }
+  };
+
+  const closeFlow = () => {
+    setShowFlowModal(false);
+    setCurrentScreenIndex(0);
+    setFormData({});
+  };
+
+  const renderFormComponent = (component) => {
+    const componentId = component.id;
+    const currentValue = formData[componentId] || '';
+
+    switch (component.type) {
+      case 'text-input':
+        return (
+          <div key={componentId} className="flow-form-field">
+            <label className="flow-form-label">{component.label}</label>
+            <input
+              type="text"
+              className="flow-form-input"
+              placeholder={component.properties?.placeholder || ''}
+              value={currentValue}
+              onChange={(e) => handleInputChange(componentId, e.target.value)}
+            />
+          </div>
+        );
+
+      case 'textarea':
+        return (
+          <div key={componentId} className="flow-form-field">
+            <label className="flow-form-label">{component.label}</label>
+            <textarea
+              className="flow-form-textarea"
+              placeholder={component.properties?.placeholder || ''}
+              rows={component.properties?.rows || 3}
+              value={currentValue}
+              onChange={(e) => handleInputChange(componentId, e.target.value)}
+            />
+          </div>
+        );
+
+      case 'dropdown':
+        return (
+          <div key={componentId} className="flow-form-field">
+            <label className="flow-form-label">{component.label}</label>
+            <select
+              className="flow-form-select"
+              value={currentValue}
+              onChange={(e) => handleInputChange(componentId, e.target.value)}
+            >
+              <option value="">Select an option</option>
+              {(component.properties?.options || []).map((option, index) => (
+                <option key={index} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+        );
+
+      case 'date-picker':
+        return (
+          <div key={componentId} className="flow-form-field">
+            <label className="flow-form-label">{component.label}</label>
+            <input
+              type="date"
+              className="flow-form-input"
+              value={currentValue}
+              onChange={(e) => handleInputChange(componentId, e.target.value)}
+            />
+          </div>
+        );
+
+      case 'radio-group':
+        return (
+          <div key={componentId} className="flow-form-field">
+            <label className="flow-form-label">{component.label}</label>
+            <div className="flow-form-radio-group">
+              {(component.properties?.options || []).map((option, index) => (
+                <label key={index} className="flow-form-radio-label">
+                  <input
+                    type="radio"
+                    name={componentId}
+                    value={option}
+                    checked={currentValue === option}
+                    onChange={(e) => handleInputChange(componentId, e.target.value)}
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'checkbox-group':
+        const selectedValues = Array.isArray(currentValue) ? currentValue : [];
+        return (
+          <div key={componentId} className="flow-form-field">
+            <label className="flow-form-label">{component.label}</label>
+            <div className="flow-form-checkbox-group">
+              {(component.properties?.options || []).map((option, index) => (
+                <label key={index} className="flow-form-checkbox-label">
+                  <input
+                    type="checkbox"
+                    value={option}
+                    checked={selectedValues.includes(option)}
+                    onChange={(e) => {
+                      const newValues = e.target.checked
+                        ? [...selectedValues, option]
+                        : selectedValues.filter(v => v !== option);
+                      handleInputChange(componentId, newValues);
+                    }}
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'heading':
+        return (
+          <div key={componentId} className="flow-form-heading">
+            <h3>{component.label}</h3>
+          </div>
+        );
+
+      case 'text':
+        return (
+          <div key={componentId} className="flow-form-text">
+            <p>{component.properties?.content || component.label}</p>
+          </div>
+        );
+
+      default:
+        return (
+          <div key={componentId} className="flow-form-field">
+            <label className="flow-form-label">{component.label}</label>
+            <div className="flow-form-unknown">Unsupported component type: {component.type}</div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <>
+      {/* Initial template message */}
+      <div className="preview-bubble-outbound">
+        <p className="preview-text">{templateBody}</p>
+        <div className="preview-buttons-footer">
+          <div 
+            className="preview-button-pill flow-button"
+            onClick={() => setShowFlowModal(true)}
+          >
+            {buttonText}
+          </div>
+        </div>
+      </div>
+
+      {/* Flow Modal */}
+      {showFlowModal && (
+        <div className="flow-modal-overlay">
+          <div className="flow-modal">
+            {/* Header */}
+            <div className="flow-modal-header">
+              <h3>{currentScreen?.title || `Screen ${currentScreenIndex + 1}`}</h3>
+              <button 
+                className="flow-modal-close"
+                onClick={closeFlow}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flow-modal-content">
+              {currentScreen ? (
+                <div className="flow-screen">
+                  {currentScreen.components.map(renderFormComponent)}
+                </div>
+              ) : (
+                <div className="flow-no-screens">
+                  <p>No screens configured for this form.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flow-modal-footer">
+              <div className="flow-navigation">
+                {currentScreenIndex > 0 && (
+                  <button 
+                    className="flow-nav-btn flow-prev-btn"
+                    onClick={prevScreen}
+                  >
+                    Previous
+                  </button>
+                )}
+                
+                <span className="flow-screen-indicator">
+                  {currentScreenIndex + 1} of {screens.length}
+                </span>
+
+                {currentScreenIndex < screens.length - 1 ? (
+                  <button 
+                    className="flow-nav-btn flow-next-btn"
+                    onClick={nextScreen}
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button 
+                    className="flow-nav-btn flow-submit-btn"
+                    onClick={() => {
+                      closeFlow();
+                      // In real implementation, this would submit the form
+                    }}
+                  >
+                    Submit
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User completion indicator */}
+      {showFlowModal === false && formData && Object.keys(formData).length > 0 && (
+        <div className="preview-bubble-inbound">
+          <p className="preview-text-user-reply">
+            <em>User completes form...</em><br/>
+            <small>(Form data saved to attributes)</small>
+          </p>
+        </div>
+      )}
+    </>
+  );
+};
+
+// CSS Styles for the Flow Form Preview
+const FlowFormStyles = `
+  .flow-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: none !important;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .flow-button:hover {
+    transform: scale(1.05);
+  }
+
+  .flow-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .flow-modal {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .flow-modal-header {
+    background: #25D366;
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .flow-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .flow-modal-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+  }
+
+  .flow-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .flow-modal-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .flow-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .flow-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .flow-form-label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+  }
+
+  .flow-form-input,
+  .flow-form-textarea,
+  .flow-form-select {
+    padding: 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+  }
+
+  .flow-form-input:focus,
+  .flow-form-textarea:focus,
+  .flow-form-select:focus {
+    outline: none;
+    border-color: #25D366;
+  }
+
+  .flow-form-textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  .flow-form-radio-group,
+  .flow-form-checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .flow-form-radio-label,
+  .flow-form-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+  }
+
+  .flow-form-radio-label:hover,
+  .flow-form-checkbox-label:hover {
+    background: #f8f9fa;
+  }
+
+  .flow-form-heading h3 {
+    margin: 0;
+    color: #333;
+    font-size: 18px;
+    border-bottom: 2px solid #25D366;
+    padding-bottom: 8px;
+  }
+
+  .flow-form-text p {
+    margin: 0;
+    color: #666;
+    line-height: 1.5;
+  }
+
+  .flow-form-unknown {
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    padding: 12px;
+    border-radius: 6px;
+    color: #6c757d;
+    text-align: center;
+    font-style: italic;
+  }
+
+  .flow-modal-footer {
+    border-top: 1px solid #e1e5e9;
+    padding: 16px 20px;
+    background: #f8f9fa;
+  }
+
+  .flow-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .flow-nav-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .flow-prev-btn {
+    background: #6c757d;
+    color: white;
+  }
+
+  .flow-prev-btn:hover {
+    background: #5a6268;
+  }
+
+  .flow-next-btn {
+    background: #007bff;
+    color: white;
+  }
+
+  .flow-next-btn:hover {
+    background: #0056b3;
+  }
+
+  .flow-submit-btn {
+    background: #28a745;
+    color: white;
+  }
+
+  .flow-submit-btn:hover {
+    background: #218838;
+  }
+
+  .flow-screen-indicator {
+    font-size: 14px;
+    color: #6c757d;
+    font-weight: 500;
+  }
+
+  .flow-no-screens {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = FlowFormStyles;
+  document.head.appendChild(styleElement);
+}
+
+export default FlowFormPreview;

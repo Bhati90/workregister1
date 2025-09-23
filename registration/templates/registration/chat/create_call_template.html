@@ -1,0 +1,91 @@
+{% extends 'registration/job/base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Create a "Call Us" WhatsApp Template</h2>
+    <p>Use this form to define your template. When you submit, it will be sent to Meta for approval.</p>
+
+    <div class="card p-4">
+        <div class="form-group mb-3">
+            <label for="templateName">Template Name</label>
+            <input type="text" id="templateName" class="form-control" placeholder="e.g., call_support_v1">
+            <small class="form-text text-muted">Must be lowercase with underscores instead of spaces.</small>
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="bodyText">Body Text</label>
+            <textarea id="bodyText" class="form-control" rows="3" placeholder="e.g., Need help with your booking? Tap the button to call us."></textarea>
+            <small class="form-text text-muted">You can use variables like {{1}} for personalization (e.g., Hi {{1}}, ...).</small>
+        </div>
+
+        <hr>
+        <h5>Button Configuration</h5>
+
+        <div class="form-group mb-3">
+            <label for="buttonText">Button Text</label>
+            <input type="text" id="buttonText" class="form-control" placeholder="e.g., Call Support Now">
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="phoneNumber">Phone Number to Call</label>
+            <input type="tel" id="phoneNumber" class="form-control" placeholder="e.g., +919876543210">
+            <small class="form-text text-muted">Must be a full number with country code, and registered with your WABA.</small>
+        </div>
+
+        <button class="btn btn-success mt-3" onclick="submitTemplateForApproval()">Create and Submit to Meta</button>
+
+        <div class="mt-4">
+            <h5>Meta API Response:</h5>
+            <pre id="apiResponse" style="background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+        </div>
+    </div>
+</div>
+
+{% csrf_token %}
+<script>
+async function submitTemplateForApproval() {
+    const rawTemplateName = document.getElementById('templateName').value;
+    const bodyText = document.getElementById('bodyText').value;
+    const buttonText = document.getElementById('buttonText').value;
+    const phoneNumber = document.getElementById('phoneNumber').value;
+    const responsePre = document.getElementById('apiResponse');
+
+    // --- FIX IS HERE ---
+    // Automatically format the template name to be compliant with Meta's rules.
+    const templateName = rawTemplateName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z_]/g, '');
+
+    // Basic validation
+    if (!templateName || !bodyText || !buttonText || !phoneNumber) {
+        responsePre.textContent = JSON.stringify({ error: "All fields are required. Please ensure the template name is also valid." }, null, 2);
+        return;
+    }
+
+    responsePre.textContent = 'Submitting to Meta...';
+
+    const payload = {
+        template_name: templateName, // Use the cleaned name
+        body_text: bodyText,
+        button_text: buttonText,
+        phone_number: phoneNumber
+    };
+
+    try {
+        const response = await fetch("{% url 'registration:create_call_template_api' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        responsePre.textContent = JSON.stringify(result, null, 2);
+
+    } catch (error) {
+        console.error('Error:', error);
+        responsePre.textContent = JSON.stringify({ error: `An unexpected error occurred: ${error.message}` }, null, 2);
+    }
+}
+</script>
+{% endblock %}

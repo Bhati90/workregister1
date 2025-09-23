@@ -10,13 +10,22 @@ urlpatterns = [
     path('', views.home_view, name='home'),
     path('registration/', views.MultiStepRegistrationView.as_view(), name='registration'),
     path('success/', views.success_view, name='success_page'),
-     
+    path('form-builder/', views.whatsapp_form_builder_view, name='whatsapp_form_builder'),
+    path('submit-form-and-template/', views.submit_form_and_template_view, name='submit_form_and_template'),
+    # Add to your urlpatterns
+     path('send-flow/', views.send_flow_view, name='send_flow_view'),
 
+    path('api/send-flow-template/', views.send_flow_template_api_view, name='send_flow_template'),
+    path('api/send-interactive-flow/', views.send_interactive_flow_message, name='send_interactive_flow'),
+    path('api/get-flow-templates/', views.get_flow_templates, name='get_flow_templates'),
+    # path('form/', views.whatsapp_form_view, name='whatsapp_form'),
     path('api/upload-template-media/', views.upload_template_media_api_view, name='upload_template_media_api'),
     
     # path('api/get-whatsapp-templates/', views.get_whatsapp_templates_api, name='get_whatsapp_templates_api'),
     # path('api/save-flow/', views.save_flow_api, name='save_flow_api'),
     
+     path('create-call-template/', views.create_call_template_page_view, name='create_call_template_page'),
+    path('create-call-template-api/', views.create_call_template_api_view, name='create_call_template_api'),
 
 
     path('api/chat/send-carousel/', views.send_carousel_api_view, name='send_carousel_api'),
