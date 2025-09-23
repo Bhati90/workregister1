@@ -1252,8 +1252,7 @@ def handle_flow_completion(contact, response_data):
 
     try:
         # Get the flow form from our database to find its structure
-        flow_form = WhatsAppFlowForm.objects.get(id=session.flow_form_id)
-        
+        flow_form = WhatsAppFlowForm.objects.get(meta_flow_id=session.flow_form_id)
         # This is where we create the mapping. We'll map the component LABEL to the attribute NAME.
         # This is more readable than using component_id.
         attribute_map = {}
@@ -1319,6 +1318,8 @@ def handle_flow_completion(contact, response_data):
 
     except Exception as e:
         logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)# API endpoint to fetch available forms for the fronten
+
+
 from django.shortcuts import get_object_or_404
 def flow_form_detail_api(request, form_id):
     """
