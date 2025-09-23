@@ -1383,58 +1383,46 @@ def process_flow_data_in_webhook(value, contact):
                 logger.error(f"Error processing inline flow data: {e}")
 
 
-def get_whatsapp_forms_api(request):
-   
-        try:
-            headers = {
-                "Authorization": f"Bearer {META_ACCESS_TOKEN}",
-                "Content-Type": "application/json"
-            }
-            
-            # Get message templates
-            # Ensure WABA_ID is defined, likely same as WHATSAPP_BUSINESS_ACCOUNT_ID
-            # WABA_ID = os.environ.get("WHATSAPP_BUSINESS_ACCOUNT_ID")
-            templates_url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates?fields=name,status,category,language,components"
-            response = requests.get(templates_url, headers=headers)
-            
-            if response.status_code == 200:
-                templates_data = response.json()
-                
-                # Filter for flow templates (templates with FLOW buttons)
-                flow_templates = []
-                for template in templates_data.get('data', []):
-                    components = template.get('components', [])
-                    for component in components:
-                        # The component type from Meta is uppercase 'BUTTONS'
-                        if component.get('type') == 'BUTTONS':
-                            buttons = component.get('buttons', [])
-                            for button in buttons:
-                                if button.get('type') == 'FLOW':
-                                    flow_templates.append({
-                                        'name': template.get('name'),
-                                        'status': template.get('status'),
-                                        'flow_id': button.get('flow_id'),
-                                        'button_text': button.get('text'),
-                                        # Pass components to the frontend for better preview
-                                        'components': template.get('components')
-                                    })
-                                    break # Found the FLOW button, move to next template
-                
-                return JsonResponse({
-                    'status': 'success',
-                    'flow_templates': flow_templates
-                })
-            else:
-                return JsonResponse({
-                    'status': 'error', 
-                    'message': 'Failed to fetch templates',
-                    'response': response.json()
-                }, status=response.status_code)
-            
-        except Exception as e:
-            logger.error(f"Error getting flow templates: {e}", exc_info=True)
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+# In your views.py
+from .models import WhatsAppFlowForm # Make sure this is imported
 
+#
+# >>> THIS IS THE ONLY VIEW YOU NEED TO GET THE LIST OF FLOWS <<<
+#
+def get_whatsapp_forms_api(request):
+    """
+    API endpoint that returns all saved WhatsApp Flows from the local database.
+    This is the single source of truth for your React Flow Builder.
+    """
+    try:
+        forms = WhatsAppFlowForm.objects.all().order_by('-created_at')
+        
+        forms_data = []
+        for form in forms:
+            # We map the model fields to the keys the React frontend expects
+            forms_data.append({
+                'name': form.name,
+                'flow_id': form.meta_flow_id,
+                'structure': form.screens_data, # Contains the full structure
+                
+                # We include all other fields for the detailed preview
+                'template_category': form.template_category,
+                'template_body': form.template_body,
+                'template_button_text': form.template_button_text,
+                'flow_status': form.flow_status,
+                'template_name': form.template_name,
+                'template_status': form.template_status,
+                'created_at': form.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+        return JsonResponse({'status': 'success', 'forms': forms_data})
+    
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+#
+# >>> YOU CAN DELETE get_flow_details_api_view AS IT IS NO LONGER NEEDED <<<
+#
 # In your views.py
 # In your views.py
 # In your views.py

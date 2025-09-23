@@ -78,17 +78,18 @@ const FlowBuilder = ({ initialData }) => {
         setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
     }, [setNodes, setEdges]);
 // In FlowBuilder.js
+// In FlowBuilder.js
 
 useEffect(() => {
     const fetchData = async () => {
         try {
             setIsLoading(true);
             
-            // Fetch templates
+            // This part can remain the same
             const templatesResponse = await axios.get(`${API_URL}/api/templates/`);
             setTemplates(templatesResponse.data);
             
-            // Fetch flow forms
+            // This is the API call for your flow forms
             const formsResponse = await axios.get(`${API_URL}/api/whatsapp-forms/`);
 
             // --- FIX IS HERE ---
@@ -207,7 +208,15 @@ useEffect(() => {
                             selectedFormId: '',
                             selectedFormName: '',
                             templateBody: '',
-                            buttonText: ''
+                            buttonText: '',
+                            templateCategory: '',
+                            templateBody: '',
+                            templateButtonText: '',
+                            flowStatus: '',
+                            templateName: '',
+                            templateStatus: '',
+                            createdAt: '',
+                            flowStructure: null
                         }
                     };
                     break;

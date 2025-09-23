@@ -1,54 +1,36 @@
-import React, { memo, useState } from 'react';
+import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 
-// Ensure this URL points to your deployed Django backend
-const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
-
 const FormFlowNode = ({ id, data }) => {
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-  const [error, setError] = useState(null);
 
-  const handleSelectChange = async (event) => {
+  const handleSelectChange = (event) => {
     const selectedFlowId = event.target.value;
-    
-    // Reset state on every change
-    data.onUpdate('flowStructure', null);
-    setError(null);
-    
-    if (!selectedFlowId) {
-      data.onUpdate('selectedFormId', '');
-      data.onUpdate('selectedFormName', '');
-      return;
-    }
-
     const selectedFlow = data.forms.find(form => form.flow_id == selectedFlowId);
+
     if (selectedFlow) {
+      // --- UPDATE THIS SECTION TO STORE ALL THE NEW DATA ---
       data.onUpdate('selectedFormId', selectedFlowId);
       data.onUpdate('selectedFormName', selectedFlow.name);
-      setIsLoadingDetails(true);
-
-      try {
-        const response = await fetch(`${API_URL}/api/get-flow-details/${selectedFlowId}/`);
-        if (!response.ok) {
-            // Handle HTTP errors like 404 or 500
-            throw new Error(`API request failed with status ${response.status}`);
-        }
-        
-        const result = await response.json();
-
-        if (result.status === 'success' && result.data.flow_json) {
-          data.onUpdate('flowStructure', result.data.flow_json);
-        } else {
-          // Handle logical errors from our own API
-          throw new Error(result.message || 'Failed to fetch flow details.');
-        }
-
-      } catch (err) {
-        console.error("Error fetching flow details:", err);
-        setError(err.message);
-      } finally {
-        setIsLoadingDetails(false);
-      }
+      data.onUpdate('flowStructure', selectedFlow.structure || null);
+      data.onUpdate('templateCategory', selectedFlow.template_category);
+      data.onUpdate('templateBody', selectedFlow.template_body);
+      data.onUpdate('templateButtonText', selectedFlow.template_button_text);
+      data.onUpdate('flowStatus', selectedFlow.flow_status);
+      data.onUpdate('templateName', selectedFlow.template_name);
+      data.onUpdate('templateStatus', selectedFlow.template_status);
+      data.onUpdate('createdAt', selectedFlow.created_at);
+    } else {
+      // Clear all data if nothing is selected
+      data.onUpdate('selectedFormId', '');
+      data.onUpdate('selectedFormName', '');
+      data.onUpdate('flowStructure', null);
+      data.onUpdate('templateCategory', '');
+      data.onUpdate('templateBody', '');
+      data.onUpdate('templateButtonText', '');
+      data.onUpdate('flowStatus', '');
+      data.onUpdate('templateName', '');
+      data.onUpdate('templateStatus', '');
+      data.onUpdate('createdAt', '');
     }
   };
 
@@ -73,22 +55,30 @@ const FormFlowNode = ({ id, data }) => {
           ))}
         </select>
         
-        {isLoadingDetails && <div className="loading-text">Loading details...</div>}
-        {error && <div className="error-text">Error: {error}</div>}
+        {/* This section now displays everything */}
+        {data.selectedFormId && (
+          <div className="flow-content-preview">
+            
+            {/* --- NEW: Display all the database fields --- */}
+            <div className="flow-details">
+                <p><strong>Flow Name:</strong> {data.selectedFormName}</p>
+                <p><strong>Flow Status:</strong> {data.flowStatus}</p>
+                <p><strong>Template Name:</strong> {data.templateName}</p>
+                <p><strong>Template Status:</strong> {data.templateStatus}</p>
+                <p><strong>Category:</strong> {data.templateCategory}</p>
+                <p><strong>Created At:</strong> {data.createdAt}</p>
+            </div>
+            
+            <hr />
 
-        {/* This improved rendering logic safely displays the full structure */}
-        {data.flowStructure && !isLoadingDetails && (
-          <div className="flow-structure-preview">
             <h5>Flow Structure Preview:</h5>
-            {data.flowStructure.screens?.map((screen, index) => (
+            {data.flowStructure?.screens_data?.map((screen, index) => (
               <div key={screen.id || index} className="screen-preview">
                 <strong>Screen: {screen.title}</strong>
                 <ul>
-                  {screen.layout?.children
-                    ?.filter(c => c.type !== 'Footer') // Don't show the footer
-                    .map((component, compIndex) => (
+                  {screen.components?.map((component, compIndex) => (
                     <li key={compIndex}>
-                      {component.type}: "{component.label || component.text}"
+                      {component.type}: "{component.label}"
                     </li>
                   ))}
                 </ul>
