@@ -466,30 +466,30 @@ def execute_flow_node(contact, flow, target_node):
         try:
             # Get the form from your database
             from .models import WhatsAppFlowForm  # Adjust import as needed
-            flow_form = WhatsAppFlowForm.objects.get(id=form_id)
-            
+            flow_form = WhatsAppFlowForm.objects.get(meta_flow_id=form_id)
+          
+          # Get the ID of the first screen to start the flow
+            first_screen_id = "FORM_SCREEN" # A safe default
+            if flow_form.screens_data and 'screens_data' in flow_form.screens_data and flow_form.screens_data['screens_data']:
+                # --- FIX #2: Access the nested 'screens_data' key ---
+                first_screen_id = flow_form.screens_data['screens_data'][0].get('id', first_screen_id)
+
             # Create the Flow message payload
-            payload.update({
+                payload.update({
                 "type": "interactive",
                 "interactive": {
                     "type": "flow",
-                    "header": {
-                        "type": "text",
-                        "text": "Complete Form"
-                    },
-                    "body": {
-                        "text": template_body or flow_form.template_body
-                    },
+                    "header": {"type": "text", "text": flow_form.name},
+                    "body": {"text": template_body or flow_form.template_body},
                     "action": {
                         "name": "flow",
                         "parameters": {
                             "flow_message_version": "3",
-                            "flow_token": f"flow_{contact.wa_id}_{target_node_id}_{int(time.time())}",
-                            "flow_id": flow_form.meta_flow_id,  # The Meta Flow ID
-                            "flow_cta": button_text,
+                            "flow_id": flow_form.meta_flow_id,
+                            "flow_cta": button_text or flow_form.template_button_text,
                             "flow_action": "navigate",
                             "flow_action_payload": {
-                                "screen": flow_form.screens_data[0]['id'] if flow_form.screens_data else "SCREEN_0"
+                                "screen": first_screen_id
                             }
                         }
                     }
