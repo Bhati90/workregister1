@@ -1201,21 +1201,19 @@ def whatsapp_webhook_view(request):
                     if 'flows' in value:
                         for flow_data in value.get('flows', []):
                             logger.info(f"DEBUG-FLOW: Received flow data: {flow_data}")
-                            # Handle flow completion inline
                             try:
-                                flow_token = flow_data.get('flow_token', '')
-                                response_json = flow_data.get('response_json', {})
+                                response_json = json.loads(flow_data.get('response_json', '{}'))
+                                contact_wa_id = flow_data.get('from')
                                 
-                                # Extract contact ID from the flow data
-                                if 'from' in flow_data:
-                                    contact_wa_id = flow_data['from']
+                                if contact_wa_id and response_json:
                                     contact, _ = ChatContact.objects.get_or_create(wa_id=contact_wa_id)
                                     
-                                    # Process the flow completion
-                                    handle_flow_completion(contact, flow_token, response_json)
+                                    # --- CALL THE NEW FUNCTION HERE ---
+                                    handle_flow_completion(contact, response_json)
+                                    
                             except Exception as e:
-                                logger.error(f"Error processing flow data: {e}")
-
+                                logger.error(f"Error processing flow data: {e}", exc_info=True)
+   
                     if 'statuses' in value:
                         for status in value.get('statuses', []):
                             if status.get('status') == 'read':
@@ -1238,53 +1236,76 @@ def get_media_url_from_id(media_id):
         logger.error(f"Could not retrieve media URL for ID {media_id}: {e}")
         return None
     
-def handle_flow_completion(contact, flow_token, response_json):
+from .models import WhatsAppFlowForm, Attribute, ContactAttributeValue, UserFlowSession # Add necessary imports
+
+def handle_flow_completion(contact, response_data):
     """
-    Handle when a user completes a Flow form.
+    Parses the submitted Flow data and saves it to the contact's attributes.
     """
+    logger.info(f"Handling flow completion for contact: {contact.wa_id}")
+    
+    # Find the user's current session to know which flow was just completed
+    session = UserFlowSession.objects.filter(contact=contact, waiting_for_flow_completion=True).first()
+    if not session or not session.flow_form_id:
+        logger.warning("No session found waiting for flow completion. Cannot map attributes.")
+        return
+
     try:
-        logger.info(f"DEBUG-FLOW-COMPLETION: Processing completion for {contact.wa_id}")
+        # Get the flow form from our database to find its structure
+        flow_form = WhatsAppFlowForm.objects.get(id=session.flow_form_id)
         
-        session = UserFlowSession.objects.filter(
-            contact=contact,
-            waiting_for_flow_completion=True
-        ).first()
-        
-        if not session:
-            logger.warning(f"No session found waiting for flow completion for {contact.wa_id}")
-            return
-        
+        # This is where we create the mapping. We'll map the component LABEL to the attribute NAME.
+        # This is more readable than using component_id.
+        attribute_map = {}
+        for screen in flow_form.screens_data.get('screens_data', []):
+            for component in screen.get('components', []):
+                # For now, let's assume the component label is the same as the attribute name
+                # e.g., A component labeled "Full Name" saves to an attribute named "Full Name"
+                attribute_map[component['id']] = component['label']
+
+        logger.info(f"Using attribute map for flow '{flow_form.name}': {attribute_map}")
+
+        # Now, iterate through the user's submitted data
+        for component_id, user_value in response_data.items():
+            attribute_name = attribute_map.get(component_id)
+            if not attribute_name:
+                continue # Skip if we don't have a mapping for this component
+
+            try:
+                # Find the attribute in our database
+                attribute_to_save = Attribute.objects.get(name__iexact=attribute_name)
+                
+                # Save the user's submitted value
+                ContactAttributeValue.objects.update_or_create(
+                    contact=contact,
+                    attribute=attribute_to_save,
+                    defaults={'value': str(user_value)}
+                )
+                logger.info(f"Saved attribute '{attribute_name}' with value '{user_value}' for contact {contact.wa_id}")
+
+            except Attribute.DoesNotExist:
+                logger.warning(f"Attribute '{attribute_name}' not found in database. Cannot save value.")
+                
+        # The flow is complete, so we can now find the next node in the visual flow
         flow = session.flow
         current_node_id = session.current_node_id
-        
-        # Save form data to attributes
-        if session.flow_form_id and response_json:
-            save_flow_form_data(contact, session.flow_form_id, response_json)
-        
-        # Clear the waiting state
-        session.waiting_for_flow_completion = False
-        session.flow_form_id = None
-        session.save()
-        
-        # Find next node (onComplete handle)
         edges = flow.flow_data.get('edges', [])
-        next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onComplete'), None)
+        next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onSuccess'), None)
         
+        # IMPORTANT: Clear the user's session after processing
+        session.delete()
+        logger.info("Flow session cleared.")
+
         if next_edge:
             next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
             if next_node:
-                logger.info(f"DEBUG-FLOW-COMPLETION: Continuing to next node: {next_node.get('id')}")
-                execute_flow_node(contact, flow, next_node)
-            else:
-                logger.error(f"DEBUG-FLOW-COMPLETION: Next node not found")
-                session.delete()
-        else:
-            logger.info(f"DEBUG-FLOW-COMPLETION: No next edge found, ending flow")
-            session.delete()
-            
-    except Exception as e:
-        logger.error(f"Error handling flow completion: {e}")
+                logger.info(f"Continuing to next node: {next_node.get('id')}")
+                execute_flow_node(contact, flow, next_node) # This function is already in your code
 
+    except WhatsAppFlowForm.DoesNotExist:
+        logger.error(f"Cannot process flow submission. FlowForm with ID {session.flow_form_id} not found.")
+    except Exception as e:
+        logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)
 # API endpoint to fetch available forms for the fronten
 from django.shortcuts import get_object_or_404
 def flow_form_detail_api(request, form_id):
