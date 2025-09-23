@@ -1236,7 +1236,7 @@ def get_media_url_from_id(media_id):
         logger.error(f"Could not retrieve media URL for ID {media_id}: {e}")
         return None
     
-from .models import WhatsAppFlowForm, Attribute, ContactAttributeValue, UserFlowSession # Add necessary imports
+from .models import WhatsAppFlowForm, Attribute, ContactAttributeValue # Add necessary imports
 
 def handle_flow_completion(contact, response_data):
     """
