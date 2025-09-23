@@ -91,7 +91,7 @@ const FormFlowNode = ({ id, data }) => {
         )}
       </div>
 
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Bottom} id = "onSuccess" />
     </div>
   );
 };

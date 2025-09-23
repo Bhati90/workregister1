@@ -1246,7 +1246,7 @@ def handle_flow_completion(contact, response_data):
     
     # Find the user's current session to know which flow was just completed
     session = UserFlowSession.objects.filter(contact=contact, waiting_for_flow_completion=True).first()
-    if not session or not session.flow_form_id:
+    if not session :
         logger.warning("No session found waiting for flow completion. Cannot map attributes.")
         return
 
@@ -1290,9 +1290,19 @@ def handle_flow_completion(contact, response_data):
         flow = session.flow
         current_node_id = session.current_node_id
         edges = flow.flow_data.get('edges', [])
+        
+        # First, try to find an edge specifically from the 'onSuccess' handle
         next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onSuccess'), None)
         
-        # IMPORTANT: Clear the user's session after processing
+        # If not found, and there's only ONE possible exit, take that path as a fallback.
+        if not next_edge:
+            source_edges = [e for e in edges if e.get('source') == current_node_id]
+            if len(source_edges) == 1:
+                logger.info(f"No 'onSuccess' handle found for node {current_node_id}, but found a single unnamed exit edge. Proceeding.")
+                next_edge = source_edges[0]
+        # --- END OF IMPROVEMENT ---
+        
+        # IMPORTANT: Clear the user's session AFTER finding the next step
         session.delete()
         logger.info("Flow session cleared.")
 
@@ -1300,13 +1310,15 @@ def handle_flow_completion(contact, response_data):
             next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
             if next_node:
                 logger.info(f"Continuing to next node: {next_node.get('id')}")
-                execute_flow_node(contact, flow, next_node) # This function is already in your code
+                # This is your existing function that sends the next message
+                execute_flow_node(contact, flow, next_node)
+            else:
+                logger.warning(f"Next node with ID {next_edge.get('target')} not found in flow data.")
+        else:
+            logger.info(f"Flow completed. No next node found for {current_node_id}.")
 
-    except WhatsAppFlowForm.DoesNotExist:
-        logger.error(f"Cannot process flow submission. FlowForm with ID {session.flow_form_id} not found.")
     except Exception as e:
-        logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)
-# API endpoint to fetch available forms for the fronten
+        logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)# API endpoint to fetch available forms for the fronten
 from django.shortcuts import get_object_or_404
 def flow_form_detail_api(request, form_id):
     """
