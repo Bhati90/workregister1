@@ -77,49 +77,54 @@ const FlowBuilder = ({ initialData }) => {
         setNodes((nds) => nds.filter((node) => node.id !== nodeId));
         setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
     }, [setNodes, setEdges]);
+// In FlowBuilder.js
 
-    // Fetch templates and flow forms
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setIsLoading(true);
-                
-                // Fetch templates
-                const templatesResponse = await axios.get(`${API_URL}/api/templates/`);
-                setTemplates(templatesResponse.data);
-                
-                // Fetch flow forms
-                const formsResponse = await axios.get(`${API_URL}/api/whatsapp-forms/`);
-                if (formsResponse.data.status === 'success') {
-                    setFlowForms(formsResponse.data.forms);
-                }
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            } finally {
-                setIsLoading(false);
+useEffect(() => {
+    const fetchData = async () => {
+        try {
+            setIsLoading(true);
+            
+            // Fetch templates
+            const templatesResponse = await axios.get(`${API_URL}/api/templates/`);
+            setTemplates(templatesResponse.data);
+            
+            // Fetch flow forms
+            const formsResponse = await axios.get(`${API_URL}/api/whatsapp-forms/`);
+
+            // --- FIX IS HERE ---
+            // Change 'formsResponse.data.forms' to 'formsResponse.data.flow_templates'
+            if (formsResponse.data.status === 'success') {
+                setFlowForms(formsResponse.data.flow_templates);
             }
-        };
-        
-        fetchData();
-    }, []);
+            // --- END OF FIX ---
+
+        } catch (error) {
+            console.error("Error fetching data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    fetchData();
+}, []); // The dependency array should be empty to run once on mount
 
     // Update existing flow form nodes when forms data is loaded
-    useEffect(() => {
-        if (flowForms.length > 0) {
-            setNodes(nds => nds.map(node => {
-                if (node.type === 'flowFormNode') {
-                    return {
-                        ...node,
-                        data: {
-                            ...node.data,
-                            forms: flowForms
-                        }
-                    };
-                }
-                return node;
-            }));
-        }
-    }, [flowForms, setNodes]);
+    // useEffect(() => {
+    //     if (flowForms.length > 0) {
+    //         setNodes(nds => nds.map(node => {
+    //             if (node.type === 'flowFormNode') {
+    //                 return {
+    //                     ...node,
+    //                     data: {
+    //                         ...node.data,
+    //                         forms: flowForms
+    //                     }
+    //                 };
+    //             }
+    //             return node;
+    //         }));
+    //     }
+    // }, [flowForms, setNodes]);
 
     const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 

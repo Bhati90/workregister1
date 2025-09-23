@@ -13,7 +13,8 @@ urlpatterns = [
     path('api/attributes/', views.attribute_list_create_view, name='attribute-list-create'),
     path('api/attributes/<int:pk>/', views.attribute_detail_view, name='attribute-detail'),
     
-   
+    path('api/get-flow-details/<str:flow_id>/', views.get_flow_details_api_view, name='get_flow_details_api'),
+
    path('api/whatsapp-forms/', views.get_whatsapp_forms_api, name='get_whatsapp_forms'),
     path('api/whatsapp-forms/<int:form_id>/', views.flow_form_detail_api, name='flow_form_detail'),
     

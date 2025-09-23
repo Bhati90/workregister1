@@ -1435,7 +1435,45 @@ def get_whatsapp_forms_api(request):
             logger.error(f"Error getting flow templates: {e}", exc_info=True)
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
+# In your views.py
 
+def get_flow_details_api_view(request, flow_id):
+    """
+    API endpoint that fetches the full details of a single WhatsApp Flow from Meta.
+    """
+    try:
+        if not flow_id:
+            return JsonResponse({'status': 'error', 'message': 'Flow ID is required.'}, status=400)
+
+        # The Meta Graph API endpoint for fetching a specific flow's details
+        api_url = f"https://graph.facebook.com/v19.0/{flow_id}"
+        
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+        }
+        
+        params = {
+            'fields': 'flow_json' # We only need the flow_json field
+        }
+
+        response = requests.get(api_url, headers=headers, params=params)
+        response_data = response.json()
+
+        if response.status_code >= 400:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to fetch flow details from Meta.',
+                'meta_response': response_data
+            }, status=response.status_code)
+
+        # The flow_json from Meta is a STRING, so we need to parse it into a real JSON object
+        if 'flow_json' in response_data:
+            response_data['flow_json'] = json.loads(response_data['flow_json'])
+
+        return JsonResponse({'status': 'success', 'data': response_data})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 # ... (keep all your other imports: JsonResponse, csrf_exempt, models, etc.)
 import logging
