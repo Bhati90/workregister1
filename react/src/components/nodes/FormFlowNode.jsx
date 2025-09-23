@@ -1,15 +1,19 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 
-// Define the absolute base URL for your API at the top of the file
+// Ensure this URL points to your deployed Django backend
 const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
 
 const FormFlowNode = ({ id, data }) => {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSelectChange = async (event) => {
     const selectedFlowId = event.target.value;
+    
+    // Reset state on every change
     data.onUpdate('flowStructure', null);
+    setError(null);
     
     if (!selectedFlowId) {
       data.onUpdate('selectedFormId', '');
@@ -24,22 +28,24 @@ const FormFlowNode = ({ id, data }) => {
       setIsLoadingDetails(true);
 
       try {
-        // --- FIX IS HERE ---
-        // Use the full, absolute API_URL
         const response = await fetch(`${API_URL}/api/get-flow-details/${selectedFlowId}/`);
-        // --- END OF FIX ---
+        if (!response.ok) {
+            // Handle HTTP errors like 404 or 500
+            throw new Error(`API request failed with status ${response.status}`);
+        }
         
-        // This line was causing the error because the response was HTML
-        const result = await response.json(); 
+        const result = await response.json();
 
         if (result.status === 'success' && result.data.flow_json) {
           data.onUpdate('flowStructure', result.data.flow_json);
         } else {
-          console.error("Failed to fetch flow details:", result);
+          // Handle logical errors from our own API
+          throw new Error(result.message || 'Failed to fetch flow details.');
         }
-      } catch (error) {
-        // The error you saw was caught here
-        console.error("Error fetching flow details:", error);
+
+      } catch (err) {
+        console.error("Error fetching flow details:", err);
+        setError(err.message);
       } finally {
         setIsLoadingDetails(false);
       }
@@ -67,19 +73,19 @@ const FormFlowNode = ({ id, data }) => {
           ))}
         </select>
         
-        {/* Show a loading message */}
         {isLoadingDetails && <div className="loading-text">Loading details...</div>}
+        {error && <div className="error-text">Error: {error}</div>}
 
-        {/* Display the full structure once it's loaded */}
+        {/* This improved rendering logic safely displays the full structure */}
         {data.flowStructure && !isLoadingDetails && (
           <div className="flow-structure-preview">
             <h5>Flow Structure Preview:</h5>
-            {data.flowStructure.screens.map((screen, index) => (
+            {data.flowStructure.screens?.map((screen, index) => (
               <div key={screen.id || index} className="screen-preview">
                 <strong>Screen: {screen.title}</strong>
                 <ul>
-                  {screen.layout.children
-                    .filter(c => c.type !== 'Footer') // Don't show the footer
+                  {screen.layout?.children
+                    ?.filter(c => c.type !== 'Footer') // Don't show the footer
                     .map((component, compIndex) => (
                     <li key={compIndex}>
                       {component.type}: "{component.label || component.text}"

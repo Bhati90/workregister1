@@ -1437,6 +1437,7 @@ def get_whatsapp_forms_api(request):
 
 # In your views.py
 # In your views.py
+# In your views.py
 
 def get_flow_details_api_view(request, flow_id):
     """
@@ -1450,32 +1451,33 @@ def get_flow_details_api_view(request, flow_id):
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
         
         # --- FIX IS HERE ---
-        # The correct field name is 'body', not 'flow_json'.
-        params = {
-            'fields': 'body'
-        }
+        # Remove the 'params' dictionary completely.
+        # This asks Meta for the default full object, which includes the 'body'.
+        response = requests.get(api_url, headers=headers)
         # --- END OF FIX ---
 
-        response = requests.get(api_url, headers=headers, params=params)
         response_data = response.json()
 
         if response.status_code >= 400:
+            logger.error(f"Meta API Error fetching flow {flow_id}: {response_data}")
             return JsonResponse({
                 'status': 'error',
                 'message': 'Failed to fetch flow details from Meta.',
                 'meta_response': response_data
             }, status=response.status_code)
 
-        # The 'body' from Meta is a STRING, so we need to parse it into a real JSON object.
-        # We then rename it to 'flow_json' so the frontend doesn't need to change.
+        # The rest of the logic is still correct.
+        # The default response contains a 'body' key with the stringified JSON.
         if 'body' in response_data:
             response_data['flow_json'] = json.loads(response_data['body'])
-            del response_data['body'] # Remove the original 'body' key
+            del response_data['body']
 
         return JsonResponse({'status': 'success', 'data': response_data})
 
     except Exception as e:
+        logger.error(f"Error in get_flow_details_api_view: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
 # ... (keep all your other imports: JsonResponse, csrf_exempt, models, etc.)
 import logging
 logger = logging.getLogger(__name__)
