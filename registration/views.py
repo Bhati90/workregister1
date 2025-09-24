@@ -677,128 +677,59 @@ from django.views.decorators.http import require_http_methods
 META_ACCESS_TOKEN="EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ"
 WABA_ID ="1477047197063313"
 
-# # --- NEW: Helper function to map builder components to Meta's Flow JSON format ---
-# def map_component_to_flow_json(component):
-#     """Converts a single component from the builder's format to Meta's format."""
-#     comp_type = component.get('type')
-#     label = component.get('label')
-#     # Generate a unique name for the component based on its ID
-#     name = component.get('id', f"{comp_type}_{label.lower().replace(' ', '_')}")
+# In contact_app/views.py
+import re # Make sure 're' is imported
 
-#     if comp_type == 'text-input':
-#         return {
-#             "type": "TextInput",
-#             "label": label,
-#             "name": name,
-#             "placeholder": component.get('properties', {}).get('placeholder', ''),
-#             "required": True  # Assuming all fields are required for simplicity
-#         }
-#     elif comp_type == 'textarea':
-#         return {
-#             "type": "TextArea",
-#             "label": label,
-#             "name": name,
-#             "placeholder": component.get('properties', {}).get('placeholder', ''),
-#             "required": True
-#         }
-#     elif comp_type == 'dropdown':
-#         options = component.get('properties', {}).get('options', [])
-#         return {
-#             "type": "Dropdown",
-#             "label": label,
-#             "name": name,
-#             "required": True,
-#             "data-source": [{"id": opt.lower().replace(" ", "_"), "title": opt} for opt in options]
-#         }
-#     elif comp_type == 'radio-group':
-#         options = component.get('properties', {}).get('options', [])
-#         return {
-#             "type": "RadioButtonsGroup",
-#             "label": label,
-#             "name": name,
-#             "required": True,
-#             "data-source": [{"id": opt.lower().replace(" ", "_"), "title": opt} for opt in options]
-#         }
-#     elif comp_type == 'date-picker':
-#         return {
-#             "type": "DatePicker",
-#             "label": label,
-#             "name": name,
-#             "required": True
-#         }
-#     elif comp_type == 'heading':
-#         return {
-#             "type": "TextHeading",
-#             "text": label
-#         }
-#     elif comp_type == 'text':
-#         return {
-#             "type": "TextBody",
-#             "text": component.get('properties', {}).get('content', '')
-#         }
-#     return None # Return None for unhandled component types
+def map_component_to_flow_json(component):
+    """
+    Converts a single component from the builder's format to Meta's format,
+    ensuring all input components have a 'name'.
+    """
+    comp_type = component.get('type')
+    label = component.get('label')
+    # The 'name' of the component will be its unique ID (e.g., "component_3")
+    name = component.get('id')
+    properties = component.get('properties', {})
 
-
-# # --- REWRITTEN: Function to generate multi-screen Flow JSON ---
-# def generate_multi_screen_flow_json(screens_data):
-#     """
-#     Converts the multi-screen structure from the builder into a valid Flow JSON.
-#     """
-#     flow_screens = []
-#     num_screens = len(screens_data)
-
-#     for i, screen in enumerate(screens_data):
-#         is_last_screen = (i == num_screens - 1)
+    if comp_type in ['text-input', 'textarea', 'date-picker', 'dropdown', 'radio-group', 'checkbox-group']:
+        # This block handles all components that collect user input
         
-#         # 1. Convert all components for the current screen
-#         children = []
-#         for component in screen.get('components', []):
-#             mapped_comp = map_component_to_flow_json(component)
-#             if mapped_comp:
-#                 children.append(mapped_comp)
+        # Map your builder type to Meta's type
+        meta_type_map = {
+            'text-input': 'TextInput',
+            'textarea': 'TextArea',
+            'date-picker': 'DatePicker',
+            'dropdown': 'Dropdown',
+            'radio-group': 'RadioButtonsGroup',
+            'checkbox-group': 'CheckboxGroup'
+        }
         
-#         # 2. Add the navigation footer
-#         if is_last_screen:
-#             # The final screen completes the flow
-#             footer_action = {
-#                 "name": "complete",
-#                 "payload": {}
-#             }
-#             footer_label = "Submit"
-#         else:
-#             # Intermediate screens navigate to the next one
-#             next_screen_id = screens_data[i + 1].get('id', f'SCREEN_{i+1}')
-#             footer_action = {
-#                 "name": "navigate",
-#                 "payload": {
-#                     "screen": next_screen_id
-#                 }
-#             }
-#             footer_label = "Next"
-
-#         children.append({
-#             "type": "Footer",
-#             "label": footer_label,
-#             "on-click-action": footer_action
-#         })
+        component_json = {
+            "type": meta_type_map[comp_type],
+            "label": label,
+            "name": name, # <-- THIS IS THE REQUIRED PROPERTY
+            "required": properties.get('required', True)
+        }
         
-#         # 3. Build the screen object
-#         flow_screen = {
-#             "id": screen.get('id', f'SCREEN_{i}'),
-#             "title": screen.get('title', f'Screen {i+1}'),
-#             "terminal": is_last_screen,
-#             "layout": {
-#                 "type": "SingleColumnLayout",
-#                 "children": children
-#             }
-#         }
-#         flow_screens.append(flow_screen)
-
-#     return {
-#         "version": "5.1", # Using a recent, supported version
-#         "screens": flow_screens
-#     }
-
+        # Add data-source for dropdowns/radios/checkboxes
+        if comp_type in ['dropdown', 'radio-group', 'checkbox-group']:
+            options = properties.get('options', [])
+            component_json["data-source"] = [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
+            
+        # Add hint for text inputs
+        if comp_type in ['text-input', 'textarea']:
+             component_json["hint"] = properties.get('placeholder', '')
+             
+        return component_json
+        
+    # Display components do not need a 'name'
+    elif comp_type == 'heading':
+        return {"type": "TextHeading", "text": label}
+        
+    elif comp_type == 'text':
+        return {"type": "TextBody", "text": properties.get('content', '')}
+        
+    return None
 
 import json
 import logging
@@ -819,110 +750,110 @@ from flow.models import WhatsAppFlowForm
 
 logger = logging.getLogger(__name__)
 
-def map_component_to_flow_json(component):
-    """Converts a single component from the builder's format to Meta's format."""
-    comp_type = component.get('type')
-    label = component.get('label')
-    name = component.get('id')  # Using the unique ID from the frontend
+# def map_component_to_flow_json(component):
+#     """Converts a single component from the builder's format to Meta's format."""
+#     comp_type = component.get('type')
+#     label = component.get('label')
+#     name = component.get('id')  # Using the unique ID from the frontend
 
-    if comp_type == 'text-input':
-        # Create a list to potentially include instruction text
-        components = []
+#     if comp_type == 'text-input':
+#         # Create a list to potentially include instruction text
+#         components = []
         
-        # Add instruction text if placeholder exists
-        placeholder = component.get('properties', {}).get('placeholder', '')
-        if placeholder:
-            components.append({
-                "type": "TextBody",
-                "text": placeholder
-            })
+#         # Add instruction text if placeholder exists
+#         placeholder = component.get('properties', {}).get('placeholder', '')
+#         if placeholder:
+#             components.append({
+#                 "type": "TextBody",
+#                 "text": placeholder
+#             })
         
-        # Add the actual input
-        input_component = {
-            "type": "TextInput",
-            "label": label,
-            "name": name,
-            "required": True
-        }
+#         # Add the actual input
+#         input_component = {
+#             "type": "TextInput",
+#             "label": label,
+#             "name": name,
+#             "required": True
+#         }
         
-        # If we have instruction text, return both components
-        if components:
-            components.append(input_component)
-            return components
-        else:
-            return input_component
+#         # If we have instruction text, return both components
+#         if components:
+#             components.append(input_component)
+#             return components
+#         else:
+#             return input_component
         
-    elif comp_type == 'checkbox-group': # Add this block
-        options = component.get('properties', {}).get('options', [])
-        return {
-            "type": "CheckboxGroup",
-            "label": component.get('label'),
-            "name": component.get('id'),
-            "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
-        }
+#     elif comp_type == 'checkbox-group': # Add this block
+#         options = component.get('properties', {}).get('options', [])
+#         return {
+#             "type": "CheckboxGroup",
+#             "label": component.get('label'),
+#             "name": component.get('id'),
+#             "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
+#         }
     
-    elif comp_type == 'textarea':
-        # Create a list to potentially include instruction text
-        components = []
+#     elif comp_type == 'textarea':
+#         # Create a list to potentially include instruction text
+#         components = []
         
-        # Add instruction text if placeholder exists
-        placeholder = component.get('properties', {}).get('placeholder', '')
-        if placeholder:
-            components.append({
-                "type": "TextBody",
-                "text": placeholder
-            })
+#         # Add instruction text if placeholder exists
+#         placeholder = component.get('properties', {}).get('placeholder', '')
+#         if placeholder:
+#             components.append({
+#                 "type": "TextBody",
+#                 "text": placeholder
+#             })
         
-        # Add the actual textarea
-        textarea_component = {
-            "type": "TextArea",
-            "label": label,
-            "name": name,
-            "required": True
-        }
+#         # Add the actual textarea
+#         textarea_component = {
+#             "type": "TextArea",
+#             "label": label,
+#             "name": name,
+#             "required": True
+#         }
         
-        # If we have instruction text, return both components
-        if components:
-            components.append(textarea_component)
-            return components
-        else:
-            return textarea_component
-    elif comp_type == 'dropdown':
-        options = component.get('properties', {}).get('options', [])
-        return {
-            "type": "Dropdown",
-            "label": label,
-            "name": name,
-            "required": True,
-            "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
-        }
-    elif comp_type == 'radio-group':
-        options = component.get('properties', {}).get('options', [])
-        return {
-            "type": "RadioButtonsGroup",
-            "label": label,
-            "name": name,
-            "required": True,
-            "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
-        }
-    elif comp_type == 'date-picker':
-        return {
-            "type": "DatePicker",
-            "label": label,
-            "name": name,
-            "required": True
-        }
-    elif comp_type == 'heading':
-        return {
-            "type": "TextHeading",
-            "text": label
-        }
-    elif comp_type == 'text':
-        return {
-            "type": "TextBody",
-            "text": component.get('properties', {}).get('content', '')
-        }
-    return None
+#         # If we have instruction text, return both components
+#         if components:
+#             components.append(textarea_component)
+#             return components
+#         else:
+#             return textarea_component
+#     elif comp_type == 'dropdown':
+#         options = component.get('properties', {}).get('options', [])
+#         return {
+#             "type": "Dropdown",
+#             "label": label,
+#             "name": name,
+#             "required": True,
+#             "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
+#         }
+#     elif comp_type == 'radio-group':
+#         options = component.get('properties', {}).get('options', [])
+#         return {
+#             "type": "RadioButtonsGroup",
+#             "label": label,
+#             "name": name,
+#             "required": True,
+#             "data-source": [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
+#         }
+#     elif comp_type == 'date-picker':
+#         return {
+#             "type": "DatePicker",
+#             "label": label,
+#             "name": name,
+#             "required": True
+#         }
+#     elif comp_type == 'heading':
+#         return {
+#             "type": "TextHeading",
+#             "text": label
+#         }
+#     elif comp_type == 'text':
+#         return {
+#             "type": "TextBody",
+#             "text": component.get('properties', {}).get('content', '')
+#         }
+#     return None
 
 def generate_multi_screen_flow_json(screens_data):
     """
