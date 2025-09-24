@@ -25,6 +25,7 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
+import logging
 from django.http import HttpResponse
 logger = logging.getLogger(__name__)
 

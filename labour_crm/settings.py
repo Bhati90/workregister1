@@ -33,29 +33,7 @@ cloudinary.config(
     secure=True
 )
 
-# Optional: Add logging configuration for better debugging
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': 'cloudinary_uploads.log',
-        },
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        'registration.views': {
-            'handlers': ['file', 'console'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-    },
-}
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
