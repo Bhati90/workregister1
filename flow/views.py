@@ -1254,7 +1254,7 @@ def get_media_url_from_id(media_id):
 from .models import WhatsAppFlowForm, Attribute, ContactAttributeValue # Add necessary imports
 
 # In contact_app/views.py
-from .models import WhatsAppFlowForm, Attribute, ContactAttributeValue, UserFlowSession
+from .models import WhatsAppFlowForm, Attribute, ContactAttributeValue
 
 def handle_flow_completion(contact, response_data):
     """
