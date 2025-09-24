@@ -1199,22 +1199,34 @@ def whatsapp_webhook_view(request):
                                 logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
                                 continue
                     # 2. Check for and process any status updates
+                    # 2. Check for and process any status updates
                     if 'flows' in value:
+                        logger.info(f"DEBUG-WEBHOOK: Found 'flows' section in webhook")
                         for flow_data in value.get('flows', []):
-                            logger.info(f"DEBUG-FLOW: Received flow data: {flow_data}")
+                            logger.info(f"DEBUG-WEBHOOK: Processing flow data: {json.dumps(flow_data, indent=2)}")
                             try:
-                                response_json = json.loads(flow_data.get('response_json', '{}'))
+                                response_json_str = flow_data.get('response_json', '{}')
                                 contact_wa_id = flow_data.get('from')
+                                
+                                logger.info(f"DEBUG-WEBHOOK: contact_wa_id = {contact_wa_id}")
+                                logger.info(f"DEBUG-WEBHOOK: response_json_str = {response_json_str}")
+                                
+                                response_json = json.loads(response_json_str)
                                 
                                 if contact_wa_id and response_json:
                                     contact, _ = ChatContact.objects.get_or_create(wa_id=contact_wa_id)
+                                    logger.info(f"DEBUG-WEBHOOK: About to call handle_flow_completion for {contact.wa_id}")
                                     
-                                    # --- CALL THE NEW FUNCTION HERE ---
+                                    # Call the function
                                     handle_flow_completion(contact, response_json)
+                                    logger.info(f"DEBUG-WEBHOOK: Successfully called handle_flow_completion")
+                                else:
+                                    logger.error(f"DEBUG-WEBHOOK: Missing contact_wa_id or empty response_json")
                                     
                             except Exception as e:
-                                logger.error(f"Error processing flow data: {e}", exc_info=True)
-   
+                                logger.error(f"DEBUG-WEBHOOK: Error processing flow data: {e}", exc_info=True)
+                    else:
+                        logger.info(f"DEBUG-WEBHOOK: No 'flows' key found in webhook data")
                     if 'statuses' in value:
                         for status in value.get('statuses', []):
                             if status.get('status') == 'read':
