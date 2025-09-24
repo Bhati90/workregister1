@@ -1,0 +1,163 @@
+{% load static %}
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{% block title %}Labor Management Dashboard{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    {% block extra_head %}{% endblock %}
+
+    <style>
+        /* All your common styles will live here */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* --- Header and Button Styles --- */
+        .dashboard-header {
+            background: var(--primary-gradient);
+            color: white; padding: 30px 0;
+        }
+        .dashboard-title { font-size: 2.5rem; font-weight: 700; margin: 0; }
+        .dashboard-subtitle { font-size: 1.1rem; opacity: 0.9; margin: 0; }
+        .btn-action {
+            border-radius: 25px; padding: 10px 25px; font-weight: 600;
+            margin-right: 15px; margin-bottom: 10px; transition: all 0.3s ease;
+        }
+        .btn-action:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+
+        /* --- NEW Main Navigation Bar Styles --- */
+        .main-nav-container {
+            background-color: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+        .main-nav .nav-link {
+            color: #495057;
+            font-weight: 500;
+            padding: 1rem 1.5rem;
+            border-bottom: 3px solid transparent;
+        }
+        .main-nav .nav-link:hover {
+            border-bottom-color: #ddd;
+        }
+        .main-nav .nav-link.active {
+            color: #667eea;
+            font-weight: 600;
+            border-bottom-color: #667eea;
+        }
+
+        /* --- Common Page Title Style --- */
+        .page-title {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Add placeholder and job card styles here for use in other pages */
+        /* {% block extra_styles %}{% endblock %} */
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dashboard-title { font-size: 1.8rem; }
+            .main-nav { flex-direction: column; align-items: stretch; }
+            .main-nav .nav-link { text-align: center; border-bottom-width: 2px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="dashboard-title"><i class="fas fa-chart-pie me-3"></i>Labor Management</h1>
+                    <p class="dashboard-subtitle">Overview of all registrations and analytics</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="{% url 'registration:dashboard' %}" class="btn btn-light btn-action me-2"><i class="fas fa-home me-2"></i>Main Home</a>
+                   <a href="/admin/" class="btn btn-outline-light btn-action"><i class="fas fa-cog me-2"></i>Admin</a>
+                   
+                <a class="btn btn-light btn-action me-2 " 
+                   href="{% url 'registration:live_bids_dashboard' %}">
+                    <i class="fas fa-gavel me-2"></i>Live Bids
+                </a>
+                  <a class="btn btn-light btn-action me-2" href="{% url 'registration:profile_selector' %}">
+        <i class="fas fa-id-card me-2"></i>Profiles
+    </a>
+     <a class="nav-link" href="{% url 'registration:chat_contact_list' %}">
+                    <i class="fas fa-comments me-2"></i>Chat History
+                </a>
+
+                <a class="nav-link" href="{% url 'registration:standard_template_builder' %}">
+                    <i class="fas fa-comments me-2"></i>template builder
+                </a>
+          <a class="nav-link" href="{% url 'registration:template_sender' %}">
+                    <i class="fas fa-comments me-2"></i> template sender
+                </a>
+                <a class="nav-link" href="{% url 'registration:carousel_sender' %}">
+                    <i class="fas fa-comments me-2"></i> template sender CAROUSEL
+                </a>
+
+                <a class="nav-link" href="{% url 'registration:whatsapp_form_builder' %}">
+                    <i class="fas fa-comments me-2"></i> template form
+                </a>
+
+               
+
+                <a class="nav-link" href="{% url 'registration:template_builder' %}">
+                    <i class="fas fa-comments me-2"></i>Create template
+                </a>
+
+                <a class="nav-link" href="{% url 'registration:template_inspector_page' %}">
+                    <i class="fas fa-comments me-2"></i>Create template json
+                </a>
+                <a class="nav-link" href="{% url 'registration:carousel_sender' %}">
+                    <i class="fas fa-comments me-2"></i>listing Sender
+                </a>
+
+                <a class="nav-link" href="{% url 'registration:send_flow_view' %}">
+                    <i class="fas fa-comments me-2"></i> Sender flow
+                </a>
+
+                <a class="nav-link" href="{% url 'registration:create_call_template_page' %}">
+                    <i class="fas fa-comments me-2"></i> call template 
+                </a>
+
+                <a class="nav-link" href="{% url 'registration:carousel_template_builder' %}">
+                    <i class="fas fa-comments me-2"></i>Carousel builder
+                </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav-container">
+        <div class="container">
+            <ul class="nav main-nav">
+           </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_script %}{% endblock %}
+    {% block extra_scripts %}{% endblock %}
+    {% block extra_script4 %}{%endblock%}
+
+    {% block extra_scripts1 %}{%endblock%}
+
+</body>
+</html>

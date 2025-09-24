@@ -1,0 +1,578 @@
+{% extends 'registration/job/base.html' %}
+
+{% block extra_head %}
+<style>
+    .builder-container { display: flex; height: 100vh; }
+    .sidebar { width: 300px; background: white; border-right: 1px solid #e1e5e9; padding: 20px; overflow-y: auto; }
+    .canvas { flex: 1; background: #f8f9fa; position: relative; overflow: hidden; }
+    .preview-panel { width: 350px; background: white; border-left: 1px solid #e1e5e9; padding: 20px; }
+    
+    .screen-nav { background: white; padding: 15px 20px; border-bottom: 1px solid #e1e5e9; display: flex; align-items: center; gap: 15px; }
+    .screen-tab { padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: #f8f9fa; }
+    .screen-tab.active { background: #007bff; color: white; border-color: #007bff; }
+    .add-screen-btn { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+    
+    .component-palette { margin-bottom: 30px; }
+    .component-palette h3 { margin: 0 0 15px 0; font-size: 16px; color: #333; }
+    .component-item { padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; cursor: grab; background: white; }
+    .component-item:hover { background: #f8f9fa; border-color: #007bff; }
+    
+    .screen-editor { padding: 20px; position: absolute; width: 100%; height: 100%; overflow-y: auto; }
+    .screen-editor.hidden { display: none; }
+    
+    .drop-zone { min-height: 200px; border: 2px dashed #ddd; border-radius: 8px; padding: 20px; margin: 20px 0; position: relative; }
+    .drop-zone.drag-over { border-color: #007bff; background: #f8f9fa; }
+    .drop-zone-text { text-align: center; color: #999; font-size: 14px; }
+    
+    .component-editor { border: 1px solid #ddd; border-radius: 6px; padding: 15px; margin-bottom: 15px; background: white; position: relative; }
+    .component-editor .remove-btn { position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; }
+    
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #333; }
+    .form-control { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+    
+    /* Phone Preview */
+    .phone-preview { width: 300px; height: 600px; background: #000; border-radius: 30px; padding: 10px; margin: 0 auto; }
+    .phone-screen { background: #fff; height: 100%; border-radius: 20px; overflow: hidden; position: relative; }
+    .phone-header { background: #25D366; color: white; padding: 15px; text-align: center; font-weight: bold; }
+    .phone-content { padding: 20px; height: calc(100% - 120px); overflow-y: auto; }
+    .phone-footer { position: absolute; bottom: 0; width: 100%; padding: 15px; background: #f8f9fa; border-top: 1px solid #e1e5e9; }
+    
+    .preview-component { margin-bottom: 15px; }
+    .preview-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+    .preview-button { width: 100%; padding: 12px; background: #25D366; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    
+    .action-buttons { display: flex; gap: 10px; margin-top: 20px; }
+    .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .btn-primary { background: #007bff; color: white; }
+    .btn-success { background: #28a745; color: white; }
+    
+    #response-container { background: white; margin-top: 20px; padding: 20px; border-radius: 8px; border: 1px solid #e1e5e9; }
+    #api-response-pre { background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; font-family: monospace; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="builder-container">
+    <!-- Component Palette Sidebar -->
+    <div class="sidebar">
+        <h2>WhatsApp Flow Builder</h2>
+        
+        <!-- Form Configuration -->
+        <div class="component-palette">
+            <h3>Flow Configuration</h3>
+            <div class="form-group">
+                <label>Flow Name</label>
+                <input type="text" id="form-name" class="form-control" placeholder="e.g., travel_booking_flow" required>
+            </div>
+            <div class="form-group">
+                <label>Template Category</label>
+                <select id="template-category" class="form-control">
+                    <option value="UTILITY">Utility</option>
+                    <option value="MARKETING">Marketing</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Message Body</label>
+                <textarea id="template-body" class="form-control" rows="2">I'd like to book a trip</textarea>
+            </div>
+            <div class="form-group">
+                <label>Button Text</label>
+                <input type="text" id="template-button-text" class="form-control" value="Book Now">
+            </div>
+        </div>
+        
+        <div class="component-palette">
+            <h3>Form Components</h3>
+            <div class="component-item" draggable="true" data-type="text-input">
+                📝 Text Input
+            </div>
+            <div class="component-item" draggable="true" data-type="textarea">
+                📄 Text Area
+            </div>
+            <div class="component-item" draggable="true" data-type="dropdown">
+                📋 Dropdown
+            </div>
+            <div class="component-item" draggable="true" data-type="date-picker">
+                📅 Date Picker
+            </div>
+            <div class="component-item" draggable="true" data-type="radio-group">
+                🔘 Radio Group
+            </div>
+            <div class="component-item" draggable="true" data-type="checkbox-group">
+    ✅ Checkbox Group
+</div>
+        </div>
+        
+        <div class="component-palette">
+            <h3>Display</h3>
+            <div class="component-item" draggable="true" data-type="heading">
+                📰 Heading
+            </div>
+            <div class="component-item" draggable="true" data-type="text">
+                📝 Text Block
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <button class="btn btn-success" onclick="saveAndSubmitFlow()">Save & Submit to Meta</button>
+        </div>
+    </div>
+    
+    <!-- Main Canvas Area -->
+    <div class="canvas">
+        <div class="screen-nav">
+            <div class="screen-tab active" data-screen="0">Screen 1</div>
+            <button class="add-screen-btn" onclick="addScreen()">+ Add Screen</button>
+        </div>
+        
+        <div class="screen-editor" id="screen-0">
+            <h3>Screen 1 Configuration</h3>
+            <div class="form-group">
+                <label>Screen Title</label>
+                <input type="text" class="screen-title form-control" value="Book a trip" onchange="updateScreenTitle(0, this.value)">
+            </div>
+            <div class="form-group">
+                <label>Screen ID</label>
+                <input type="text" class="screen-id form-control" value="BOOKING_SCREEN" onchange="updateScreenId(0, this.value)">
+            </div>
+            
+            <div class="drop-zone" ondrop="drop(event, 0)" ondragover="allowDrop(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)">
+                <div class="drop-zone-text">Drag components here to build your screen</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Preview Panel -->
+    <div class="preview-panel">
+        <h3>Live Preview</h3>
+        <div class="phone-preview">
+            <div class="phone-screen">
+                <div class="phone-header" id="preview-header">Book a trip</div>
+                <div class="phone-content" id="preview-content">
+                    <!-- Preview content will be generated here -->
+                </div>
+                <div class="phone-footer">
+                    <button class="preview-button">Continue</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3 text-center">
+            <button class="btn btn-secondary" onclick="prevPreviewScreen()" style="margin-right: 10px;">← Previous</button>
+            <span id="screen-indicator">Screen 1 of 1</span>
+            <button class="btn btn-secondary" onclick="nextPreviewScreen()" style="margin-left: 10px;">Next →</button>
+        </div>
+    </div>
+</div>
+
+<!-- Response Container -->
+<div id="response-container" style="display:none;">
+    <h4>Meta API Response</h4>
+    <pre id="api-response-pre"></pre>
+</div>
+
+<!-- CSRF Token -->
+{% csrf_token %}
+
+<script>
+// Global state
+let screens = [
+    {
+        id: 'BOOKING_SCREEN',
+        title: 'Book a trip',
+        components: []
+    }
+];
+let currentScreen = 0;
+let previewScreen = 0;
+let componentCounter = 0;
+
+// Drag and Drop functionality
+let draggedElement = null;
+
+document.querySelectorAll('.component-item').forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+        draggedElement = e.target;
+        e.dataTransfer.effectAllowed = 'copy';
+    });
+});
+
+function allowDrop(event) {
+    event.preventDefault();
+}
+
+function dragEnter(event) {
+    event.preventDefault();
+    event.target.classList.add('drag-over');
+}
+
+function dragLeave(event) {
+    event.target.classList.remove('drag-over');
+}
+
+function drop(event, screenIndex) {
+    event.preventDefault();
+    event.target.classList.remove('drag-over');
+    
+    if (draggedElement) {
+        const componentType = draggedElement.getAttribute('data-type');
+        addComponent(screenIndex, componentType);
+        draggedElement = null;
+    }
+}
+
+// Component management
+function addComponent(screenIndex, type) {
+    const component = {
+        id: `component_${componentCounter++}`,
+        type: type,
+        label: getDefaultLabel(type),
+        properties: getDefaultProperties(type)
+    };
+    
+    screens[screenIndex].components.push(component);
+    renderScreen(screenIndex);
+    updatePreview();
+}
+
+function getDefaultLabel(type) {
+    const labels = {
+        'text-input': 'Enter text',
+        'textarea': 'Enter description',
+        'dropdown': 'Select option',
+        'date-picker': 'Select date',
+        'radio-group': 'Choose option',
+        'heading': 'Section Title',
+        'text': 'Description text',
+        'checkbox-group': 'Select options'
+    };
+    return labels[type] || 'Component';
+}
+
+function getDefaultProperties(type) {
+    const defaults = {
+        'text-input': { placeholder: 'Enter your text here', required: true },
+        'textarea': { placeholder: 'Enter description', rows: 3 },
+        'dropdown': { options: ['Option 1', 'Option 2', 'Option 3'] },
+        'date-picker': { format: 'YYYY-MM-DD' },
+        'radio-group': { options: ['Option A', 'Option B', 'Option C'] },
+        'heading': { level: 2 },
+        'text': { content: 'Add your text content here' },
+        'checkbox-group': { options: ['Seat 1A', 'Seat 2A'] }
+    };
+    return defaults[type] || {};
+}
+
+function renderScreen(screenIndex) {
+    const screen = screens[screenIndex];
+    const dropZone = document.querySelector(`#screen-${screenIndex} .drop-zone`);
+    
+    if (screen.components.length === 0) {
+        dropZone.innerHTML = '<div class="drop-zone-text">Drag components here to build your screen</div>';
+        return;
+    }
+
+    let html = '';
+    screen.components.forEach((component, index) => {
+        html += `
+            <div class="component-editor">
+                <button class="remove-btn" onclick="removeComponent(${screenIndex}, ${index})">×</button>
+                <h4>${component.label}</h4>
+                ${renderComponentEditor(component, screenIndex, index)}
+            </div>
+        `;
+    });
+    
+    dropZone.innerHTML = html;
+}
+
+function renderComponentEditor(component, screenIndex, componentIndex) {
+    let html = `
+        <div class="form-group">
+            <label>Label</label>
+            <input type="text" class="form-control" value="${component.label}" 
+                   onchange="updateComponent(${screenIndex}, ${componentIndex}, 'label', this.value)">
+        </div>
+    `;
+
+    switch (component.type) {
+        case 'text-input':
+        case 'textarea':
+            html += `
+                <div class="form-group">
+                    <label>Placeholder</label>
+                    <input type="text" class="form-control" value="${component.properties.placeholder || ''}" 
+                           onchange="updateComponent(${screenIndex}, ${componentIndex}, 'placeholder', this.value)">
+                </div>
+            `;
+            break;
+        case 'dropdown':
+        case 'radio-group':
+            html += `
+                <div class="form-group">
+                    <label>Options (one per line)</label>
+                    <textarea class="form-control" rows="3" 
+                              onchange="updateComponent(${screenIndex}, ${componentIndex}, 'options', this.value.split('\\n').filter(o => o.trim()))">${(component.properties.options || []).join('\n')}</textarea>
+                </div>
+            `;
+            break;
+        case 'checkbox-group': // Add this case
+                html += `
+                    <div class="form-group">
+                        <label>Options (one per line)</label>
+                        <textarea class="form-control" rows="3" 
+                                  onchange="updateComponent(${screenIndex}, ${componentIndex}, 'options', this.value.split('\\n').filter(o => o.trim()))">${(component.properties.options || []).join('\n')}</textarea>
+                    </div>
+                `;
+                break;
+        case 'text':
+            html += `
+                <div class="form-group">
+                    <label>Content</label>
+                    <textarea class="form-control" rows="3" 
+                              onchange="updateComponent(${screenIndex}, ${componentIndex}, 'content', this.value)">${component.properties.content || ''}</textarea>
+                </div>
+            `;
+            break;
+    }
+
+    return html;
+}
+
+function updateComponent(screenIndex, componentIndex, property, value) {
+    if (property === 'label') {
+        screens[screenIndex].components[componentIndex].label = value;
+    } else {
+        screens[screenIndex].components[componentIndex].properties[property] = value;
+    }
+    updatePreview();
+}
+
+function removeComponent(screenIndex, componentIndex) {
+    screens[screenIndex].components.splice(componentIndex, 1);
+    renderScreen(screenIndex);
+    updatePreview();
+}
+
+// Screen management
+function addScreen() {
+    const screenIndex = screens.length;
+    const screenId = `SCREEN_${screenIndex}`;
+    const screenTitle = `Screen ${screenIndex + 1}`;
+    
+    screens.push({
+        id: screenId,
+        title: screenTitle,
+        components: []
+    });
+    
+    // Add tab
+    const screenNav = document.querySelector('.screen-nav');
+    const addBtn = screenNav.querySelector('.add-screen-btn');
+    
+    const newTab = document.createElement('div');
+    newTab.className = 'screen-tab';
+    newTab.setAttribute('data-screen', screenIndex);
+    newTab.textContent = screenTitle;
+    newTab.onclick = () => switchScreen(screenIndex);
+    
+    screenNav.insertBefore(newTab, addBtn);
+    
+    // Add screen editor
+    const canvas = document.querySelector('.canvas');
+    const newEditor = document.createElement('div');
+    newEditor.className = 'screen-editor hidden';
+    newEditor.id = `screen-${screenIndex}`;
+    newEditor.innerHTML = `
+        <h3>${screenTitle} Configuration</h3>
+        <div class="form-group">
+            <label>Screen Title</label>
+            <input type="text" class="screen-title form-control" value="${screenTitle}" onchange="updateScreenTitle(${screenIndex}, this.value)">
+        </div>
+        <div class="form-group">
+            <label>Screen ID</label>
+            <input type="text" class="screen-id form-control" value="${screenId}" onchange="updateScreenId(${screenIndex}, this.value)">
+        </div>
+        <div class="drop-zone" ondrop="drop(event, ${screenIndex})" ondragover="allowDrop(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)">
+            <div class="drop-zone-text">Drag components here to build your screen</div>
+        </div>
+    `;
+    
+    canvas.appendChild(newEditor);
+    switchScreen(screenIndex);
+}
+
+function switchScreen(screenIndex) {
+    // Update tabs
+    document.querySelectorAll('.screen-tab').forEach((tab, index) => {
+        tab.classList.toggle('active', index === screenIndex);
+    });
+    
+    // Update editors
+    document.querySelectorAll('.screen-editor').forEach((editor, index) => {
+        editor.classList.toggle('hidden', index !== screenIndex);
+    });
+    
+    currentScreen = screenIndex;
+    updatePreview();
+}
+
+function updateScreenTitle(screenIndex, title) {
+    screens[screenIndex].title = title;
+    document.querySelector(`[data-screen="${screenIndex}"]`).textContent = title;
+    updatePreview();
+}
+
+function updateScreenId(screenIndex, id) {
+    screens[screenIndex].id = id;
+}
+
+// Preview management
+function updatePreview() {
+    const screen = screens[previewScreen];
+    const previewContent = document.getElementById('preview-content');
+    const previewHeader = document.getElementById('preview-header');
+    const screenIndicator = document.getElementById('screen-indicator');
+    
+    previewHeader.textContent = screen.title;
+    screenIndicator.textContent = `Screen ${previewScreen + 1} of ${screens.length}`;
+    
+    let html = '';
+    screen.components.forEach(component => {
+        html += renderPreviewComponent(component);
+    });
+    
+    previewContent.innerHTML = html || '<p style="color: #999; text-align: center;">Add components to see preview</p>';
+}
+
+function renderPreviewComponent(component) {
+    switch (component.type) {
+        case 'text-input':
+            return `<div class="preview-component">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${component.label}</label>
+                <input type="text" class="preview-input" placeholder="${component.properties.placeholder || ''}">
+            </div>`;
+        
+        case 'textarea':
+            return `<div class="preview-component">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${component.label}</label>
+                <textarea class="preview-input" rows="3" placeholder="${component.properties.placeholder || ''}"></textarea>
+            </div>`;
+        
+        case 'dropdown':
+            let options = (component.properties.options || []).map(opt => `<option>${opt}</option>`).join('');
+            return `<div class="preview-component">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${component.label}</label>
+                <select class="preview-input">${options}</select>
+            </div>`;
+        
+        case 'date-picker':
+            return `<div class="preview-component">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${component.label}</label>
+                <input type="date" class="preview-input">
+            </div>`;
+        
+        case 'radio-group':
+            let radioOptions = (component.properties.options || []).map((opt, i) => 
+                `<label style="display: block; margin-bottom: 8px;">
+                    <input type="radio" name="${component.id}" style="margin-right: 8px;">${opt}
+                </label>`
+            ).join('');
+            return `<div class="preview-component">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${component.label}</label>
+                ${radioOptions}
+            </div>`;
+        case 'checkbox-group': // Add this new case for the preview
+                let checkboxOptions = (component.properties.options || []).map((opt, i) =>
+                    `<label style="display: block; margin-bottom: 8px;"><input type="checkbox" name="${component.id}" style="margin-right: 8px;">${opt}</label>`
+                ).join('');
+                return `<div class="preview-component"><label style="display: block; margin-bottom: 5px; font-weight: bold;">${component.label}</label>${checkboxOptions}</div>`;
+            
+        case 'heading':
+            return `<div class="preview-component">
+                <h3 style="margin: 0 0 10px 0; color: #333;">${component.label}</h3>
+            </div>`;
+        
+        case 'text':
+            return `<div class="preview-component">
+                <p style="margin: 0 0 10px 0; color: #666;">${component.properties.content || component.label}</p>
+            </div>`;
+        
+        default:
+            return `<div class="preview-component">
+                <div style="padding: 10px; background: #f8f9fa; border-radius: 4px; color: #666;">
+                    ${component.label}
+                </div>
+            </div>`;
+    }
+}
+
+function nextPreviewScreen() {
+    if (previewScreen < screens.length - 1) {
+        previewScreen++;
+        updatePreview();
+    }
+}
+
+function prevPreviewScreen() {
+    if (previewScreen > 0) {
+        previewScreen--;
+        updatePreview();
+    }
+}
+
+// Save and submit functionality
+async function saveAndSubmitFlow() {
+    const formName = document.getElementById('form-name').value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!formName) {
+        alert('Please enter a flow name');
+        return;
+    }
+
+    const payload = {
+        form_name: formName,
+        screens_data: screens,  // New multi-screen format
+        template_category: document.getElementById('template-category').value,
+        template_body: document.getElementById('template-body').value,
+        template_button_text: document.getElementById('template-button-text').value
+    };
+
+    const responseContainer = document.getElementById('response-container');
+    const apiResponsePre = document.getElementById('api-response-pre');
+    responseContainer.style.display = 'block';
+    apiResponsePre.textContent = 'Submitting multi-screen flow to Meta...';
+
+    try {
+        const response = await fetch("{% url 'registration:submit_form_and_template' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', 
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await response.json();
+        apiResponsePre.textContent = JSON.stringify(result, null, 2);
+        
+        if (result.status === 'success' || result.status === 'partial_success') {
+            alert('Flow created successfully! Check the response below for details.');
+        } else {
+            alert('There was an issue creating the flow. Check the response for details.');
+        }
+    } catch (error) {
+        console.error('Failed to submit flow:', error);
+        apiResponsePre.textContent = JSON.stringify({ 
+            error: 'An unexpected error occurred.', 
+            details: error.message 
+        }, null, 2);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    updatePreview();
+});
+</script>
+{% endblock %}
