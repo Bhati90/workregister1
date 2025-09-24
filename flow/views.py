@@ -485,7 +485,7 @@ def execute_flow_node(contact, flow, target_node):
                     "action": {
                         "name": "flow",
                         "parameters": {
-                            "flow_message_version": "5.1",
+                            "flow_message_version": "3",
                             "flow_id": meta_flow_id,
                             "flow_cta": button_text or flow_form.template_button_text,
                             "flow_action": "navigate",
