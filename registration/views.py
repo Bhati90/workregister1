@@ -680,56 +680,6 @@ WABA_ID ="1477047197063313"
 # In contact_app/views.py
 import re # Make sure 're' is imported
 
-def map_component_to_flow_json(component):
-    """
-    Converts a single component from the builder's format to Meta's format,
-    ensuring all input components have a 'name'.
-    """
-    comp_type = component.get('type')
-    label = component.get('label')
-    # The 'name' of the component will be its unique ID (e.g., "component_3")
-    name = component.get('id')
-    properties = component.get('properties', {})
-
-    if comp_type in ['text-input', 'textarea', 'date-picker', 'dropdown', 'radio-group', 'checkbox-group']:
-        # This block handles all components that collect user input
-        
-        # Map your builder type to Meta's type
-        meta_type_map = {
-            'text-input': 'TextInput',
-            'textarea': 'TextArea',
-            'date-picker': 'DatePicker',
-            'dropdown': 'Dropdown',
-            'radio-group': 'RadioButtonsGroup',
-            'checkbox-group': 'CheckboxGroup'
-        }
-        
-        component_json = {
-            "type": meta_type_map[comp_type],
-            "label": label,
-            "name": name, # <-- THIS IS THE REQUIRED PROPERTY
-            "required": properties.get('required', True)
-        }
-        
-        # Add data-source for dropdowns/radios/checkboxes
-        if comp_type in ['dropdown', 'radio-group', 'checkbox-group']:
-            options = properties.get('options', [])
-            component_json["data-source"] = [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
-            
-        # Add hint for text inputs
-        if comp_type in ['text-input', 'textarea']:
-             component_json["hint"] = properties.get('placeholder', '')
-             
-        return component_json
-        
-    # Display components do not need a 'name'
-    elif comp_type == 'heading':
-        return {"type": "TextHeading", "text": label}
-        
-    elif comp_type == 'text':
-        return {"type": "TextBody", "text": properties.get('content', '')}
-        
-    return None
 
 import json
 import logging
@@ -854,6 +804,58 @@ logger = logging.getLogger(__name__)
 #             "text": component.get('properties', {}).get('content', '')
 #         }
 #     return None
+
+def map_component_to_flow_json(component):
+    """
+    Converts a single component from the builder's format to Meta's format,
+    ensuring all input components have a 'name'.
+    """
+    comp_type = component.get('type')
+    label = component.get('label')
+    # The 'name' of the component will be its unique ID (e.g., "component_3")
+    name = component.get('id')
+    properties = component.get('properties', {})
+
+    if comp_type in ['text-input', 'textarea', 'date-picker', 'dropdown', 'radio-group', 'checkbox-group']:
+        # This block handles all components that collect user input
+        
+        # Map your builder type to Meta's type
+        meta_type_map = {
+            'text-input': 'TextInput',
+            'textarea': 'TextArea',
+            'date-picker': 'DatePicker',
+            'dropdown': 'Dropdown',
+            'radio-group': 'RadioButtonsGroup',
+            'checkbox-group': 'CheckboxGroup'
+        }
+        
+        component_json = {
+            "type": meta_type_map[comp_type],
+            "label": label,
+            "name": name, # <-- THIS IS THE REQUIRED PROPERTY
+            "required": properties.get('required', True)
+        }
+        
+        # Add data-source for dropdowns/radios/checkboxes
+        if comp_type in ['dropdown', 'radio-group', 'checkbox-group']:
+            options = properties.get('options', [])
+            component_json["data-source"] = [{"id": re.sub(r'\W+', '_', opt.lower()), "title": opt} for opt in options]
+            
+        # Add hint for text inputs
+        if comp_type in ['text-input', 'textarea']:
+             component_json["hint"] = properties.get('placeholder', '')
+             
+        return component_json
+        
+    # Display components do not need a 'name'
+    elif comp_type == 'heading':
+        return {"type": "TextHeading", "text": label}
+        
+    elif comp_type == 'text':
+        return {"type": "TextBody", "text": properties.get('content', '')}
+        
+    return None
+
 
 def generate_multi_screen_flow_json(screens_data):
     """
