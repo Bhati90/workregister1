@@ -1036,7 +1036,6 @@ def submit_form_and_template_view(request):
 
     # --- NEW: Save everything to your database ---
         try:
-        # Use update_or_create to save the form details
             form_instance, created = WhatsAppFlowForm.objects.update_or_create(
                 name=form_name,
                 defaults={

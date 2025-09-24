@@ -546,139 +546,139 @@ def execute_flow_node(contact, flow, target_node):
     return False
 
 
-def handle_flow_response(request_body):
-    """
-    Handle incoming Flow responses from Meta.
-    This is called when a user completes or cancels a Flow form.
-    """
-    try:
-        data = json.loads(request_body)
+# def handle_flow_response(request_body):
+#     """
+#     Handle incoming Flow responses from Meta.
+#     This is called when a user completes or cancels a Flow form.
+#     """
+#     try:
+#         data = json.loads(request_body)
         
-        # Flow responses come in a different format
-        flow_token = data.get('flow_token', '')
-        response_json = data.get('response_json', {})
-        action = data.get('action', '')
+#         # Flow responses come in a different format
+#         flow_token = data.get('flow_token', '')
+#         response_json = data.get('response_json', {})
+#         action = data.get('action', '')
         
-        logger.info(f"DEBUG-FLOW-RESPONSE: Received flow response")
-        logger.info(f"Flow token: {flow_token}")
-        logger.info(f"Action: {action}")
-        logger.info(f"Response data: {json.dumps(response_json, indent=2)}")
+#         logger.info(f"DEBUG-FLOW-RESPONSE: Received flow response")
+#         logger.info(f"Flow token: {flow_token}")
+#         logger.info(f"Action: {action}")
+#         logger.info(f"Response data: {json.dumps(response_json, indent=2)}")
         
-        # Extract contact info from flow_token
-        # Format: flow_{wa_id}_{node_id}_{timestamp}
-        token_parts = flow_token.split('_')
-        if len(token_parts) >= 4:
-            wa_id = token_parts[1]
-            node_id = token_parts[2]
+#         # Extract contact info from flow_token
+#         # Format: flow_{wa_id}_{node_id}_{timestamp}
+#         token_parts = flow_token.split('_')
+#         if len(token_parts) >= 4:
+#             wa_id = token_parts[1]
+#             node_id = token_parts[2]
             
-            try:
-                contact = ChatContact.objects.get(wa_id=wa_id)
-                session = UserFlowSession.objects.filter(
-                    contact=contact,
-                    waiting_for_flow_completion=True
-                ).first()
+#             try:
+#                 contact = ChatContact.objects.get(wa_id=wa_id)
+#                 session = UserFlowSession.objects.filter(
+#                     contact=contact,
+#                     waiting_for_flow_completion=True
+#                 ).first()
                 
-                if not session:
-                    logger.warning(f"No session found waiting for flow completion for {wa_id}")
-                    return
+#                 if not session:
+#                     logger.warning(f"No session found waiting for flow completion for {wa_id}")
+#                     return
                 
-                flow = session.flow
-                current_node_id = session.current_node_id
+#                 flow = session.flow
+#                 current_node_id = session.current_node_id
                 
-                # Determine the outcome
-                next_handle = None
-                if action == 'COMPLETE':
-                    next_handle = 'onComplete'
-                    # Save form data to attributes
-                    save_flow_form_data(contact, session.flow_form_id, response_json)
-                elif action == 'CANCEL':
-                    next_handle = 'onError'
-                elif action == 'TIMEOUT':
-                    next_handle = 'onTimeout'
-                else:
-                    next_handle = 'onError'
+#                 # Determine the outcome
+#                 next_handle = None
+#                 if action == 'COMPLETE':
+#                     next_handle = 'onComplete'
+#                     # Save form data to attributes
+#                     save_flow_form_data(contact, session.flow_form_id, response_json)
+#                 elif action == 'CANCEL':
+#                     next_handle = 'onError'
+#                 elif action == 'TIMEOUT':
+#                     next_handle = 'onTimeout'
+#                 else:
+#                     next_handle = 'onError'
                 
-                logger.info(f"DEBUG-FLOW-RESPONSE: Using handle '{next_handle}'")
+#                 logger.info(f"DEBUG-FLOW-RESPONSE: Using handle '{next_handle}'")
                 
-                # Clear the waiting state
-                session.waiting_for_flow_completion = False
-                session.flow_form_id = None
-                session.save()
+#                 # Clear the waiting state
+#                 session.waiting_for_flow_completion = False
+#                 session.flow_form_id = None
+#                 session.save()
                 
-                # Find next node
-                edges = flow.flow_data.get('edges', [])
-                next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == next_handle), None)
+#                 # Find next node
+#                 edges = flow.flow_data.get('edges', [])
+#                 next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == next_handle), None)
                 
-                if next_edge:
-                    next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-                    if next_node:
-                        logger.info(f"DEBUG-FLOW-RESPONSE: Continuing to next node: {next_node.get('id')}")
-                        execute_flow_node(contact, flow, next_node)
-                    else:
-                        logger.error(f"DEBUG-FLOW-RESPONSE: Next node not found")
-                        session.delete()
-                else:
-                    logger.info(f"DEBUG-FLOW-RESPONSE: No next edge found, ending flow")
-                    session.delete()
+#                 if next_edge:
+#                     next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
+#                     if next_node:
+#                         logger.info(f"DEBUG-FLOW-RESPONSE: Continuing to next node: {next_node.get('id')}")
+#                         execute_flow_node(contact, flow, next_node)
+#                     else:
+#                         logger.error(f"DEBUG-FLOW-RESPONSE: Next node not found")
+#                         session.delete()
+#                 else:
+#                     logger.info(f"DEBUG-FLOW-RESPONSE: No next edge found, ending flow")
+#                     session.delete()
                     
-            except ChatContact.DoesNotExist:
-                logger.error(f"Contact {wa_id} not found")
-            except Exception as e:
-                logger.error(f"Error processing flow response: {e}")
-        else:
-            logger.error(f"Invalid flow token format: {flow_token}")
+#             except ChatContact.DoesNotExist:
+#                 logger.error(f"Contact {wa_id} not found")
+#             except Exception as e:
+#                 logger.error(f"Error processing flow response: {e}")
+#         else:
+#             logger.error(f"Invalid flow token format: {flow_token}")
             
-    except Exception as e:
-        logger.error(f"Error handling flow response: {e}")
+#     except Exception as e:
+#         logger.error(f"Error handling flow response: {e}")
 
-def save_flow_form_data(contact, flow_form_id, response_data):
-    """
-    Save the flow form response data to contact attributes.
-    """
-    try:
-        from .models import WhatsAppFlowForm
-        flow_form = WhatsAppFlowForm.objects.get(id=flow_form_id)
+# def save_flow_form_data(contact, flow_form_id, response_data):
+#     """
+#     Save the flow form response data to contact attributes.
+#     """
+#     try:
+#         from .models import WhatsAppFlowForm
+#         flow_form = WhatsAppFlowForm.objects.get(id=flow_form_id)
         
-        logger.info(f"DEBUG-FLOW-SAVE: Saving form data for {contact.wa_id}")
-        logger.info(f"Response data: {json.dumps(response_data, indent=2)}")
+#         logger.info(f"DEBUG-FLOW-SAVE: Saving form data for {contact.wa_id}")
+#         logger.info(f"Response data: {json.dumps(response_data, indent=2)}")
         
-        # The response_data contains the user's answers
-        # Format is typically: {"component_id": "value", ...}
+#         # The response_data contains the user's answers
+#         # Format is typically: {"component_id": "value", ...}
         
-        for screen in flow_form.screens_data:
-            for component in screen.get('components', []):
-                component_id = component.get('id')
-                component_label = component.get('label', '')
+#         for screen in flow_form.screens_data:
+#             for component in screen.get('components', []):
+#                 component_id = component.get('id')
+#                 component_label = component.get('label', '')
                 
-                if component_id in response_data:
-                    value = response_data[component_id]
+#                 if component_id in response_data:
+#                     value = response_data[component_id]
                     
-                    # Create or get attribute based on component label/id
-                    attribute_name = f"form_{flow_form.name}_{component_label}".lower().replace(' ', '_')
-                    attribute, created = Attribute.objects.get_or_create(
-                        name=attribute_name,
-                        defaults={'description': f'Form field: {component_label}'}
-                    )
+#                     # Create or get attribute based on component label/id
+#                     attribute_name = f"form_{flow_form.name}_{component_label}".lower().replace(' ', '_')
+#                     attribute, created = Attribute.objects.get_or_create(
+#                         name=attribute_name,
+#                         defaults={'description': f'Form field: {component_label}'}
+#                     )
                     
-                    # Handle different value types
-                    if isinstance(value, list):
-                        value_str = ', '.join(str(v) for v in value)
-                    else:
-                        value_str = str(value)
+#                     # Handle different value types
+#                     if isinstance(value, list):
+#                         value_str = ', '.join(str(v) for v in value)
+#                     else:
+#                         value_str = str(value)
                     
-                    # Save the value
-                    ContactAttributeValue.objects.update_or_create(
-                        contact=contact,
-                        attribute=attribute,
-                        defaults={'value': value_str}
-                    )
+#                     # Save the value
+#                     ContactAttributeValue.objects.update_or_create(
+#                         contact=contact,
+#                         attribute=attribute,
+#                         defaults={'value': value_str}
+#                     )
                     
-                    logger.info(f"DEBUG-FLOW-SAVE: Saved '{value_str}' to attribute '{attribute_name}'")
+#                     logger.info(f"DEBUG-FLOW-SAVE: Saved '{value_str}' to attribute '{attribute_name}'")
         
-        logger.info(f"DEBUG-FLOW-SAVE: Successfully saved all form data")
+#         logger.info(f"DEBUG-FLOW-SAVE: Successfully saved all form data")
         
-    except Exception as e:
-        logger.error(f"Error saving flow form data: {e}")
+#     except Exception as e:
+#         logger.error(f"Error saving flow form data: {e}")
 
 # OPTIONAL: Add a test endpoint for the API Request node
 @csrf_exempt
@@ -1253,37 +1253,45 @@ def get_media_url_from_id(media_id):
     
 from .models import WhatsAppFlowForm, Attribute, ContactAttributeValue # Add necessary imports
 
-# In contact_app/views.py
-from .models import WhatsAppFlowForm, Attribute, ContactAttributeValue
-
 def handle_flow_completion(contact, response_data):
     """
-    Parses the submitted Flow data, saves it to attributes, and continues the flow.
+    Parses the submitted Flow data and saves it to the contact's attributes.
     """
-    logger.info(f"--- Handling flow completion for contact: {contact.wa_id} ---")
-    logger.info(f"Received response data: {response_data}")
+    logger.info(f"=== FLOW COMPLETION DEBUG START ===")
+    logger.info(f"Contact: {contact.wa_id}")
+    logger.info(f"Response data: {response_data}")
     
     # Find the user's current session to know which flow was just completed
     session = UserFlowSession.objects.filter(contact=contact, waiting_for_flow_completion=True).first()
+    logger.info(f"Session found: {session}")
     
-    if not session or not session.flow_form_id:
+    if session:
+        logger.info(f"Session flow_form_id: {session.flow_form_id}")
+        logger.info(f"Session current_node_id: {session.current_node_id}")
+        logger.info(f"Session flow name: {session.flow.name if session.flow else 'None'}")
+    
+    if not session:
         logger.warning("No session found waiting for flow completion. Cannot map attributes.")
         return
 
     try:
-        # --- FIX #1: Look up the form using the DATABASE ID from the session ---
-        flow_form = WhatsAppFlowForm.objects.get(id=session.flow_form_id)
-        
-        # This is where we create the mapping of component IDs to their labels
+        # Get the flow form from our database to find its structure
+        flow_form = WhatsAppFlowForm.objects.get(meta_flow_id=session.flow_form_id)
+        # This is where we create the mapping. We'll map the component LABEL to the attribute NAME.
+        # This is more readable than using component_id.
         attribute_map = {}
-        
-        # --- FIX #2: Correctly access the nested 'screens_data' array ---
-        # The structure you save is {'screens_data': [...]}, so we access it like this
-        screens_list = flow_form.screens_data.get('screens_data', [])
+        # Handle both possible data structures
+        screens_data = flow_form.screens_data
+        if isinstance(screens_data, dict) and 'screens_data' in screens_data:
+            screens_list = screens_data['screens_data']
+        else:
+            screens_list = screens_data if isinstance(screens_data, list) else []
 
         for screen in screens_list:
             for component in screen.get('components', []):
-                attribute_map[component.get('id')] = component.get('label')
+                # For now, let's assume the component label is the same as the attribute name
+                # e.g., A component labeled "Full Name" saves to an attribute named "Full Name"
+                attribute_map[component['id']] = component['label']
 
         logger.info(f"Using attribute map for flow '{flow_form.name}': {attribute_map}")
 
@@ -1291,10 +1299,10 @@ def handle_flow_completion(contact, response_data):
         for component_id, user_value in response_data.items():
             attribute_name = attribute_map.get(component_id)
             if not attribute_name:
-                continue
+                continue # Skip if we don't have a mapping for this component
 
             try:
-                # Find the attribute in our database by its name (case-insensitive)
+                # Find the attribute in our database
                 attribute_to_save = Attribute.objects.get(name__iexact=attribute_name)
                 
                 # Save the user's submitted value
@@ -1308,18 +1316,29 @@ def handle_flow_completion(contact, response_data):
             except Attribute.DoesNotExist:
                 logger.warning(f"Attribute '{attribute_name}' not found in database. Cannot save value.")
                 
-        # The rest of the logic to continue the flow is correct.
+        # The flow is complete, so we can now find the next node in the visual flow
+        # The flow is complete, so we can now find the next node in the visual flow
         flow = session.flow
         current_node_id = session.current_node_id
         edges = flow.flow_data.get('edges', [])
-        
+
+        logger.info(f"=== LOOKING FOR NEXT NODE ===")
+        logger.info(f"Current node ID: {current_node_id}")
+        logger.info(f"Total edges in flow: {len(edges)}")
+        logger.info(f"All edges from current node: {[e for e in edges if e.get('source') == current_node_id]}")
+
+        # First, try to find an edge specifically from the 'onSuccess' handle
         next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onSuccess'), None)
-        
-        if not next_edge: # Fallback for unnamed handles
+        logger.info(f"Found 'onSuccess' edge: {next_edge}")
+        # If not found, and there's only ONE possible exit, take that path as a fallback.
+        if not next_edge:
             source_edges = [e for e in edges if e.get('source') == current_node_id]
             if len(source_edges) == 1:
+                logger.info(f"No 'onSuccess' handle found for node {current_node_id}, but found a single unnamed exit edge. Proceeding.")
                 next_edge = source_edges[0]
+        # --- END OF IMPROVEMENT ---
         
+        # IMPORTANT: Clear the user's session AFTER finding the next step
         session.delete()
         logger.info("Flow session cleared.")
 
@@ -1327,14 +1346,16 @@ def handle_flow_completion(contact, response_data):
             next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
             if next_node:
                 logger.info(f"Continuing to next node: {next_node.get('id')}")
+                # This is your existing function that sends the next message
                 execute_flow_node(contact, flow, next_node)
+            else:
+                logger.warning(f"Next node with ID {next_edge.get('target')} not found in flow data.")
         else:
             logger.info(f"Flow completed. No next node found for {current_node_id}.")
-            
-    except WhatsAppFlowForm.DoesNotExist:
-        logger.error(f"Cannot process flow submission. FlowForm with DATABASE ID {session.flow_form_id} not found.")
+
     except Exception as e:
-        logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)
+        logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)# API endpoint to fetch available forms for the fronten
+
 
 from django.shortcuts import get_object_or_404
 def flow_form_detail_api(request, form_id):
