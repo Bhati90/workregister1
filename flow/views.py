@@ -1020,6 +1020,11 @@ def whatsapp_webhook_view(request):
     if request.method == 'POST':
         data = json.loads(request.body)
         logger.info(f"====== INCOMING WEBHOOK ======\n{json.dumps(data, indent=2)}")
+        if any('flows' in change.get('value', {}) for entry in data.get('entry', []) for change in entry.get('changes', [])):
+            logger.info("DEBUG: FLOWS DATA DETECTED IN WEBHOOK!")
+        else:
+            logger.info("DEBUG: No flows data in this webhook call")
+        
         try:
             for entry in data.get('entry', []):
                 for change in entry.get('changes', []):
