@@ -17,7 +17,7 @@ const FormFlowNode = ({ id, data }) => {
   // The handleSelectChange function remains the same
   const handleSelectChange = (event) => {
     const selectedFlowId = event.target.value;
-    const selectedFlow = data.forms.find(form => form.flow_id == selectedFlowId);
+    const selectedFlow = data.forms.find(form => form.id == selectedFlowId);
 
     if (selectedFlow) {
       data.onUpdate('selectedFormId', selectedFlowId);
@@ -56,7 +56,7 @@ const FormFlowNode = ({ id, data }) => {
         >
           <option value="">-- Choose a Flow --</option>
           {data.forms && data.forms.map((form) => (
-            <option key={form.flow_id} value={form.flow_id}>
+            <option key={form.id} value={form.id}>
               {form.name}
             </option>
           ))}

@@ -455,27 +455,28 @@ def execute_flow_node(contact, flow, target_node):
         return True
     
     elif node_type == 'flowFormNode':
-        form_id = node_data.get('selectedFormId')  # This is the DATABASE ID
+        form_db_id = node_data.get('selectedFormId')
         template_body = node_data.get('templateBody', '')
         button_text = node_data.get('buttonText', 'Open Form')
         
-        logger.info(f"DEBUG-FORM-NODE: Processing flowFormNode {target_node_id}")
-        logger.info(f"DEBUG-FORM-NODE: selectedFormId (DB ID) = {form_id}")
-        
-        if not form_id:
-            logger.error(f"No form selected for flowFormNode {target_node_id}")
-            return False
+        # if not form_id:
+        #     logger.error(f"No form selected for flowFormNode {target_node_id}")
+        #     return False
         
         try:
-            # FIXED: Use the database ID to get the form, then use its meta_flow_id
-            flow_form = WhatsAppFlowForm.objects.get(id=form_id)  # Use database ID here
-            meta_flow_id = flow_form.meta_flow_id  # Get the Meta Flow ID
-            
-            logger.info(f"DEBUG-FORM-NODE: Found form: {flow_form.name}")
-            logger.info(f"DEBUG-FORM-NODE: Meta Flow ID: {meta_flow_id}")
-            
-            # ... existing payload creation code using meta_flow_id ...
-            payload.update({
+            # Get the form from your database
+            from .models import WhatsAppFlowForm  # Adjust import as needed
+            flow_form = WhatsAppFlowForm.objects.get(id=form_db_id)
+            meta_flow_id = flow_form.meta_flow_id
+          
+          # Get the ID of the first screen to start the flow
+            first_screen_id = "FORM_SCREEN" # A safe default
+            if flow_form.screens_data and 'screens_data' in flow_form.screens_data and flow_form.screens_data['screens_data']:
+                # --- FIX #2: Access the nested 'screens_data' key ---
+                first_screen_id = flow_form.screens_data['screens_data'][0].get('id', first_screen_id)
+
+            # Create the Flow message payload
+                payload.update({
                 "type": "interactive",
                 "interactive": {
                     "type": "flow",
@@ -484,8 +485,8 @@ def execute_flow_node(contact, flow, target_node):
                     "action": {
                         "name": "flow",
                         "parameters": {
-                            "flow_message_version": "3",
-                            "flow_id": meta_flow_id,  # Use meta_flow_id here
+                            "flow_message_version": "5.1",
+                            "flow_id": meta_flow_id,
                             "flow_cta": button_text or flow_form.template_button_text,
                             "flow_action": "navigate",
                             "flow_action_payload": {
@@ -506,21 +507,20 @@ def execute_flow_node(contact, flow, target_node):
                     'flow': flow, 
                     'current_node_id': target_node_id,
                     'waiting_for_flow_completion': True,
-                    'flow_form_id': meta_flow_id  # Store meta_flow_id, not database id
+                    'flow_form_id': meta_flow_id
                 }
             )
             
-            logger.info(f"DEBUG-FORM-NODE: Session set with meta_flow_id: {meta_flow_id}")
-            
         except WhatsAppFlowForm.DoesNotExist:
-            logger.error(f"Flow form with database id {form_id} not found")
+            logger.error(f"Flow form with id {meta_flow_id} not found")
             return False
         except Exception as e:
             logger.error(f"Error creating flow form message: {e}")
             return False
-        else:
-            logger.error(f"Message construction for node type '{node_type}' is not implemented.")
-            return False
+    
+    else:
+        logger.error(f"Message construction for node type '{node_type}' is not implemented.")
+        return False
 
     success, response_data = send_whatsapp_message(payload)
 
@@ -737,6 +737,24 @@ def test_api_request(request):
             }, status=500)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+# def extract_json_path(data, path):
+   
+#     try:
+#         current = data
+#         parts = path.split('.')
+        
+#         for part in parts:
+#             if part.isdigit():
+#                 # Handle array index
+#                 current = current[int(part)]
+#             else:
+#                 # Handle object key
+#                 current = current[part]
+                
+#         return current
+#     except (KeyError, IndexError, TypeError, ValueError):
+#         return None
 
 
 def try_execute_status_trigger(wamid, wa_id):
@@ -1441,6 +1459,7 @@ def get_whatsapp_forms_api(request):
             # We map the model fields to the keys the React frontend expects
             forms_data.append({
                 'name': form.name,
+                'id': form.id,
                 'flow_id': form.meta_flow_id,
                 'structure': form.screens_data, # Contains the full structure
                 
@@ -1839,4 +1858,3 @@ def upload_image_to_meta_api(request):
             return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
 
     return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
-
