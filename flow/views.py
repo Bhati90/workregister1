@@ -1401,60 +1401,7 @@ def flow_form_detail_api(request, form_id):
             'message': str(e)
         }, status=500)
 
-@csrf_exempt
-def whatsapp_flow_webhook_view(request):
-    """
-    Separate webhook endpoint specifically for WhatsApp Flow responses.
-    Meta sends Flow completion data to this endpoint.
-    """
-    if request.method == 'GET':
-        # Handle webhook verification
-        mode = request.GET.get('hub.mode')
-        token = request.GET.get('hub.verify_token')
-        challenge = request.GET.get('hub.challenge')
-        
-        # Replace with your actual verify token
-        VERIFY_TOKEN = 'your_flow_verify_token'
-        
-        if mode == 'subscribe' and token == VERIFY_TOKEN:
-            return HttpResponse(challenge)
-        else:
-            return HttpResponse('Forbidden', status=403)
-    
-    elif request.method == 'POST':
-        try:
-            body = request.body.decode('utf-8')
-            logger.info(f"Flow webhook received: {body}")
-            
-            handle_flow_response(body)
-            return JsonResponse({"status": "success"}, status=200)
-            
-        except Exception as e:
-            logger.error(f"Error in flow webhook: {e}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=500)
-    
-    return JsonResponse({"status": "method not allowed"}, status=405)
 
-# Add this to your existing webhook view to handle flow data inline
-def process_flow_data_in_webhook(value, contact):
-    """
-    Process flow data that comes through the main webhook.
-    """
-    if 'flows' in value:
-        for flow_data in value.get('flows', []):
-            try:
-                flow_token = flow_data.get('flow_token', '')
-                response_json = flow_data.get('response_json', {})
-                
-                logger.info(f"DEBUG-FLOW-INLINE: Processing flow completion for {contact.wa_id}")
-                logger.info(f"Flow token: {flow_token}")
-                logger.info(f"Response data: {json.dumps(response_json, indent=2)}")
-                
-                # Handle the flow completion
-                handle_flow_completion(contact, flow_token, response_json)
-                
-            except Exception as e:
-                logger.error(f"Error processing inline flow data: {e}")
 
 
 # In your views.py
