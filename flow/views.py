@@ -993,7 +993,53 @@ import json
 
 # Add this to your urls.py file (in the urlpatterns list):
 # path('echo/', test_echo_endpoint, name='test_echo'),
+# In contact_app/views.py
+from .models import WhatsAppCall # Add this import
+from django.views.decorators.http import require_http_methods
+@csrf_exempt
+@require_http_methods(["POST"])
+def initiate_whatsapp_call_view(request):
+    """
+    API endpoint to initiate a WhatsApp call from the business to a user.
+    Expects a JSON payload: {"wa_id": "91xxxxxxxxxx"}
+    """
+    try:
+        data = json.loads(request.body)
+        user_wa_id = data.get('wa_id')
 
+        if not user_wa_id:
+            return JsonResponse({'status': 'error', 'message': 'wa_id is required.'}, status=400)
+        
+        contact, _ = ChatContact.objects.get_or_create(wa_id=user_wa_id)
+        api_url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
+        payload = {"recipient": user_wa_id}
+
+        logger.info(f"Attempting to initiate WhatsApp call to {user_wa_id}...")
+        response = requests.post(api_url, headers=headers, json=payload)
+        response_data = response.json()
+
+        if response.status_code >= 400:
+            logger.error(f"Meta API Error (Call Initiation): {response_data}")
+            return JsonResponse({'status': 'error', 'meta_response': response_data}, status=response.status_code)
+
+        call_id = response_data.get("call_id")
+        if call_id:
+            # Create a log for the outbound call
+            WhatsAppCall.objects.create(
+                call_id=call_id,
+                contact=contact,
+                direction='outbound',
+                status='initiated' # The status will be updated by the webhook
+            )
+            logger.info(f"Successfully initiated call to {user_wa_id}. Call ID: {call_id}")
+        
+        return JsonResponse({'status': 'success', 'message': 'Call initiated.', 'call_id': call_id})
+
+    except Exception as e:
+        logger.error(f"Error in initiate_whatsapp_call_view: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
 @csrf_exempt
 def whatsapp_webhook_view(request):
     """
@@ -1016,6 +1062,39 @@ def whatsapp_webhook_view(request):
                     # --- CORRECTED LOGIC: Process messages and statuses independently ---
                     
                     # 1. Check for and process any incoming messages
+                    # --- NEW LOGIC TO HANDLE CALLS ---
+                    if 'calls' in value:
+                        for call_data in value.get('calls', []):
+                            call_id = call_data.get('call_id')
+                            wa_id = call_data.get('from')
+                            event = call_data.get('event') # e.g., ringing, answered, ended, missed
+                            
+                            if not all([call_id, wa_id, event]):
+                                continue
+
+                            contact, _ = ChatContact.objects.get_or_create(wa_id=wa_id)
+                            
+                            # Use update_or_create to handle all call events
+                            call_log, created = WhatsAppCall.objects.update_or_create(
+                                call_id=call_id,
+                                defaults={
+                                    'contact': contact,
+                                    'status': event,
+                                    # If this is the first we hear of this call, it must be inbound
+                                    'direction': 'inbound' if created else WhatsAppCall.objects.get(call_id=call_id).direction
+                                }
+                            )
+
+                            logger.info(f"Call log {'created' if created else 'updated'}: Call {call_id} from {wa_id} is now '{event}'")
+
+                            # If the call is finished, record the end time
+                            if event in ['ended', 'missed']:
+                                call_log.ended_at = timezone.now()
+                                call_log.save()
+                        
+                        # After handling call events, we are done with this webhook payload
+                        return JsonResponse({"status": "success"}, status=200)
+                    
                     if 'messages' in value:
                         for msg in value.get('messages', []):
                             contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])

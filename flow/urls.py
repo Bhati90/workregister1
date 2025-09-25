@@ -12,7 +12,7 @@ urlpatterns = [
     path('api/flows/list/', views.get_flows_list_api, name='api_list_flows'),
     path('api/attributes/', views.attribute_list_create_view, name='attribute-list-create'),
     path('api/attributes/<int:pk>/', views.attribute_detail_view, name='attribute-detail'),
-    
+    path('api/initiate-call/', views.initiate_whatsapp_call_view, name='initiate_whatsapp_call'),
     path('api/get-flow-details/<str:flow_id>/', views.get_flow_details_api_view, name='get_flow_details_api'),
 
    path('api/whatsapp-forms/', views.get_whatsapp_forms_api, name='get_whatsapp_forms'),
@@ -26,7 +26,7 @@ urlpatterns = [
     # 
 
     # In your urls.py file, add this to urlpatterns:
-    path('echo/', views.test_echo_endpoint, name='test_echo'),
+    # path('echo/', views.test_echo_endpoint, name='test_echo'),
     # --- ADD THESE NEW URLS ---
     path('api/flows/<int:flow_id>/', views.get_flow_detail_api, name='api_get_flow_detail'),
     path('api/flows/<int:flow_id>/status/', views.update_flow_status_api, name='api_update_flow_status'),

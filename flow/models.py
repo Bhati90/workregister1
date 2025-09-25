@@ -3,6 +3,26 @@
 from django.db import models
 from django.contrib import admin
 from registration.models import ChatContact
+
+# In contact_app/models.py
+from django.db import models
+from registration.models import ChatContact
+
+class WhatsAppCall(models.Model):
+    """Logs every inbound and outbound WhatsApp call."""
+    CALL_DIRECTIONS = (('inbound', 'Inbound'), ('outbound', 'Outbound'))
+    
+    call_id = models.CharField(max_length=255, unique=True, db_index=True, help_text="The unique ID from Meta for this call")
+    contact = models.ForeignKey(ChatContact, on_delete=models.SET_NULL, null=True, related_name="calls")
+    direction = models.CharField(max_length=10, choices=CALL_DIRECTIONS)
+    status = models.CharField(max_length=20, default='initiated', help_text="e.g., ringing, answered, ended, missed")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    ended_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when the call was ended or missed")
+
+    def __str__(self):
+        return f"{self.direction.capitalize()} call with {self.contact.wa_id} - {self.status}"
 class Flows(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
     name = models.CharField(max_length=255, unique=True, default="Untitled Flow")
