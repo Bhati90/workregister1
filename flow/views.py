@@ -547,200 +547,6 @@ def execute_flow_node(contact, flow, target_node):
     return False
 
 
-# def handle_flow_response(request_body):
-#     """
-#     Handle incoming Flow responses from Meta.
-#     This is called when a user completes or cancels a Flow form.
-#     """
-#     try:
-#         data = json.loads(request_body)
-        
-#         # Flow responses come in a different format
-#         flow_token = data.get('flow_token', '')
-#         response_json = data.get('response_json', {})
-#         action = data.get('action', '')
-        
-#         logger.info(f"DEBUG-FLOW-RESPONSE: Received flow response")
-#         logger.info(f"Flow token: {flow_token}")
-#         logger.info(f"Action: {action}")
-#         logger.info(f"Response data: {json.dumps(response_json, indent=2)}")
-        
-#         # Extract contact info from flow_token
-#         # Format: flow_{wa_id}_{node_id}_{timestamp}
-#         token_parts = flow_token.split('_')
-#         if len(token_parts) >= 4:
-#             wa_id = token_parts[1]
-#             node_id = token_parts[2]
-            
-#             try:
-#                 contact = ChatContact.objects.get(wa_id=wa_id)
-#                 session = UserFlowSession.objects.filter(
-#                     contact=contact,
-#                     waiting_for_flow_completion=True
-#                 ).first()
-                
-#                 if not session:
-#                     logger.warning(f"No session found waiting for flow completion for {wa_id}")
-#                     return
-                
-#                 flow = session.flow
-#                 current_node_id = session.current_node_id
-                
-#                 # Determine the outcome
-#                 next_handle = None
-#                 if action == 'COMPLETE':
-#                     next_handle = 'onComplete'
-#                     # Save form data to attributes
-#                     save_flow_form_data(contact, session.flow_form_id, response_json)
-#                 elif action == 'CANCEL':
-#                     next_handle = 'onError'
-#                 elif action == 'TIMEOUT':
-#                     next_handle = 'onTimeout'
-#                 else:
-#                     next_handle = 'onError'
-                
-#                 logger.info(f"DEBUG-FLOW-RESPONSE: Using handle '{next_handle}'")
-                
-#                 # Clear the waiting state
-#                 session.waiting_for_flow_completion = False
-#                 session.flow_form_id = None
-#                 session.save()
-                
-#                 # Find next node
-#                 edges = flow.flow_data.get('edges', [])
-#                 next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == next_handle), None)
-                
-#                 if next_edge:
-#                     next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
-#                     if next_node:
-#                         logger.info(f"DEBUG-FLOW-RESPONSE: Continuing to next node: {next_node.get('id')}")
-#                         execute_flow_node(contact, flow, next_node)
-#                     else:
-#                         logger.error(f"DEBUG-FLOW-RESPONSE: Next node not found")
-#                         session.delete()
-#                 else:
-#                     logger.info(f"DEBUG-FLOW-RESPONSE: No next edge found, ending flow")
-#                     session.delete()
-                    
-#             except ChatContact.DoesNotExist:
-#                 logger.error(f"Contact {wa_id} not found")
-#             except Exception as e:
-#                 logger.error(f"Error processing flow response: {e}")
-#         else:
-#             logger.error(f"Invalid flow token format: {flow_token}")
-            
-#     except Exception as e:
-#         logger.error(f"Error handling flow response: {e}")
-
-# def save_flow_form_data(contact, flow_form_id, response_data):
-#     """
-#     Save the flow form response data to contact attributes.
-#     """
-#     try:
-#         from .models import WhatsAppFlowForm
-#         flow_form = WhatsAppFlowForm.objects.get(id=flow_form_id)
-        
-#         logger.info(f"DEBUG-FLOW-SAVE: Saving form data for {contact.wa_id}")
-#         logger.info(f"Response data: {json.dumps(response_data, indent=2)}")
-        
-#         # The response_data contains the user's answers
-#         # Format is typically: {"component_id": "value", ...}
-        
-#         for screen in flow_form.screens_data:
-#             for component in screen.get('components', []):
-#                 component_id = component.get('id')
-#                 component_label = component.get('label', '')
-                
-#                 if component_id in response_data:
-#                     value = response_data[component_id]
-                    
-#                     # Create or get attribute based on component label/id
-#                     attribute_name = f"form_{flow_form.name}_{component_label}".lower().replace(' ', '_')
-#                     attribute, created = Attribute.objects.get_or_create(
-#                         name=attribute_name,
-#                         defaults={'description': f'Form field: {component_label}'}
-#                     )
-                    
-#                     # Handle different value types
-#                     if isinstance(value, list):
-#                         value_str = ', '.join(str(v) for v in value)
-#                     else:
-#                         value_str = str(value)
-                    
-#                     # Save the value
-#                     ContactAttributeValue.objects.update_or_create(
-#                         contact=contact,
-#                         attribute=attribute,
-#                         defaults={'value': value_str}
-#                     )
-                    
-#                     logger.info(f"DEBUG-FLOW-SAVE: Saved '{value_str}' to attribute '{attribute_name}'")
-        
-#         logger.info(f"DEBUG-FLOW-SAVE: Successfully saved all form data")
-        
-#     except Exception as e:
-#         logger.error(f"Error saving flow form data: {e}")
-
-# OPTIONAL: Add a test endpoint for the API Request node
-# @csrf_exempt
-# def test_api_request(request):
-#     """Test endpoint for API Request node functionality"""
-#     if request.method == 'POST':
-#         try:
-#             data = json.loads(request.body)
-            
-#             # Extract request details
-#             api_url = data.get('apiUrl')
-#             method = data.get('method', 'GET').upper()
-#             headers = data.get('headers', '{}')
-#             request_body = data.get('requestBody', '{}')
-            
-#             # Prepare request
-#             request_config = {
-#                 'method': method,
-#                 'url': api_url,
-#                 'timeout': 10
-#             }
-            
-#             # Parse headers
-#             try:
-#                 if headers:
-#                     request_config['headers'] = json.loads(headers)
-#             except json.JSONDecodeError:
-#                 request_config['headers'] = {}
-            
-#             # Parse body for non-GET requests
-#             if method != 'GET' and request_body:
-#                 try:
-#                     request_config['json'] = json.loads(request_body)
-#                 except json.JSONDecodeError:
-#                     request_config['data'] = request_body
-            
-#             # Make request
-#             response = requests.request(**request_config)
-#             response_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
-            
-#             return JsonResponse({
-#                 'success': True,
-#                 'status': response.status_code,
-#                 'data': response_data,
-#                 'headers': dict(response.headers)
-#             })
-            
-#         except requests.exceptions.RequestException as e:
-#             return JsonResponse({
-#                 'success': False,
-#                 'error': str(e)
-#             }, status=400)
-#         except Exception as e:
-#             return JsonResponse({
-#                 'success': False,
-#                 'error': f"Unexpected error: {str(e)}"
-#             }, status=500)
-    
-#     return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
 def try_execute_status_trigger(wamid, wa_id):
     """Executes a flow step triggered by a 'read' status update."""
     try:
@@ -924,76 +730,7 @@ from .models import WhatsAppFlowForm
 from django.utils import timezone
 import json
 
-# @csrf_exempt
-# def test_echo_endpoint(request):
-#     """Echo endpoint for testing API requests - returns exactly what it receives"""
-    
-#     # Log the incoming request
-#     logger.info(f"ECHO-ENDPOINT: Received {request.method} request")
-#     logger.info(f"ECHO-ENDPOINT: Headers: {dict(request.headers)}")
-    
-#     if request.method == 'POST':
-#         try:
-#             # Parse the request body
-#             raw_body = request.body.decode('utf-8')
-#             logger.info(f"ECHO-ENDPOINT: Raw body: {raw_body}")
-            
-#             data = json.loads(raw_body)
-#             logger.info(f"ECHO-ENDPOINT: Parsed JSON: {data}")
-            
-#             # Return comprehensive response
-#             response_data = {
-#                 "success": True,
-#                 "message": "Echo endpoint received your request",
-#                 "received_data": data,
-#                 "request_info": {
-#                     "method": request.method,
-#                     "content_type": request.headers.get('Content-Type', 'not specified'),
-#                     "timestamp": str(timezone.now()),
-#                     "body_length": len(raw_body)
-#                 },
-#                 "headers_received": dict(request.headers),
-#                 "echo_test": "This confirms your API request node is working!"
-#             }
-            
-#             logger.info(f"ECHO-ENDPOINT: Sending response: {response_data}")
-#             return JsonResponse(response_data, status=200)
-            
-#         except json.JSONDecodeError as e:
-#             logger.error(f"ECHO-ENDPOINT: Invalid JSON: {e}")
-#             return JsonResponse({
-#                 "success": False,
-#                 "error": "Invalid JSON in request body",
-#                 "received_raw": request.body.decode('utf-8')
-#             }, status=400)
-            
-#         except Exception as e:
-#             logger.error(f"ECHO-ENDPOINT: Unexpected error: {e}")
-#             return JsonResponse({
-#                 "success": False,
-#                 "error": f"Unexpected error: {str(e)}"
-#             }, status=500)
-    
-#     elif request.method == 'GET':
-#         # Handle GET requests for basic testing
-#         return JsonResponse({
-#             "success": True,
-#             "message": "Echo endpoint is working",
-#             "method": "GET",
-#             "timestamp": str(timezone.now()),
-#             "test_url": request.build_absolute_uri()
-#         })
-    
-#     else:
-#         # Handle other HTTP methods
-#         return JsonResponse({
-#             "success": False,
-#             "error": f"Method {request.method} not supported",
-#             "supported_methods": ["GET", "POST"]
-#         }, status=405)
 
-# Add this to your urls.py file (in the urlpatterns list):
-# path('echo/', test_echo_endpoint, name='test_echo'),
 # In contact_app/views.py
 from .models import WhatsAppCall # Add this import
 from django.views.decorators.http import require_http_methods
@@ -1209,96 +946,6 @@ def create_twilio_call(whatsapp_call_id, from_number):
     except Exception as e:
         logger.error(f"Failed to create Twilio call: {e}")
         return None
-@csrf_exempt
-@require_http_methods(["POST"])
-def webhook_handler(request):
-    """Handle incoming WhatsApp webhooks"""
-    try:
-        data = json.loads(request.body)
-        
-        # Extract call information
-        for entry in data.get('entry', []):
-            for change in entry.get('changes', []):
-                if change.get('field') == 'calls':
-                    calls = change.get('value', {}).get('calls', [])
-                    
-                    for call in calls:
-                        call_id = call.get('id')
-                        event = call.get('event')
-                        from_number = call.get('from')
-                        to_number = call.get('to')
-                        
-                        logger.info(f"Received call event: {event} for call ID: {call_id}")
-                        
-                        if event == 'connect':
-                            # Step 1: Pre-accept the call
-                            sdp_answer = generate_twilio_sdp_offer()
-                            pre_accept_response = call_whatsapp_api(call_id, 'pre_accept', sdp_answer)
-                            
-                            if pre_accept_response and pre_accept_response.get('success'):
-                                logger.info(f"Pre-accepted call: {call_id}")
-                                
-                                # Step 2: Create Twilio call to business number
-                                twilio_call_sid = create_twilio_call(call_id, from_number)
-                                
-                                if twilio_call_sid:
-                                    # Store the relationship between WhatsApp and Twilio calls
-                                    active_calls[call_id] = {
-                                        'twilio_sid': twilio_call_sid,
-                                        'whatsapp_from': from_number,
-                                        'whatsapp_to': to_number,
-                                        'status': 'connecting'
-                                    }
-                                    
-                                    # Step 3: Accept the WhatsApp call
-                                    accept_response = call_whatsapp_api(
-                                        call_id, 
-                                        'accept', 
-                                        sdp_answer,
-                                        f"twilio_sid:{twilio_call_sid}"
-                                    )
-                                    
-                                    if accept_response and accept_response.get('success'):
-                                        logger.info(f"Accepted call: {call_id}")
-                                        active_calls[call_id]['status'] = 'accepted'
-                                    else:
-                                        logger.error(f"Failed to accept call: {call_id}")
-                                        # Cancel Twilio call if WhatsApp accept failed
-                                        try:
-                                            twilio_client.calls(twilio_call_sid).update(status='completed')
-                                        except:
-                                            pass
-                                else:
-                                    logger.error(f"Failed to create Twilio call for: {call_id}")
-                            else:
-                                logger.error(f"Failed to pre-accept call: {call_id}")
-                        
-                        elif event == 'terminate':
-                            logger.info(f"Call terminated: {call_id}")
-                            status = call.get('status')
-                            duration = call.get('duration')
-                            logger.info(f"Call status: {status}, Duration: {duration} seconds")
-                            
-                            # Terminate associated Twilio call
-                            if call_id in active_calls:
-                                twilio_sid = active_calls[call_id]['twilio_sid']
-                                try:
-                                    twilio_client.calls(twilio_sid).update(status='completed')
-                                    logger.info(f"Terminated Twilio call: {twilio_sid}")
-                                except Exception as e:
-                                    logger.error(f"Failed to terminate Twilio call: {e}")
-                                
-                                del active_calls[call_id]
-        
-        return JsonResponse({'status': 'success'})
-    
-    except json.JSONDecodeError:
-        logger.error("Invalid JSON received")
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
-    
-    except Exception as e:
-        logger.error(f"Error processing webhook: {e}")
-        return JsonResponse({'error': 'Internal server error'}, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -1858,7 +1505,25 @@ def handle_flow_completion(contact, response_data):
         logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)
     
     logger.info(f"=== FLOW COMPLETION DEBUG END ===")
-
+# In your Django views.py, add this endpoint:
+@csrf_exempt
+def update_flow(request, flow_id):
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            flow = Flow.objects.get(id=flow_id)
+            
+            flow.name = data.get('name', flow.name)
+            flow.template_name = data.get('template_name', flow.template_name)
+            flow.flow_data = data.get('flow', flow.flow_data)
+            flow.save()
+            
+            return JsonResponse({'message': 'Flow updated successfully'})
+        except Flow.DoesNotExist:
+            return JsonResponse({'error': 'Flow not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 @csrf_exempt
 def debug_flow_completion(request):
     """Debug endpoint to test flow completion manually"""

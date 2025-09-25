@@ -35,7 +35,7 @@ urlpatterns = [
     path('terminate-call/', views.terminate_call, name='terminate_call'),
     # path('webhook/', production_webhook_view, name='whatsapp_webhook'),
     # path('health/', production_health_check, name='health_check'),
-    
+    path('api/flows/<int:flow_id>/update/', views.update_flow, name='update_flow'),
     # In your urls.py file, add this to urlpatterns:
     # path('echo/', views.test_echo_endpoint, name='test_echo'),
     # --- ADD THESE NEW URLS ---
