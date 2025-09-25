@@ -24,6 +24,15 @@ urlpatterns = [
     path('api/save-flow/', views.save_flow_api, name='save_flow'),
     # path('flow-builder/', views.flow_builder_view, name='flow_builder'),
     # 
+    #  path('webhook/', views.webhook_verify, name='webhook_verify'),  # GET
+    # path('webhook/', views.webhook_handler, name='webhook_handler'),  # POST
+    
+    # Twilio callback endpoints
+    path('twilio-connect/<str:whatsapp_call_id>/', views.twilio_connect, name='twilio_connect'),
+    path('twilio-status/<str:whatsapp_call_id>/', views.twilio_status, name='twilio_status'),
+    
+    # Manual controls
+    path('terminate-call/', views.terminate_call, name='terminate_call'),
     # path('webhook/', production_webhook_view, name='whatsapp_webhook'),
     # path('health/', production_health_check, name='health_check'),
     
