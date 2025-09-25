@@ -1039,7 +1039,37 @@ def initiate_whatsapp_call_view(request):
     except Exception as e:
         logger.error(f"Error in initiate_whatsapp_call_view: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    
+def initiate_outbound_call(user_wa_id):
+    """Helper function to make the API call to start a call."""
+    try:
+        contact, _ = ChatContact.objects.get_or_create(wa_id=user_wa_id)
+        api_url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
+        payload = {"recipient": user_wa_id}
+
+        logger.info(f"[Outbound Call] Attempting to initiate WhatsApp call to {user_wa_id}...")
+        response = requests.post(api_url, headers=headers, json=payload)
+        response_data = response.json()
+
+        if response.status_code >= 400:
+            logger.error(f"[Outbound Call] Meta API Error: {response_data}")
+            return False
+
+        call_id = response_data.get("call_id")
+        if call_id:
+            WhatsAppCall.objects.create(
+                call_id=call_id,
+                contact=contact,
+                direction='outbound',
+                status='initiated'
+            )
+            logger.info(f"[Outbound Call] Successfully initiated. Call ID: {call_id}")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"[Outbound Call] Error: {e}", exc_info=True)
+        return False
+   
 @csrf_exempt
 def whatsapp_webhook_view(request):
     """
@@ -1276,6 +1306,19 @@ def whatsapp_webhook_view(request):
                                     except Exception as e:
                                         logger.error(f"DEBUG-FLOW-NFM: Error processing nfm_reply: {e}", exc_info=True)
                                         # elif message_type == 'text': user_input = msg.get('text', {}).get('body')
+                                elif interactive.get('type') == 'call_permission_reply':
+                                    call_permission = interactive.get('call_permission_reply', {})
+                                    if call_permission.get('response') == 'accept':
+                                        logger.info(f"Received call permission from {contact.wa_id}. Triggering outbound call NOW.")
+                                    # THIS IS THE MISSING STEP:
+                                        initiate_outbound_call(contact.wa_id)
+                                    else:
+                                        logger.warning(f"User {contact.wa_id} denied call permission.")
+                                
+                                    continue 
+
+                            
+                            
                             logger.info(f"DEBUG-FLOW: Extracted user_input='{user_input}' and replied_to_wamid='{replied_to_wamid}'")
                             flow_handled = False
                             if user_input and replied_to_wamid:
