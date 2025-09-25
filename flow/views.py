@@ -10,7 +10,8 @@ from django.shortcuts import render # Make sure render is imported
 # def home_page(request):
 #     return render(request, 'contact_app/home.html', {'message': 'Welcome to my Contact App!'})
 
-# from .models import Flow, Message, ChatContact # Make sure these are imported
+# from .models import Flow, Message, 
+#  # Make sure these are imported
 from registration.models import ChatContact, Message
 from .models import Flows as Flow
 from .models import UserFlowSessions as UserFlowSession

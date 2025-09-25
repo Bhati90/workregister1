@@ -4,70 +4,22 @@ from django.db import models
 from django.contrib import admin
 from registration.models import ChatContact
 
-# In contact_app/models.py
-from django.db import models
-from registration.models import ChatContact
-
 
 class WhatsAppCall(models.Model):
-    """Model to store WhatsApp call information"""
-    CALL_STATUS_CHOICES = [
-        ('ringing', 'Ringing'),
-        ('connected', 'Connected'), 
-        ('ended', 'Ended'),
-        ('missed', 'Missed'),
-        ('rejected', 'Rejected'),
-    ]
+    """Logs every inbound and outbound WhatsApp call."""
+    CALL_DIRECTIONS = (('inbound', 'Inbound'), ('outbound', 'Outbound'))
     
-    DIRECTION_CHOICES = [
-        ('inbound', 'Inbound'),
-        ('outbound', 'Outbound'),
-    ]
+    call_id = models.CharField(max_length=255, unique=True, db_index=True, help_text="The unique ID from Meta for this call")
+    contact = models.ForeignKey(ChatContact, on_delete=models.SET_NULL, null=True, related_name="calls")
+    direction = models.CharField(max_length=10, choices=CALL_DIRECTIONS)
+    status = models.CharField(max_length=20, default='initiated', help_text="e.g., ringing, answered, ended, missed")
     
-    call_id = models.CharField(max_length=255, unique=True)
-    contact = models.ForeignKey('ChatContact', on_delete=models.CASCADE)
-    direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES)
-    status = models.CharField(max_length=15, choices=CALL_STATUS_CHOICES)
-    started_at = models.DateTimeField(null=True, blank=True)
-    ended_at = models.DateTimeField(null=True, blank=True)
-    call_data = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        ordering = ['-created_at']
-    
+    updated_at = models.DateTimeField(auto_now=True)
+    ended_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when the call was ended or missed")
+
     def __str__(self):
-        return f"{self.direction.title()} call {self.call_id} - {self.status}"
-
-class CallbackRequest(models.Model):
-    """Model to store callback requests"""
-    URGENCY_CHOICES = [
-        ('immediate', 'Immediate'),
-        ('normal', 'Normal'),
-        ('scheduled', 'Scheduled'),
-    ]
-    
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
-    ]
-    
-    contact = models.ForeignKey('ChatContact', on_delete=models.CASCADE)
-    urgency = models.CharField(max_length=15, choices=URGENCY_CHOICES)
-    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='pending')
-    requested_at = models.DateTimeField()
-    scheduled_for = models.DateTimeField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    notes = models.TextField(blank=True)
-    
-    class Meta:
-        ordering = ['-requested_at']
-    
-    def __str__(self):
-        return f"Callback request from {self.contact.wa_id} - {self.status}"
-
-
+        return f"{self.direction.capitalize()} call with {self.contact.wa_id} - {self.status}"
 class Flows(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
     name = models.CharField(max_length=255, unique=True, default="Untitled Flow")
