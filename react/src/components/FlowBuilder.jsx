@@ -57,7 +57,7 @@ const FlowBuilder = ({ initialData }) => {
     const [flowName, setFlowName] = useState(initialData?.name || 'My New Flow');
     const [isSidebarVisible, setIsSidebarVisible] = useState(true);
     const [flowForms, setFlowForms] = useState([]);
-
+    
     const updateNodeData = (nodeId, field, value) => {
         setNodes((nds) =>
           nds.map((node) => {
@@ -230,54 +230,62 @@ useEffect(() => {
     );
     
     const onSave = useCallback(() => {
-        if (!reactFlowInstance) return;
-        const flow = reactFlowInstance.toObject();
-        const templateNode = flow.nodes.find(n => n.type === 'templateNode');
-        const triggerTemplateName = templateNode?.data.selectedTemplateName || null;
+    if (!reactFlowInstance) return;
+    const flow = reactFlowInstance.toObject();
+    const templateNode = flow.nodes.find(n => n.type === 'templateNode');
+    const triggerTemplateName = templateNode?.data.selectedTemplateName || null;
 
-        if (!templateNode || !triggerTemplateName) {
-            alert("Error: A 'WhatsApp Template' node must exist and have a template selected to save the flow.");
-            return;
-        }
-        if (!flowName.trim()) {
-            alert("Please enter a name for the flow.");
-            return;
-        }
+    if (!templateNode || !triggerTemplateName) {
+        alert("Error: A 'WhatsApp Template' node must exist and have a template selected to save the flow.");
+        return;
+    }
+    if (!flowName.trim()) {
+        alert("Please enter a name for the flow.");
+        return;
+    }
 
-        // Clean the flow data - remove functions and large objects from node data
-        const cleanedNodes = flow.nodes.map(node => ({
-            id: node.id,
-            type: node.type,
-            position: node.position,
-            data: {
-                ...Object.fromEntries(
-                    Object.entries(node.data || {}).filter(([key, value]) => 
-                        !['onUpdate', 'onDelete', 'forms', 'templates'].includes(key) &&
-                        typeof value !== 'function'
-                    )
+    // Clean the flow data - remove functions and large objects from node data
+    const cleanedNodes = flow.nodes.map(node => ({
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        data: {
+            ...Object.fromEntries(
+                Object.entries(node.data || {}).filter(([key, value]) => 
+                    !['onUpdate', 'onDelete', 'forms', 'templates'].includes(key) &&
+                    typeof value !== 'function'
                 )
-            }
-        }));
+            )
+        }
+    }));
 
-        const payload = { 
-            name: flowName, 
-            template_name: triggerTemplateName, 
-            flow: {
-                nodes: cleanedNodes,
-                edges: flow.edges
-            }
-        };
+    const payload = { 
+        name: flowName, 
+        template_name: triggerTemplateName, 
+        flow: {
+            nodes: cleanedNodes,
+            edges: flow.edges
+        }
+    };
 
-        axios.post(`${API_URL}/api/flows/save/`, payload)
-            .then(response => {
-                alert(response.data.message);
-                navigate('/');
-            })
-            .catch(error => {
-                console.error("Error saving flow:", error);
-                alert("Failed to save flow.");
-            });
-    }, [reactFlowInstance, flowName, navigate]);
+    // Determine if we're creating a new flow or updating an existing one
+    const isEditing = initialData && initialData.id;
+    const apiUrl = isEditing 
+        ? `${API_URL}/api/flows/${initialData.id}/update/`
+        : `${API_URL}/api/flows/save/`;
+    
+    const httpMethod = isEditing ? 'put' : 'post';
+
+    axios[httpMethod](apiUrl, payload)
+        .then(response => {
+            alert(isEditing ? 'Flow updated successfully!' : response.data.message);
+            navigate('/');
+        })
+        .catch(error => {
+            console.error(`Error ${isEditing ? 'updating' : 'saving'} flow:`, error);
+            alert(`Failed to ${isEditing ? 'update' : 'save'} flow.`);
+        });
+}, [reactFlowInstance, flowName, navigate, initialData]);
 
     if (isLoading) {
         return (

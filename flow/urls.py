@@ -19,7 +19,7 @@ urlpatterns = [
     path('api/whatsapp-forms/<int:form_id>/', views.flow_form_detail_api, name='flow_form_detail'),
     
     # Webhook endpoints
-    path('webhook/whatsapp/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
+    # path('webhook/whatsapp/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
     # path('webhook/whatsapp-flows/', views.whatsapp_flow_webhook_view, name='whatsapp_flow_webhook'),
     path('api/save-flow/', views.save_flow_api, name='save_flow'),
     # path('flow-builder/', views.flow_builder_view, name='flow_builder'),
