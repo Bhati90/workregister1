@@ -1091,7 +1091,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from twilio.rest import Client
-from twilio.twiml import VoiceResponse
+from twilio.twiml.voice_response import VoiceResponse
 import logging
 
 logger = logging.getLogger(__name__)
