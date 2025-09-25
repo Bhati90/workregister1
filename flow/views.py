@@ -1184,18 +1184,21 @@ def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
     except requests.exceptions.RequestException as e:
         logger.error(f"WhatsApp API call failed: {e}")
         return None
-
+BASE_URL_t = 'https://workregister1-g7pf.onrender.com' 
 def create_twilio_call(whatsapp_call_id, from_number):
     """Create a Twilio call to bridge with WhatsApp call"""
     try:
-        # Create TwiML for the call
-        callback_url = "https://workregister1-g7pf.onrender.com/whatsapp/twilio-connect/{whatsapp_call_id}/"
+        # FIXED: Proper f-string formatting
+        callback_url = f"{BASE_URL_t}/whatsapp/twilio-connect/{whatsapp_call_id}/"
+        status_callback_url = f"{BASE_URL_t}/whatsapp/twilio-status/{whatsapp_call_id}/"
+        
+        logger.info(f"Creating Twilio call with callback: {callback_url}")
         
         call = twilio_client.calls.create(
             to=BUSINESS_PHONE_NUMBER,
             from_=TWILIO_PHONE_NUMBER,
             url=callback_url,
-            status_callback=f"{settings.BASE_URL}/whatsapp/twilio-status/{whatsapp_call_id}/",
+            status_callback=status_callback_url,
             status_callback_event=['initiated', 'ringing', 'answered', 'completed'],
             status_callback_method='POST'
         )
@@ -1206,7 +1209,6 @@ def create_twilio_call(whatsapp_call_id, from_number):
     except Exception as e:
         logger.error(f"Failed to create Twilio call: {e}")
         return None
-
 @csrf_exempt
 @require_http_methods(["POST"])
 def webhook_handler(request):
@@ -1383,6 +1385,82 @@ def terminate_call(request):
         logger.error(f"Error terminating call: {e}")
         return JsonResponse({'error': 'Internal server error'}, status=500)
 
+def handle_calling_webhook(change, contact):
+    """Handle calling webhooks separately"""
+    if change.get('field') == 'calls':  # FIXED: Proper field check
+        calls = change.get('value', {}).get('calls', [])
+        
+        for call in calls:
+            call_id = call.get('id')
+            event = call.get('event')
+            from_number = call.get('from')
+            to_number = call.get('to')
+            
+            logger.info(f"Received call event: {event} for call ID: {call_id}")
+            
+            if event == 'connect':
+                logger.info(f"CALL CONNECT: Processing call from {from_number} to {to_number}")
+                
+                # Step 1: Pre-accept the call
+                sdp_answer = generate_twilio_sdp_offer()
+                pre_accept_response = call_whatsapp_api(call_id, 'pre_accept', sdp_answer)
+                
+                if pre_accept_response and pre_accept_response.get('success'):
+                    logger.info(f"Pre-accepted call: {call_id}")
+                    
+                    # Step 2: Create Twilio call to business number
+                    twilio_call_sid = create_twilio_call(call_id, from_number)
+                    
+                    if twilio_call_sid:
+                        # Store the relationship between WhatsApp and Twilio calls
+                        active_calls[call_id] = {
+                            'twilio_sid': twilio_call_sid,
+                            'whatsapp_from': from_number,
+                            'whatsapp_to': to_number,
+                            'status': 'connecting'
+                        }
+                        
+                        # Step 3: Accept the WhatsApp call
+                        accept_response = call_whatsapp_api(
+                            call_id, 
+                            'accept', 
+                            sdp_answer,
+                            f"twilio_sid:{twilio_call_sid}"
+                        )
+                        
+                        if accept_response and accept_response.get('success'):
+                            logger.info(f"SUCCESS: Accepted WhatsApp call: {call_id}")
+                            active_calls[call_id]['status'] = 'accepted'
+                        else:
+                            logger.error(f"FAILED: to accept WhatsApp call: {call_id}")
+                            # Cancel Twilio call if WhatsApp accept failed
+                            try:
+                                twilio_client.calls(twilio_call_sid).update(status='completed')
+                            except Exception as e:
+                                logger.error(f"Error canceling Twilio call: {e}")
+                    else:
+                        logger.error(f"FAILED: to create Twilio call for: {call_id}")
+                else:
+                    logger.error(f"FAILED: to pre-accept call: {call_id}")
+                    logger.error(f"Pre-accept response: {pre_accept_response}")
+            
+            elif event == 'terminate':
+                logger.info(f"Call terminated: {call_id}")
+                status = call.get('status')
+                duration = call.get('duration')
+                logger.info(f"Call status: {status}, Duration: {duration} seconds")
+                
+                # Terminate associated Twilio call
+                if call_id in active_calls:
+                    twilio_sid = active_calls[call_id]['twilio_sid']
+                    try:
+                        twilio_client.calls(twilio_sid).update(status='completed')
+                        logger.info(f"Terminated Twilio call: {twilio_sid}")
+                    except Exception as e:
+                        logger.error(f"Failed to terminate Twilio call: {e}")
+                    
+                    del active_calls[call_id]
+
 
 @csrf_exempt
 def whatsapp_webhook_view(request):
@@ -1402,82 +1480,14 @@ def whatsapp_webhook_view(request):
             for entry in data.get('entry', []):
                 for change in entry.get('changes', []):
                     value = change.get('value', {})
+                    handle_calling_webhook(change, contact)
+    
                     
                     # --- CORRECTED LOGIC: Process messages and statuses independently ---
                     
                     # 1. Check for and process any incoming messages
                     # --- NEW LOGIC TO HANDLE CALLS ---
-                    if value == 'calls':
-                        calls = change.get('value', {}).get('calls', [])
-                        
-                        for call in calls:
-                            call_id = call.get('id')
-                            event = call.get('event')
-                            from_number = call.get('from')
-                            to_number = call.get('to')
-                            
-                            logger.info(f"Received call event: {event} for call ID: {call_id}")
-                            
-                            if event == 'connect':
-                                # Step 1: Pre-accept the call
-                                sdp_answer = generate_twilio_sdp_offer()
-                                pre_accept_response = call_whatsapp_api(call_id, 'pre_accept', sdp_answer)
-                                
-                                if pre_accept_response and pre_accept_response.get('success'):
-                                    logger.info(f"Pre-accepted call: {call_id}")
-                                    
-                                    # Step 2: Create Twilio call to business number
-                                    twilio_call_sid = create_twilio_call(call_id, from_number)
-                                    
-                                    if twilio_call_sid:
-                                        # Store the relationship between WhatsApp and Twilio calls
-                                        active_calls[call_id] = {
-                                            'twilio_sid': twilio_call_sid,
-                                            'whatsapp_from': from_number,
-                                            'whatsapp_to': to_number,
-                                            'status': 'connecting'
-                                        }
-                                        
-                                        # Step 3: Accept the WhatsApp call
-                                        accept_response = call_whatsapp_api(
-                                            call_id, 
-                                            'accept', 
-                                            sdp_answer,
-                                            f"twilio_sid:{twilio_call_sid}"
-                                        )
-                                        
-                                        if accept_response and accept_response.get('success'):
-                                            logger.info(f"Accepted call: {call_id}")
-                                            active_calls[call_id]['status'] = 'accepted'
-                                        else:
-                                            logger.error(f"Failed to accept call: {call_id}")
-                                            # Cancel Twilio call if WhatsApp accept failed
-                                            try:
-                                                twilio_client.calls(twilio_call_sid).update(status='completed')
-                                            except:
-                                                pass
-                                    else:
-                                        logger.error(f"Failed to create Twilio call for: {call_id}")
-                                else:
-                                    logger.error(f"Failed to pre-accept call: {call_id}")
-                            
-                            elif event == 'terminate':
-                                logger.info(f"Call terminated: {call_id}")
-                                status = call.get('status')
-                                duration = call.get('duration')
-                                logger.info(f"Call status: {status}, Duration: {duration} seconds")
-                                
-                                # Terminate associated Twilio call
-                                if call_id in active_calls:
-                                    twilio_sid = active_calls[call_id]['twilio_sid']
-                                    try:
-                                        twilio_client.calls(twilio_sid).update(status='completed')
-                                        logger.info(f"Terminated Twilio call: {twilio_sid}")
-                                    except Exception as e:
-                                        logger.error(f"Failed to terminate Twilio call: {e}")
-                                    
-                                    del active_calls[call_id]
-            
+                    
                     if 'messages' in value:
                         for msg in value.get('messages', []):
                             contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
