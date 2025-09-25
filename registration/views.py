@@ -813,7 +813,7 @@ def map_component_to_flow_json(component):
     comp_type = component.get('type')
     label = component.get('label')
     # The 'name' of the component will be its unique ID (e.g., "component_3")
-    name = component.get('id')
+    name = label.replace(' ', '_').lower()
     properties = component.get('properties', {})
 
     if comp_type in ['text-input', 'textarea', 'date-picker', 'dropdown', 'radio-group', 'checkbox-group']:

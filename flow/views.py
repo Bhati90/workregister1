@@ -1039,6 +1039,8 @@ def initiate_whatsapp_call_view(request):
     except Exception as e:
         logger.error(f"Error in initiate_whatsapp_call_view: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
 def initiate_outbound_call(user_wa_id):
     """Helper function to make the API call to start a call."""
     try:
@@ -1289,27 +1291,21 @@ def whatsapp_webhook_view(request):
                                     user_input = interactive.get('list_reply', {}).get('id')
                                 elif interactive.get('type') == 'button_reply': 
                                     user_input = interactive.get('button_reply', {}).get('title')
-                                elif interactive.get('type') == 'nfm_reply':  # ADD THIS SECTION
+                                elif interactive.get('type') == 'nfm_reply':
                                     logger.info(f"DEBUG-FLOW-NFM: Received nfm_reply from {contact.wa_id}")
-                                    nfm_reply = interactive.get('nfm_reply', {})
-                                    response_json_str = nfm_reply.get('response_json', '{}')
                                     
-                                    logger.info(f"DEBUG-FLOW-NFM: response_json_str = {response_json_str}")
+                                    # Enhanced debug logging first
+                                    enhanced_webhook_debug_logging(data)
                                     
-                                    try:
-                                        response_json = json.loads(response_json_str)
-                                        logger.info(f"DEBUG-FLOW-NFM: Parsed response_json = {response_json}")
-                                        
-                                        # Call your flow completion handler
-                                        handle_flow_completion(contact, response_json)
-                                        logger.info(f"DEBUG-FLOW-NFM: Successfully called handle_flow_completion")
+                                    # Process the nfm_reply
+                                    success = process_nfm_reply_in_webhook(contact, interactive)
+                                    
+                                    if success:
+                                        logger.info(f"DEBUG-FLOW-NFM: Successfully processed flow completion")
                                         continue  # Skip further processing
-                                        
-                                    except json.JSONDecodeError as e:
-                                        logger.error(f"DEBUG-FLOW-NFM: Failed to parse response_json: {e}")
-                                    except Exception as e:
-                                        logger.error(f"DEBUG-FLOW-NFM: Error processing nfm_reply: {e}", exc_info=True)
-                                        # elif message_type == 'text': user_input = msg.get('text', {}).get('body')
+                                    else:
+                                        logger.error(f"DEBUG-FLOW-NFM: Failed to process flow completion")
+                                        continue
                                 elif interactive.get('type') == 'call_permission_reply':
                                     call_permission = interactive.get('call_permission_reply', {})
                                     if call_permission.get('response') == 'accept':
@@ -1385,47 +1381,89 @@ def handle_flow_completion(contact, response_data):
     try:
         # Get the flow form from our database to find its structure
         flow_form = WhatsAppFlowForm.objects.get(meta_flow_id=session.flow_form_id)
-        # This is where we create the mapping. We'll map the component LABEL to the attribute NAME.
-        # This is more readable than using component_id.
+        
+        # FIXED: Create proper mapping from component ID to attribute
         attribute_map = {}
-        # Handle both possible data structures
         screens_data = flow_form.screens_data
+        
+        # Handle nested structure properly
         if isinstance(screens_data, dict) and 'screens_data' in screens_data:
             screens_list = screens_data['screens_data']
         else:
             screens_list = screens_data if isinstance(screens_data, list) else []
 
+        # Build mapping from component ID to attribute name
         for screen in screens_list:
             for component in screen.get('components', []):
-                # For now, let's assume the component label is the same as the attribute name
-                # e.g., A component labeled "Full Name" saves to an attribute named "Full Name"
-                attribute_map[component['id']] = component['label']
+                component_id = component.get('id')
+                component_label = component.get('label')
+                
+                # Map component ID to its label (which should match attribute name)
+                if component_id and component_label:
+                    attribute_map[component_id] = component_label
+                    logger.info(f"Mapped component '{component_id}' to attribute '{component_label}'")
 
-        logger.info(f"Using attribute map for flow '{flow_form.name}': {attribute_map}")
+        logger.info(f"Complete attribute map: {attribute_map}")
 
-        # Now, iterate through the user's submitted data
+        # Process the user's submitted data
+        saved_count = 0
         for component_id, user_value in response_data.items():
             attribute_name = attribute_map.get(component_id)
+            
             if not attribute_name:
-                continue # Skip if we don't have a mapping for this component
+                logger.warning(f"No mapping found for component_id '{component_id}'. Skipping.")
+                continue
 
             try:
-                # Find the attribute in our database
+                # Find the attribute in our database (case-insensitive search)
                 attribute_to_save = Attribute.objects.get(name__iexact=attribute_name)
+                
+                # Handle different data types
+                if isinstance(user_value, (list, dict)):
+                    value_to_save = json.dumps(user_value)
+                else:
+                    value_to_save = str(user_value)
                 
                 # Save the user's submitted value
                 ContactAttributeValue.objects.update_or_create(
                     contact=contact,
                     attribute=attribute_to_save,
-                    defaults={'value': str(user_value)}
+                    defaults={'value': value_to_save}
                 )
-                logger.info(f"Saved attribute '{attribute_name}' with value '{user_value}' for contact {contact.wa_id}")
+                
+                logger.info(f"✓ Saved attribute '{attribute_name}' with value '{value_to_save}' for contact {contact.wa_id}")
+                saved_count += 1
 
             except Attribute.DoesNotExist:
-                logger.warning(f"Attribute '{attribute_name}' not found in database. Cannot save value.")
+                logger.warning(f"Attribute '{attribute_name}' not found in database. Creating it automatically.")
                 
-        # The flow is complete, so we can now find the next node in the visual flow
-        # The flow is complete, so we can now find the next node in the visual flow
+                # Auto-create the attribute if it doesn't exist
+                try:
+                    new_attribute = Attribute.objects.create(
+                        name=attribute_name,
+                        description=f"Auto-created from form: {flow_form.name}"
+                    )
+                    
+                    value_to_save = json.dumps(user_value) if isinstance(user_value, (list, dict)) else str(user_value)
+                    
+                    ContactAttributeValue.objects.create(
+                        contact=contact,
+                        attribute=new_attribute,
+                        value=value_to_save
+                    )
+                    
+                    logger.info(f"✓ Created and saved new attribute '{attribute_name}' with value '{value_to_save}'")
+                    saved_count += 1
+                    
+                except Exception as create_error:
+                    logger.error(f"Failed to auto-create attribute '{attribute_name}': {create_error}")
+                
+            except Exception as save_error:
+                logger.error(f"Error saving attribute '{attribute_name}': {save_error}")
+                
+        logger.info(f"Successfully saved {saved_count} attributes from flow completion")
+        
+        # Find the next node in the visual flow
         flow = session.flow
         current_node_id = session.current_node_id
         edges = flow.flow_data.get('edges', [])
@@ -1433,37 +1471,136 @@ def handle_flow_completion(contact, response_data):
         logger.info(f"=== LOOKING FOR NEXT NODE ===")
         logger.info(f"Current node ID: {current_node_id}")
         logger.info(f"Total edges in flow: {len(edges)}")
-        logger.info(f"All edges from current node: {[e for e in edges if e.get('source') == current_node_id]}")
 
-        # First, try to find an edge specifically from the 'onSuccess' handle
+        # Look for 'onSuccess' handle first, then fallback to single unnamed edge
         next_edge = next((e for e in edges if e.get('source') == current_node_id and e.get('sourceHandle') == 'onSuccess'), None)
-        logger.info(f"Found 'onSuccess' edge: {next_edge}")
-        # If not found, and there's only ONE possible exit, take that path as a fallback.
+        
         if not next_edge:
             source_edges = [e for e in edges if e.get('source') == current_node_id]
             if len(source_edges) == 1:
-                logger.info(f"No 'onSuccess' handle found for node {current_node_id}, but found a single unnamed exit edge. Proceeding.")
+                logger.info(f"No 'onSuccess' handle found, using single available edge")
                 next_edge = source_edges[0]
-        # --- END OF IMPROVEMENT ---
         
-        # IMPORTANT: Clear the user's session AFTER finding the next step
+        # Clear the session BEFORE continuing to next node
         session.delete()
-        logger.info("Flow session cleared.")
+        logger.info("✓ Flow session cleared")
 
         if next_edge:
             next_node = next((n for n in flow.flow_data.get('nodes', []) if n.get('id') == next_edge.get('target')), None)
             if next_node:
-                logger.info(f"Continuing to next node: {next_node.get('id')}")
-                # This is your existing function that sends the next message
+                logger.info(f"✓ Continuing to next node: {next_node.get('id')}")
                 execute_flow_node(contact, flow, next_node)
             else:
-                logger.warning(f"Next node with ID {next_edge.get('target')} not found in flow data.")
+                logger.warning(f"Next node with ID {next_edge.get('target')} not found in flow data")
         else:
-            logger.info(f"Flow completed. No next node found for {current_node_id}.")
+            logger.info(f"✓ Flow completed successfully. No next node found for {current_node_id}")
 
+    except WhatsAppFlowForm.DoesNotExist:
+        logger.error(f"Flow form with meta_flow_id '{session.flow_form_id}' not found in database")
     except Exception as e:
-        logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)# API endpoint to fetch available forms for the fronten
+        logger.error(f"Error in handle_flow_completion: {e}", exc_info=True)
+    
+    logger.info(f"=== FLOW COMPLETION DEBUG END ===")
 
+@csrf_exempt
+def debug_flow_completion(request):
+    """Debug endpoint to test flow completion manually"""
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        wa_id = data.get('wa_id')
+        response_data = data.get('response_data')
+        
+        contact = ChatContact.objects.get(wa_id=wa_id)
+        handle_flow_completion(contact, response_data)
+        
+        return JsonResponse({'status': 'success'})
+# FIXED: Webhook handler for nfm_reply
+def process_nfm_reply_in_webhook(contact, interactive_data):
+    """
+    Extract and process nfm_reply data from webhook
+    """
+    logger.info(f"DEBUG-FLOW-NFM: Processing nfm_reply from {contact.wa_id}")
+    
+    nfm_reply = interactive_data.get('nfm_reply', {})
+    response_json_str = nfm_reply.get('response_json', '{}')
+    
+    logger.info(f"DEBUG-FLOW-NFM: Raw response_json_str = {response_json_str}")
+    
+    try:
+        # Parse the JSON response
+        response_json = json.loads(response_json_str)
+        logger.info(f"DEBUG-FLOW-NFM: Parsed response_json = {json.dumps(response_json, indent=2)}")
+        
+        # Call the flow completion handler
+        handle_flow_completion(contact, response_json)
+        logger.info(f"DEBUG-FLOW-NFM: Successfully processed flow completion")
+        return True
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"DEBUG-FLOW-NFM: Failed to parse response_json: {e}")
+        logger.error(f"DEBUG-FLOW-NFM: Raw string was: {repr(response_json_str)}")
+        return False
+        
+    except Exception as e:
+        logger.error(f"DEBUG-FLOW-NFM: Error processing nfm_reply: {e}", exc_info=True)
+        return False
+
+
+# ENHANCED: Debug logging for webhook
+def enhanced_webhook_debug_logging(data):
+    """
+    Enhanced logging to debug webhook structure
+    """
+    logger.info(f"====== ENHANCED WEBHOOK DEBUG ======")
+    logger.info(f"Full webhook data: {json.dumps(data, indent=2)}")
+    
+    for entry in data.get('entry', []):
+        for change in entry.get('changes', []):
+            value = change.get('value', {})
+            
+            # Log all available keys in the value object
+            logger.info(f"Available keys in 'value': {list(value.keys())}")
+            
+            # Check for messages
+            if 'messages' in value:
+                for i, msg in enumerate(value['messages']):
+                    logger.info(f"Message {i}: type='{msg.get('type')}', keys={list(msg.keys())}")
+                    
+                    if msg.get('type') == 'interactive':
+                        interactive = msg.get('interactive', {})
+                        logger.info(f"Interactive type: '{interactive.get('type')}'")
+                        logger.info(f"Interactive keys: {list(interactive.keys())}")
+                        
+                        if interactive.get('type') == 'nfm_reply':
+                            nfm_reply = interactive.get('nfm_reply', {})
+                            logger.info(f"NFM Reply keys: {list(nfm_reply.keys())}")
+                            logger.info(f"Response JSON raw: {repr(nfm_reply.get('response_json'))}")
+
+
+# INTEGRATION: Updated webhook section for nfm_reply
+def handle_nfm_reply_in_webhook(msg, contact):
+    """
+    Replace the existing nfm_reply handling in your webhook with this
+    """
+    interactive = msg.get('interactive', {})
+    
+    if interactive.get('type') == 'nfm_reply':
+        logger.info(f"DEBUG-FLOW-NFM: Received nfm_reply from {contact.wa_id}")
+        
+        # Enhanced debug logging
+        enhanced_webhook_debug_logging({'entry': [{'changes': [{'value': {'messages': [msg]}}]}]})
+        
+        # Process the nfm_reply
+        success = process_nfm_reply_in_webhook(contact, interactive)
+        
+        if success:
+            logger.info(f"DEBUG-FLOW-NFM: Successfully processed nfm_reply")
+        else:
+            logger.error(f"DEBUG-FLOW-NFM: Failed to process nfm_reply")
+        
+        return True  # Indicate this message was handled
+    
+    return False  # Not an nfm_reply
 
 from django.shortcuts import get_object_or_404
 def flow_form_detail_api(request, form_id):
