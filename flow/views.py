@@ -1045,7 +1045,11 @@ def initiate_outbound_call(user_wa_id):
         contact, _ = ChatContact.objects.get_or_create(wa_id=user_wa_id)
         api_url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
-        payload = {"recipient": user_wa_id}
+          # The 'messaging_product' parameter is required by the API.
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient": user_wa_id
+        }
 
         logger.info(f"[Outbound Call] Attempting to initiate WhatsApp call to {user_wa_id}...")
         response = requests.post(api_url, headers=headers, json=payload)
