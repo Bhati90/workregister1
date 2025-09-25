@@ -681,81 +681,63 @@ def execute_flow_node(contact, flow, target_node):
 #         logger.error(f"Error saving flow form data: {e}")
 
 # OPTIONAL: Add a test endpoint for the API Request node
-@csrf_exempt
-def test_api_request(request):
-    """Test endpoint for API Request node functionality"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
+# @csrf_exempt
+# def test_api_request(request):
+#     """Test endpoint for API Request node functionality"""
+#     if request.method == 'POST':
+#         try:
+#             data = json.loads(request.body)
             
-            # Extract request details
-            api_url = data.get('apiUrl')
-            method = data.get('method', 'GET').upper()
-            headers = data.get('headers', '{}')
-            request_body = data.get('requestBody', '{}')
+#             # Extract request details
+#             api_url = data.get('apiUrl')
+#             method = data.get('method', 'GET').upper()
+#             headers = data.get('headers', '{}')
+#             request_body = data.get('requestBody', '{}')
             
-            # Prepare request
-            request_config = {
-                'method': method,
-                'url': api_url,
-                'timeout': 10
-            }
+#             # Prepare request
+#             request_config = {
+#                 'method': method,
+#                 'url': api_url,
+#                 'timeout': 10
+#             }
             
-            # Parse headers
-            try:
-                if headers:
-                    request_config['headers'] = json.loads(headers)
-            except json.JSONDecodeError:
-                request_config['headers'] = {}
+#             # Parse headers
+#             try:
+#                 if headers:
+#                     request_config['headers'] = json.loads(headers)
+#             except json.JSONDecodeError:
+#                 request_config['headers'] = {}
             
-            # Parse body for non-GET requests
-            if method != 'GET' and request_body:
-                try:
-                    request_config['json'] = json.loads(request_body)
-                except json.JSONDecodeError:
-                    request_config['data'] = request_body
+#             # Parse body for non-GET requests
+#             if method != 'GET' and request_body:
+#                 try:
+#                     request_config['json'] = json.loads(request_body)
+#                 except json.JSONDecodeError:
+#                     request_config['data'] = request_body
             
-            # Make request
-            response = requests.request(**request_config)
-            response_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
+#             # Make request
+#             response = requests.request(**request_config)
+#             response_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
             
-            return JsonResponse({
-                'success': True,
-                'status': response.status_code,
-                'data': response_data,
-                'headers': dict(response.headers)
-            })
+#             return JsonResponse({
+#                 'success': True,
+#                 'status': response.status_code,
+#                 'data': response_data,
+#                 'headers': dict(response.headers)
+#             })
             
-        except requests.exceptions.RequestException as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            }, status=400)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f"Unexpected error: {str(e)}"
-            }, status=500)
+#         except requests.exceptions.RequestException as e:
+#             return JsonResponse({
+#                 'success': False,
+#                 'error': str(e)
+#             }, status=400)
+#         except Exception as e:
+#             return JsonResponse({
+#                 'success': False,
+#                 'error': f"Unexpected error: {str(e)}"
+#             }, status=500)
     
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-# def extract_json_path(data, path):
-   
-#     try:
-#         current = data
-#         parts = path.split('.')
-        
-#         for part in parts:
-#             if part.isdigit():
-#                 # Handle array index
-#                 current = current[int(part)]
-#             else:
-#                 # Handle object key
-#                 current = current[part]
-                
-#         return current
-#     except (KeyError, IndexError, TypeError, ValueError):
-#         return None
+#     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
 def try_execute_status_trigger(wamid, wa_id):
@@ -941,73 +923,73 @@ from .models import WhatsAppFlowForm
 from django.utils import timezone
 import json
 
-@csrf_exempt
-def test_echo_endpoint(request):
-    """Echo endpoint for testing API requests - returns exactly what it receives"""
+# @csrf_exempt
+# def test_echo_endpoint(request):
+#     """Echo endpoint for testing API requests - returns exactly what it receives"""
     
-    # Log the incoming request
-    logger.info(f"ECHO-ENDPOINT: Received {request.method} request")
-    logger.info(f"ECHO-ENDPOINT: Headers: {dict(request.headers)}")
+#     # Log the incoming request
+#     logger.info(f"ECHO-ENDPOINT: Received {request.method} request")
+#     logger.info(f"ECHO-ENDPOINT: Headers: {dict(request.headers)}")
     
-    if request.method == 'POST':
-        try:
-            # Parse the request body
-            raw_body = request.body.decode('utf-8')
-            logger.info(f"ECHO-ENDPOINT: Raw body: {raw_body}")
+#     if request.method == 'POST':
+#         try:
+#             # Parse the request body
+#             raw_body = request.body.decode('utf-8')
+#             logger.info(f"ECHO-ENDPOINT: Raw body: {raw_body}")
             
-            data = json.loads(raw_body)
-            logger.info(f"ECHO-ENDPOINT: Parsed JSON: {data}")
+#             data = json.loads(raw_body)
+#             logger.info(f"ECHO-ENDPOINT: Parsed JSON: {data}")
             
-            # Return comprehensive response
-            response_data = {
-                "success": True,
-                "message": "Echo endpoint received your request",
-                "received_data": data,
-                "request_info": {
-                    "method": request.method,
-                    "content_type": request.headers.get('Content-Type', 'not specified'),
-                    "timestamp": str(timezone.now()),
-                    "body_length": len(raw_body)
-                },
-                "headers_received": dict(request.headers),
-                "echo_test": "This confirms your API request node is working!"
-            }
+#             # Return comprehensive response
+#             response_data = {
+#                 "success": True,
+#                 "message": "Echo endpoint received your request",
+#                 "received_data": data,
+#                 "request_info": {
+#                     "method": request.method,
+#                     "content_type": request.headers.get('Content-Type', 'not specified'),
+#                     "timestamp": str(timezone.now()),
+#                     "body_length": len(raw_body)
+#                 },
+#                 "headers_received": dict(request.headers),
+#                 "echo_test": "This confirms your API request node is working!"
+#             }
             
-            logger.info(f"ECHO-ENDPOINT: Sending response: {response_data}")
-            return JsonResponse(response_data, status=200)
+#             logger.info(f"ECHO-ENDPOINT: Sending response: {response_data}")
+#             return JsonResponse(response_data, status=200)
             
-        except json.JSONDecodeError as e:
-            logger.error(f"ECHO-ENDPOINT: Invalid JSON: {e}")
-            return JsonResponse({
-                "success": False,
-                "error": "Invalid JSON in request body",
-                "received_raw": request.body.decode('utf-8')
-            }, status=400)
+#         except json.JSONDecodeError as e:
+#             logger.error(f"ECHO-ENDPOINT: Invalid JSON: {e}")
+#             return JsonResponse({
+#                 "success": False,
+#                 "error": "Invalid JSON in request body",
+#                 "received_raw": request.body.decode('utf-8')
+#             }, status=400)
             
-        except Exception as e:
-            logger.error(f"ECHO-ENDPOINT: Unexpected error: {e}")
-            return JsonResponse({
-                "success": False,
-                "error": f"Unexpected error: {str(e)}"
-            }, status=500)
+#         except Exception as e:
+#             logger.error(f"ECHO-ENDPOINT: Unexpected error: {e}")
+#             return JsonResponse({
+#                 "success": False,
+#                 "error": f"Unexpected error: {str(e)}"
+#             }, status=500)
     
-    elif request.method == 'GET':
-        # Handle GET requests for basic testing
-        return JsonResponse({
-            "success": True,
-            "message": "Echo endpoint is working",
-            "method": "GET",
-            "timestamp": str(timezone.now()),
-            "test_url": request.build_absolute_uri()
-        })
+#     elif request.method == 'GET':
+#         # Handle GET requests for basic testing
+#         return JsonResponse({
+#             "success": True,
+#             "message": "Echo endpoint is working",
+#             "method": "GET",
+#             "timestamp": str(timezone.now()),
+#             "test_url": request.build_absolute_uri()
+#         })
     
-    else:
-        # Handle other HTTP methods
-        return JsonResponse({
-            "success": False,
-            "error": f"Method {request.method} not supported",
-            "supported_methods": ["GET", "POST"]
-        }, status=405)
+#     else:
+#         # Handle other HTTP methods
+#         return JsonResponse({
+#             "success": False,
+#             "error": f"Method {request.method} not supported",
+#             "supported_methods": ["GET", "POST"]
+#         }, status=405)
 
 # Add this to your urls.py file (in the urlpatterns list):
 # path('echo/', test_echo_endpoint, name='test_echo'),
@@ -1439,12 +1421,7 @@ def get_whatsapp_forms_api(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-#
-# >>> YOU CAN DELETE get_flow_details_api_view AS IT IS NO LONGER NEEDED <<<
-#
-# In your views.py
-# In your views.py
-# In your views.py
+
 
 def get_flow_details_api_view(request, flow_id):
     """

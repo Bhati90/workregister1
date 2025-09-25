@@ -1438,6 +1438,9 @@ def send_flow_view(request):
         'contacts': contacts
     }
     return render(request, 'registration/chat/send_flow.html', context)
+
+
+
 # VIEW 2: Specifically for sending CAROUSEL templates
 # registration/views.py
 
