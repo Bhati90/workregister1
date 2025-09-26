@@ -2767,7 +2767,7 @@ def business_answer_webhook(request, call_id):
     gather = response.gather(
         num_digits=1,
         timeout=15,
-        action=f"{BASE_URL}/register/whatsapp/business-accept/{call_id}/",
+        action=f"{BASE_URL}/business-accept/{call_id}/",
         method='POST'
     )
     gather.say("Press any key to accept the call.", voice='alice')
@@ -2814,7 +2814,7 @@ def business_accept_webhook(request, call_id):
             start_conference_on_enter=True,
             end_conference_on_exit=True,
             wait_url="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient",
-            status_callback=f"{BASE_URL}/register/whatsapp/conference-status/{call_id}/",
+            status_callback=f"{BASE_URL}/conference-status/{call_id}/",
             status_callback_event=['start', 'end', 'join', 'leave']
         )
         dial.append(conference)
@@ -2826,7 +2826,7 @@ def business_accept_webhook(request, call_id):
                 to=TWILIO_PHONE_NUMBER,
                 from_=TWILIO_PHONE_NUMBER,
                 url=f"{BASE_URL}/register/whatsapp/bridge-connect/{call_id}/",
-                status_callback=f"{BASE_URL}/register/whatsapp/call-status/{call_id}/bridge/"
+                status_callback=f"{BASE_URL}/call-status/{call_id}/bridge/"
             )
             
             active_calls[call_id]['bridge_call_sid'] = bridge_call.sid
