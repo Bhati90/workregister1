@@ -746,21 +746,6 @@ TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
 TWILIO_PHONE_NUMBER = '+91 82098 18471'
 
 # Verify credentials are loaded
-if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
-    logger.error("Missing Twilio credentials! Check your environment variables or settings.")
-    logger.error(f"TWILIO_ACCOUNT_SID: {'Set' if TWILIO_ACCOUNT_SID else 'Missing'}")
-    logger.error(f"TWILIO_AUTH_TOKEN: {'Set' if TWILIO_AUTH_TOKEN else 'Missing'}")
-    logger.error(f"TWILIO_PHONE_NUMBER: {'Set' if TWILIO_PHONE_NUMBER else 'Missing'}")
-
-# Initialize Twilio client with error handling
-try:
-    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-    # Test the credentials
-    account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
-    logger.info(f"Twilio client initialized successfully. Account: {account.friendly_name}")
-except Exception as e:
-    logger.error(f"Failed to initialize Twilio client: {e}")
-    twilio_client = None
 
 
    # views.py
@@ -785,6 +770,23 @@ TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
 TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
 TWILIO_PHONE_NUMBER = '+91 82098 18471'
 BUSINESS_PHONE_NUMBER = '+91 84337 76745'
+
+
+if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
+    logger.error("Missing Twilio credentials! Check your environment variables or settings.")
+    logger.error(f"TWILIO_ACCOUNT_SID: {'Set' if TWILIO_ACCOUNT_SID else 'Missing'}")
+    logger.error(f"TWILIO_AUTH_TOKEN: {'Set' if TWILIO_AUTH_TOKEN else 'Missing'}")
+    logger.error(f"TWILIO_PHONE_NUMBER: {'Set' if TWILIO_PHONE_NUMBER else 'Missing'}")
+
+# Initialize Twilio client with error handling
+try:
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    # Test the credentials
+    account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+    logger.info(f"Twilio client initialized successfully. Account: {account.friendly_name}")
+except Exception as e:
+    logger.error(f"Failed to initialize Twilio client: {e}")
+    twilio_client = None
 
 import os
 @csrf_exempt
