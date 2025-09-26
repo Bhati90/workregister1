@@ -1410,7 +1410,7 @@ def whatsapp_webhook_view(request):
                             from_number = call.get('from')
                             if from_number:
                                 contact, _ = ChatContact.objects.get_or_create(wa_id=from_number)
-                                # handle_calling_webhook_fixed(change, contact)
+                                handle_calling_webhook_direct(change, contact)
                         continue  # Skip further processing for call webhooks
                     
                     # --- PROCESS MESSAGES ---
