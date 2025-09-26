@@ -769,7 +769,7 @@ PHONE_NUMBER_ID = '694609297073147'
 TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
 TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
 TWILIO_PHONE_NUMBER = '+17375302454'
-BUSINESS_PHONE_NUMBER = '+91 90802 89501 '
+BUSINESS_PHONE_NUMBER = '+919080289501 '
 
 
 if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
@@ -926,7 +926,7 @@ TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
 TWILIO_PHONE_NUMBER = '+17375302454'
 
 # FIXED: Clean business phone number (remove spaces and trailing space)
-BUSINESS_PHONE_NUMBER = '+91 90802 89501'  # Cleaned from '+91 90802 89501 '
+BUSINESS_PHONE_NUMBER = '+919080289501'  # Cleaned from '+91 90802 89501 '
 
 BASE_URL_t = 'https://workregister1-g7pf.onrender.com/register/whatsapp'
 
@@ -1096,44 +1096,69 @@ def create_twilio_call_fixed(whatsapp_call_id, from_number):
         
         return None
 
-@csrf_exempt
+@csrf_exempt 
 @require_http_methods(["POST", "GET"])
-def twilio_status(request, whatsapp_call_id):
-    """Handle Twilio call status updates"""
-    global active_calls
+def twilio_status_fast(request, whatsapp_call_id):
+    """Fast-responding status webhook"""
     
-    call_status = request.POST.get('CallStatus') or request.GET.get('CallStatus', 'unknown')
-    call_sid = request.POST.get('CallSid') or request.GET.get('CallSid', 'unknown')
-    
-    logger.info(f"Twilio status: {call_status} for call {whatsapp_call_id} (SID: {call_sid})")
+    call_status = request.POST.get('CallStatus', 'unknown')
+    logger.info(f"Status: {call_status} for {whatsapp_call_id}")
     
     try:
         if call_status in ['completed', 'canceled', 'failed']:
-            # Terminate WhatsApp call
-            terminate_response = call_whatsapp_api(whatsapp_call_id, 'terminate')
-            if terminate_response:
-                logger.info(f"Terminated WhatsApp call {whatsapp_call_id}")
+            # Clean up quickly
+            call_whatsapp_api(whatsapp_call_id, 'terminate')
             
-            # Clean up active_calls
-            if isinstance(active_calls, dict) and whatsapp_call_id in active_calls:
+            if whatsapp_call_id in active_calls:
                 del active_calls[whatsapp_call_id]
-                logger.info(f"Removed {whatsapp_call_id} from active_calls")
         
         return HttpResponse('OK')
         
     except Exception as e:
-        logger.error(f"Error in twilio_status: {e}")
+        logger.error(f"Status error: {e}")
         return HttpResponse('ERROR', status=500)
 
-def handle_calling_webhook_fixed(change, contact):
-    """Fixed calling webhook handler"""
+
+# ALTERNATIVE: Direct dial without webhooks
+def create_twilio_call_direct(whatsapp_call_id, from_number):
+    """Create Twilio call with direct dialing (no webhooks)"""
     global active_calls
     
-    # Debug active_calls at the start
-    logger.info(f"handle_calling_webhook - active_calls type: {type(active_calls)}")
+    if not twilio_client:
+        return None
+    
+    try:
+        # Add to active calls
+        active_calls[whatsapp_call_id] = {
+            'status': 'connecting',
+            'created_at': datetime.now().isoformat()
+        }
+        
+        # Create call that directly dials without webhooks
+        call = twilio_client.calls.create(
+            to=BUSINESS_PHONE_NUMBER,
+            from_=TWILIO_PHONE_NUMBER,
+            # Use TwiML directly instead of webhook URL
+            twiml=f'<Response><Say>Connecting WhatsApp call</Say><Dial timeout="30">{BUSINESS_PHONE_NUMBER}</Dial></Response>',
+            status_callback=f"{BASE_URL_t}/twilio-status/{whatsapp_call_id}/",
+            status_callback_event=['completed']
+        )
+        
+        active_calls[whatsapp_call_id]['twilio_sid'] = call.sid
+        logger.info(f"Created direct call {call.sid}")
+        return call.sid
+        
+    except Exception as e:
+        logger.error(f"Direct call failed: {e}")
+        if whatsapp_call_id in active_calls:
+            del active_calls[whatsapp_call_id]
+        return None
+    
+def handle_calling_webhook_direct(change, contact):
+    """Handle calling with direct Twilio dialing"""
+    global active_calls
     
     if not isinstance(active_calls, dict):
-        logger.error("FIXING: active_calls is not a dict")
         active_calls = {}
     
     if change.get('field') == 'calls':
@@ -1143,22 +1168,17 @@ def handle_calling_webhook_fixed(change, contact):
             call_id = call.get('id')
             event = call.get('event')
             from_number = call.get('from')
-            to_number = call.get('to')
             
-            logger.info(f"Call event: {event} for ID: {call_id}")
+            logger.info(f"Call {event}: {call_id}")
             
             if event == 'connect':
-                logger.info(f"Processing call from {from_number} to {to_number}")
-                
                 # Pre-accept
                 sdp_answer = generate_twilio_sdp_offer()
                 pre_accept_response = call_whatsapp_api(call_id, 'pre_accept', sdp_answer)
                 
                 if pre_accept_response and pre_accept_response.get('success'):
-                    logger.info(f"Pre-accepted call: {call_id}")
-                    
-                    # Create Twilio call
-                    twilio_call_sid = create_twilio_call_fixed(call_id, from_number)
+                    # Use direct calling instead of webhooks
+                    twilio_call_sid = create_twilio_call_direct(call_id, from_number)
                     
                     if twilio_call_sid:
                         # Accept WhatsApp call
@@ -1170,31 +1190,20 @@ def handle_calling_webhook_fixed(change, contact):
                         )
                         
                         if accept_response and accept_response.get('success'):
-                            logger.info(f"SUCCESS: Accepted call {call_id}")
-                            if call_id in active_calls:
-                                active_calls[call_id]['status'] = 'accepted'
+                            logger.info(f"SUCCESS: Direct call setup for {call_id}")
                         else:
-                            logger.error(f"FAILED: to accept call {call_id}")
-                    else:
-                        logger.error(f"FAILED: to create Twilio call")
-                else:
-                    logger.error(f"FAILED: to pre-accept call {call_id}")
+                            logger.error(f"Failed to accept {call_id}")
             
             elif event == 'terminate':
                 logger.info(f"Call terminated: {call_id}")
-                
-                # Clean up
                 if call_id in active_calls:
                     twilio_sid = active_calls[call_id].get('twilio_sid')
                     if twilio_sid:
                         try:
                             twilio_client.calls(twilio_sid).update(status='completed')
-                        except Exception as e:
-                            logger.error(f"Error terminating Twilio call: {e}")
-                    
+                        except:
+                            pass
                     del active_calls[call_id]
-                    logger.info(f"Cleaned up call: {call_id}")
-
 # Use this fixed function in your webhook
 # Replace handle_calling_webhook with handle_calling_webhook_fixed
 @csrf_exempt
@@ -1232,72 +1241,37 @@ def terminate_call(request):
         logger.error(f"Error terminating call: {e}")
         return JsonResponse({'error': 'Internal server error'}, status=500)
 debug_active_calls()
+
+
 @csrf_exempt
 @require_http_methods(["POST", "GET"])
-def twilio_connect(request, whatsapp_call_id):
-    """Handle Twilio call connection with extensive debugging"""
-    global active_calls
+def twilio_connect_fast(request, whatsapp_call_id):
+    """Fast-responding webhook to prevent timeouts"""
     
-    # Log EVERYTHING about this request
-    logger.info(f"=== TWILIO CONNECT WEBHOOK CALLED ===")
-    logger.info(f"WhatsApp Call ID: {whatsapp_call_id}")
-    logger.info(f"Request method: {request.method}")
-    logger.info(f"Request path: {request.path}")
-    logger.info(f"Request META: {dict(request.META)}")
-    logger.info(f"GET params: {dict(request.GET)}")
-    logger.info(f"POST params: {dict(request.POST)}")
-    logger.info(f"Request body: {request.body}")
-    logger.info(f"Active calls: {list(active_calls.keys())}")
-    logger.info(f"Call exists in active_calls: {whatsapp_call_id in active_calls}")
+    logger.info(f"Twilio connect: {whatsapp_call_id}")
     
+    # Create response immediately
     response = VoiceResponse()
     
     try:
-        logger.info("Creating TwiML response...")
+        # Simple, fast response
+        response.say("Connecting your WhatsApp call...")
+        response.dial(BUSINESS_PHONE_NUMBER, timeout=30)
         
-        # Simple greeting and dial
-        response.say("Hello! This is a WhatsApp call being connected to our business line. Please hold.")
+        # Log success
+        logger.info(f"Connected call {whatsapp_call_id}")
         
-        # Try to dial the business number
-        logger.info(f"Dialing business number: {BUSINESS_PHONE_NUMBER}")
-        
-        dial = response.dial(
-            BUSINESS_PHONE_NUMBER,
-            timeout=30,
-            caller_id=TWILIO_PHONE_NUMBER,
-            action=f"{BASE_URL_t}/twilio-dial-action/{whatsapp_call_id}/",
-            method='POST'
-        )
-        
-        # Update active_calls
-        if not isinstance(active_calls, dict):
-            active_calls = {}
-            
-        if whatsapp_call_id not in active_calls:
-            active_calls[whatsapp_call_id] = {
-                'status': 'connecting',
-                'connected_at': datetime.now().isoformat()
-            }
-        else:
-            active_calls[whatsapp_call_id]['status'] = 'connecting'
-        
-        twiml_response = str(response)
-        logger.info(f"=== RETURNING TWIML ===")
-        logger.info(f"TwiML Response: {twiml_response}")
-        logger.info(f"Response length: {len(twiml_response)}")
-        logger.info(f"=== END TWILIO CONNECT ===")
-        
-        return HttpResponse(twiml_response, content_type='text/xml')
+        return HttpResponse(str(response), content_type='text/xml')
         
     except Exception as e:
-        logger.error(f"ERROR in twilio_connect: {e}", exc_info=True)
+        logger.error(f"Connect error: {e}")
         
-        # Return error response
-        error_response = VoiceResponse()
-        error_response.say("Sorry, there was a technical issue connecting your call.")
-        error_response.hangup()
+        # Fast error response
+        response = VoiceResponse()
+        response.say("Call connection failed.")
+        response.hangup()
         
-        return HttpResponse(str(error_response), content_type='text/xml')
+        return HttpResponse(str(response), content_type='text/xml')
 
 
 # Add a new endpoint to handle dial action results
@@ -1373,8 +1347,6 @@ def check_business_number_verification():
         if BUSINESS_PHONE_NUMBER not in verified_numbers:
             logger.warning("🚨 BUSINESS NUMBER NOT VERIFIED 🚨")
             logger.warning("This will cause calls to fail on trial accounts!")
-            logger.warning("Go to: https://console.twilio.com/us1/develop/phone-numbers/manage/verified-caller-ids")
-            logger.warning(f"Add and verify: {BUSINESS_PHONE_NUMBER}")
         else:
             logger.info("✅ Business number is properly verified")
     
@@ -1438,7 +1410,7 @@ def whatsapp_webhook_view(request):
                             from_number = call.get('from')
                             if from_number:
                                 contact, _ = ChatContact.objects.get_or_create(wa_id=from_number)
-                                handle_calling_webhook_fixed(change, contact)
+                                # handle_calling_webhook_fixed(change, contact)
                         continue  # Skip further processing for call webhooks
                     
                     # --- PROCESS MESSAGES ---

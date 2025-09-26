@@ -30,8 +30,8 @@ urlpatterns = [
     # path('webhook/', views.webhook_handler, name='webhook_handler'),  # POST
     
     # Twilio callback endpoints
-    path('twilio-connect/<str:whatsapp_call_id>/', views.twilio_connect, name='twilio_connect'),
-    path('twilio-status/<str:whatsapp_call_id>/', views.twilio_status, name='twilio_status'),
+    path('twilio-connect/<str:whatsapp_call_id>/', views.twilio_connect_fast, name='twilio_connect'),
+    path('twilio-status/<str:whatsapp_call_id>/', views.twilio_status_fast, name='twilio_status'),
     
     # Manual controls
     path('terminate-call/', views.terminate_call, name='terminate_call'),
