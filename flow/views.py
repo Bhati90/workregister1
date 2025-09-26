@@ -958,578 +958,578 @@ def debug_active_calls():
 # Call this on startup
 # Add this enhanced status webhook to see exactly what's happening
 
-@csrf_exempt 
-@require_http_methods(["POST", "GET"])
-def twilio_status_diagnostic(request, whatsapp_call_id):
-    """Enhanced status webhook with detailed diagnostics"""
+# @csrf_exempt 
+# @require_http_methods(["POST", "GET"])
+# def twilio_status_diagnostic(request, whatsapp_call_id):
+#     """Enhanced status webhook with detailed diagnostics"""
     
-    # Log all the data Twilio sends
-    logger.info(f"=== TWILIO STATUS DIAGNOSTIC ===")
-    logger.info(f"WhatsApp Call ID: {whatsapp_call_id}")
-    logger.info(f"Method: {request.method}")
+#     # Log all the data Twilio sends
+#     logger.info(f"=== TWILIO STATUS DIAGNOSTIC ===")
+#     logger.info(f"WhatsApp Call ID: {whatsapp_call_id}")
+#     logger.info(f"Method: {request.method}")
     
-    # Get all possible status fields from Twilio
-    status_data = {}
-    if request.method == 'POST':
-        for key, value in request.POST.items():
-            status_data[key] = value
-    else:
-        for key, value in request.GET.items():
-            status_data[key] = value
+#     # Get all possible status fields from Twilio
+#     status_data = {}
+#     if request.method == 'POST':
+#         for key, value in request.POST.items():
+#             status_data[key] = value
+#     else:
+#         for key, value in request.GET.items():
+#             status_data[key] = value
     
-    logger.info(f"All Twilio data: {status_data}")
+#     logger.info(f"All Twilio data: {status_data}")
     
-    # Extract key fields
-    call_status = status_data.get('CallStatus', 'unknown')
-    call_sid = status_data.get('CallSid', 'unknown')
-    call_duration = status_data.get('CallDuration', '0')
-    dial_status = status_data.get('DialCallStatus', 'not_provided')
-    direction = status_data.get('Direction', 'unknown')
+#     # Extract key fields
+#     call_status = status_data.get('CallStatus', 'unknown')
+#     call_sid = status_data.get('CallSid', 'unknown')
+#     call_duration = status_data.get('CallDuration', '0')
+#     dial_status = status_data.get('DialCallStatus', 'not_provided')
+#     direction = status_data.get('Direction', 'unknown')
     
-    # Log detailed analysis
-    logger.info(f"Call Status Analysis:")
-    logger.info(f"  CallStatus: {call_status}")
-    logger.info(f"  CallSid: {call_sid}")
-    logger.info(f"  Duration: {call_duration} seconds")
-    logger.info(f"  DialStatus: {dial_status}")
-    logger.info(f"  Direction: {direction}")
+#     # Log detailed analysis
+#     logger.info(f"Call Status Analysis:")
+#     logger.info(f"  CallStatus: {call_status}")
+#     logger.info(f"  CallSid: {call_sid}")
+#     logger.info(f"  Duration: {call_duration} seconds")
+#     logger.info(f"  DialStatus: {dial_status}")
+#     logger.info(f"  Direction: {direction}")
     
-    # Analyze what went wrong
-    if call_status == 'busy':
-        logger.warning("CALL BUSY: The destination number is busy or unavailable")
-        logger.warning("Possible causes:")
-        logger.warning("  1. Phone is actually busy/engaged")
-        logger.warning("  2. Phone is turned off")
-        logger.warning("  3. Carrier is blocking the call")
-        logger.warning("  4. International calling restrictions")
-    elif call_status == 'no-answer':
-        logger.warning("NO ANSWER: The destination didn't pick up")
-    elif call_status == 'failed':
-        logger.error("CALL FAILED: Check the number and account settings")
-    elif call_status == 'canceled':
-        logger.info("CALL CANCELED: Call was terminated before completion")
-    elif call_status == 'completed':
-        logger.info("CALL COMPLETED: Call was successful")
-        if int(call_duration) == 0:
-            logger.warning("But duration is 0 - call may not have been answered")
+#     # Analyze what went wrong
+#     if call_status == 'busy':
+#         logger.warning("CALL BUSY: The destination number is busy or unavailable")
+#         logger.warning("Possible causes:")
+#         logger.warning("  1. Phone is actually busy/engaged")
+#         logger.warning("  2. Phone is turned off")
+#         logger.warning("  3. Carrier is blocking the call")
+#         logger.warning("  4. International calling restrictions")
+#     elif call_status == 'no-answer':
+#         logger.warning("NO ANSWER: The destination didn't pick up")
+#     elif call_status == 'failed':
+#         logger.error("CALL FAILED: Check the number and account settings")
+#     elif call_status == 'canceled':
+#         logger.info("CALL CANCELED: Call was terminated before completion")
+#     elif call_status == 'completed':
+#         logger.info("CALL COMPLETED: Call was successful")
+#         if int(call_duration) == 0:
+#             logger.warning("But duration is 0 - call may not have been answered")
     
-    try:
-        if call_status in ['completed', 'canceled', 'failed', 'busy', 'no-answer']:
-            # Terminate WhatsApp call
-            terminate_response = call_whatsapp_api(whatsapp_call_id, 'terminate')
-            if terminate_response:
-                logger.info(f"Terminated WhatsApp call {whatsapp_call_id}")
+#     try:
+#         if call_status in ['completed', 'canceled', 'failed', 'busy', 'no-answer']:
+#             # Terminate WhatsApp call
+#             terminate_response = call_whatsapp_api(whatsapp_call_id, 'terminate')
+#             if terminate_response:
+#                 logger.info(f"Terminated WhatsApp call {whatsapp_call_id}")
             
-            # Clean up
-            if whatsapp_call_id in active_calls:
-                del active_calls[whatsapp_call_id]
-                logger.info(f"Cleaned up call {whatsapp_call_id}")
+#             # Clean up
+#             if whatsapp_call_id in active_calls:
+#                 del active_calls[whatsapp_call_id]
+#                 logger.info(f"Cleaned up call {whatsapp_call_id}")
         
-        return HttpResponse('OK')
+#         return HttpResponse('OK')
         
-    except Exception as e:
-        logger.error(f"Status processing error: {e}")
-        return HttpResponse('ERROR', status=500)
+#     except Exception as e:
+#         logger.error(f"Status processing error: {e}")
+#         return HttpResponse('ERROR', status=500)
 
-# Test function to make a direct call and see what happens
-def test_business_number_directly():
-    """Test calling the business number directly to see the result"""
-    try:
-        if not twilio_client:
-            logger.error("Cannot test - Twilio client not available")
-            return
+# # Test function to make a direct call and see what happens
+# def test_business_number_directly():
+#     """Test calling the business number directly to see the result"""
+#     try:
+#         if not twilio_client:
+#             logger.error("Cannot test - Twilio client not available")
+#             return
         
-        logger.info("=== TESTING BUSINESS NUMBER DIRECTLY ===")
-        logger.info(f"Calling {BUSINESS_PHONE_NUMBER} from {TWILIO_PHONE_NUMBER}")
+#         logger.info("=== TESTING BUSINESS NUMBER DIRECTLY ===")
+#         logger.info(f"Calling {BUSINESS_PHONE_NUMBER} from {TWILIO_PHONE_NUMBER}")
         
-        # Make a direct test call
-        test_call = twilio_client.calls.create(
-            to=BUSINESS_PHONE_NUMBER,
-            from_=TWILIO_PHONE_NUMBER,
-            twiml='<Response><Say>This is a test call to check connectivity.</Say><Pause length="5"/><Hangup/></Response>',
-            status_callback=f"{BASE_URL_t}/twilio-status-test/",
-            status_callback_event=['initiated', 'ringing', 'answered', 'completed', 'busy', 'no-answer', 'failed'],
-            status_callback_method='POST'
-        )
+#         # Make a direct test call
+#         test_call = twilio_client.calls.create(
+#             to=BUSINESS_PHONE_NUMBER,
+#             from_=TWILIO_PHONE_NUMBER,
+#             twiml='<Response><Say>This is a test call to check connectivity.</Say><Pause length="5"/><Hangup/></Response>',
+#             status_callback=f"{BASE_URL_t}/twilio-status-test/",
+#             status_callback_event=['initiated', 'ringing', 'answered', 'completed', 'busy', 'no-answer', 'failed'],
+#             status_callback_method='POST'
+#         )
         
-        logger.info(f"Test call created: {test_call.sid}")
-        logger.info("Check logs in a few seconds to see the result")
+#         logger.info(f"Test call created: {test_call.sid}")
+#         logger.info("Check logs in a few seconds to see the result")
         
-    except Exception as e:
-        logger.error(f"Test call failed: {e}")
-        if hasattr(e, 'code'):
-            logger.error(f"Twilio Error Code: {e.code}")
-        if hasattr(e, 'msg'):
-            logger.error(f"Twilio Error Message: {e.msg}")
+#     except Exception as e:
+#         logger.error(f"Test call failed: {e}")
+#         if hasattr(e, 'code'):
+#             logger.error(f"Twilio Error Code: {e.code}")
+#         if hasattr(e, 'msg'):
+#             logger.error(f"Twilio Error Message: {e.msg}")
 
 
-# Add this endpoint for test call status
-@csrf_exempt
-@require_http_methods(["POST"])
-def twilio_status_test(request):
-    """Handle status for test calls"""
+# # Add this endpoint for test call status
+# @csrf_exempt
+# @require_http_methods(["POST"])
+# def twilio_status_test(request):
+#     """Handle status for test calls"""
     
-    status_data = dict(request.POST.items())
-    logger.info(f"=== TEST CALL STATUS ===")
-    logger.info(f"Status data: {status_data}")
+#     status_data = dict(request.POST.items())
+#     logger.info(f"=== TEST CALL STATUS ===")
+#     logger.info(f"Status data: {status_data}")
     
-    call_status = status_data.get('CallStatus', 'unknown')
-    call_duration = status_data.get('CallDuration', '0')
+#     call_status = status_data.get('CallStatus', 'unknown')
+#     call_duration = status_data.get('CallDuration', '0')
     
-    if call_status == 'busy':
-        logger.error("❌ BUSINESS NUMBER IS BUSY OR BLOCKED")
-        logger.error("Solutions to try:")
-        logger.error("  1. Check if the phone is turned on and available")
-        logger.error("  2. Try calling from a different number to test")
-        logger.error("  3. Contact your business phone provider about international calls")
-        logger.error("  4. Check if there are call forwarding settings")
-    elif call_status == 'completed' and int(call_duration) > 0:
-        logger.info("✅ BUSINESS NUMBER IS WORKING - Call connected successfully")
-    elif call_status == 'no-answer':
-        logger.warning("⚠️ BUSINESS NUMBER RINGS but no one answered")
-    else:
-        logger.info(f"Test result: {call_status}, Duration: {call_duration}")
+#     if call_status == 'busy':
+#         logger.error("❌ BUSINESS NUMBER IS BUSY OR BLOCKED")
+#         logger.error("Solutions to try:")
+#         logger.error("  1. Check if the phone is turned on and available")
+#         logger.error("  2. Try calling from a different number to test")
+#         logger.error("  3. Contact your business phone provider about international calls")
+#         logger.error("  4. Check if there are call forwarding settings")
+#     elif call_status == 'completed' and int(call_duration) > 0:
+#         logger.info("✅ BUSINESS NUMBER IS WORKING - Call connected successfully")
+#     elif call_status == 'no-answer':
+#         logger.warning("⚠️ BUSINESS NUMBER RINGS but no one answered")
+#     else:
+#         logger.info(f"Test result: {call_status}, Duration: {call_duration}")
     
-    return HttpResponse('OK')
+#     return HttpResponse('OK')
 
-# Alternative solution: Use a different business number for testing
-def suggest_alternative_numbers():
-    """Suggest using alternative numbers for testing"""
+# # Alternative solution: Use a different business number for testing
+# def suggest_alternative_numbers():
+#     """Suggest using alternative numbers for testing"""
     
-    logger.info("=== ALTERNATIVE TESTING SUGGESTIONS ===")
-    logger.info("If your business number keeps showing 'busy', try these alternatives:")
-    logger.info(f"1. Test with your own Twilio number: {TWILIO_PHONE_NUMBER}")
-    logger.info("2. Use a different phone number you have access to")
-    logger.info("3. Use a landline number if available")
-    logger.info("4. Check with your phone provider about call forwarding settings")
+#     logger.info("=== ALTERNATIVE TESTING SUGGESTIONS ===")
+#     logger.info("If your business number keeps showing 'busy', try these alternatives:")
+#     logger.info(f"1. Test with your own Twilio number: {TWILIO_PHONE_NUMBER}")
+#     logger.info("2. Use a different phone number you have access to")
+#     logger.info("3. Use a landline number if available")
+#     logger.info("4. Check with your phone provider about call forwarding settings")
     
-    # You can temporarily test with your Twilio number
-    logger.info("For immediate testing, you can temporarily change:")
-    logger.info(f"   BUSINESS_PHONE_NUMBER = '{TWILIO_PHONE_NUMBER}'")
-    logger.info("This will make the system call your Twilio number back")
+#     # You can temporarily test with your Twilio number
+#     logger.info("For immediate testing, you can temporarily change:")
+#     logger.info(f"   BUSINESS_PHONE_NUMBER = '{TWILIO_PHONE_NUMBER}'")
+#     logger.info("This will make the system call your Twilio number back")
 
-def generate_twilio_sdp_offer():
-    """Generate SDP offer for Twilio WebRTC connection"""
-    return """v=0
-o=- 4611731400430051336 2 IN IP4 127.0.0.1
-s=-
-t=0 0
-a=group:BUNDLE 0
-a=extmap-allow-mixed
-a=msid-semantic: WMS
-m=audio 9 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126
-c=IN IP4 0.0.0.0
-a=rtcp:9 IN IP4 0.0.0.0
-a=ice-ufrag:4ZcD
-a=ice-pwd:2/1muCWoOi3uHTH0tqs1Kh+F
-a=ice-options:trickle
-a=fingerprint:sha-256 28:E8:97:FC:B8:53:24:B8:1F:AB:C1:29:E3:A0:1E:8B:38:36:C2:14:D7:76:66:83:1A:B4:EA:98:AA:64:15:1C
-a=setup:active
-a=mid:0
-a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level
-a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
-a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
-a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
-a=sendrecv
-a=msid:- 750e164d-7709-4d6b-b17f-0b9d2e4ca9de
-a=rtcp-mux
-a=rtpmap:111 opus/48000/2
-a=rtcp-fb:111 transport-cc
-a=fmtp:111 minptime=10;useinbandfec=1
-a=rtpmap:63 red/48000/2
-a=fmtp:63 111/111
-a=rtpmap:9 G722/8000
-a=rtpmap:0 PCMU/8000
-a=rtpmap:8 PCMA/8000
-a=rtpmap:13 CN/8000
-a=rtpmap:110 telephone-event/48000
-a=rtpmap:126 telephone-event/8000
-a=ssrc:1009384203 cname:nKXm1Y4g3wAKu91t
-a=ssrc:1009384203 msid:- 750e164d-7709-4d6b-b17f-0b9d2e4ca9de"""
+# def generate_twilio_sdp_offer():
+#     """Generate SDP offer for Twilio WebRTC connection"""
+#     return """v=0
+# o=- 4611731400430051336 2 IN IP4 127.0.0.1
+# s=-
+# t=0 0
+# a=group:BUNDLE 0
+# a=extmap-allow-mixed
+# a=msid-semantic: WMS
+# m=audio 9 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126
+# c=IN IP4 0.0.0.0
+# a=rtcp:9 IN IP4 0.0.0.0
+# a=ice-ufrag:4ZcD
+# a=ice-pwd:2/1muCWoOi3uHTH0tqs1Kh+F
+# a=ice-options:trickle
+# a=fingerprint:sha-256 28:E8:97:FC:B8:53:24:B8:1F:AB:C1:29:E3:A0:1E:8B:38:36:C2:14:D7:76:66:83:1A:B4:EA:98:AA:64:15:1C
+# a=setup:active
+# a=mid:0
+# a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level
+# a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+# a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+# a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
+# a=sendrecv
+# a=msid:- 750e164d-7709-4d6b-b17f-0b9d2e4ca9de
+# a=rtcp-mux
+# a=rtpmap:111 opus/48000/2
+# a=rtcp-fb:111 transport-cc
+# a=fmtp:111 minptime=10;useinbandfec=1
+# a=rtpmap:63 red/48000/2
+# a=fmtp:63 111/111
+# a=rtpmap:9 G722/8000
+# a=rtpmap:0 PCMU/8000
+# a=rtpmap:8 PCMA/8000
+# a=rtpmap:13 CN/8000
+# a=rtpmap:110 telephone-event/48000
+# a=rtpmap:126 telephone-event/8000
+# a=ssrc:1009384203 cname:nKXm1Y4g3wAKu91t
+# a=ssrc:1009384203 msid:- 750e164d-7709-4d6b-b17f-0b9d2e4ca9de"""
 
-def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
-    """Make API call to WhatsApp Calling API"""
-    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
+# def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
+#     """Make API call to WhatsApp Calling API"""
+#     url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
     
-    headers = {
-        'Authorization': f'Bearer {ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
+#     headers = {
+#         'Authorization': f'Bearer {ACCESS_TOKEN}',
+#         'Content-Type': 'application/json'
+#     }
     
-    data = {
-        "messaging_product": "whatsapp",
-        "call_id": call_id,
-        "action": action
-    }
+#     data = {
+#         "messaging_product": "whatsapp",
+#         "call_id": call_id,
+#         "action": action
+#     }
     
-    if sdp and action in ['pre_accept', 'accept']:
-        data["session"] = {
-            "sdp_type": "answer",
-            "sdp": sdp
-        }
+#     if sdp and action in ['pre_accept', 'accept']:
+#         data["session"] = {
+#             "sdp_type": "answer",
+#             "sdp": sdp
+#         }
     
-    if callback_data and action == 'accept':
-        data["biz_opaque_callback_data"] = callback_data
+#     if callback_data and action == 'accept':
+#         data["biz_opaque_callback_data"] = callback_data
     
-    try:
-        logger.info(f"[WhatsApp API] Calling {action} for call {call_id}")
-        response = requests.post(url, headers=headers, json=data)
+#     try:
+#         logger.info(f"[WhatsApp API] Calling {action} for call {call_id}")
+#         response = requests.post(url, headers=headers, json=data)
         
-        if response.status_code == 200:
-            return response.json()
-        else:
-            error_data = response.json() if response.content else {}
-            logger.error(f"[WhatsApp API] Error response: {error_data}")
-            return {"success": False, "error": error_data}
+#         if response.status_code == 200:
+#             return response.json()
+#         else:
+#             error_data = response.json() if response.content else {}
+#             logger.error(f"[WhatsApp API] Error response: {error_data}")
+#             return {"success": False, "error": error_data}
             
-    except Exception as e:
-        logger.error(f"[WhatsApp API] Error for {action}: {e}")
-        return {"success": False, "error": str(e)}
+#     except Exception as e:
+#         logger.error(f"[WhatsApp API] Error for {action}: {e}")
+#         return {"success": False, "error": str(e)}
 
-def create_twilio_call_fixed(whatsapp_call_id, from_number):
-    """Create Twilio call with proper setup"""
-    global active_calls
+# def create_twilio_call_fixed(whatsapp_call_id, from_number):
+#     """Create Twilio call with proper setup"""
+#     global active_calls
     
-    if not twilio_client:
-        logger.error("Twilio client not initialized")
-        return None
+#     if not twilio_client:
+#         logger.error("Twilio client not initialized")
+#         return None
     
-    try:
-        # Ensure active_calls is a dict before using it
-        if not isinstance(active_calls, dict):
-            logger.error("active_calls is not a dict! Converting...")
-            active_calls = {}
+#     try:
+#         # Ensure active_calls is a dict before using it
+#         if not isinstance(active_calls, dict):
+#             logger.error("active_calls is not a dict! Converting...")
+#             active_calls = {}
         
-        # Add to active_calls BEFORE creating Twilio call
-        active_calls[whatsapp_call_id] = {
-            'twilio_sid': None,
-            'whatsapp_from': from_number,
-            'whatsapp_to': BUSINESS_PHONE_NUMBER,
-            'status': 'initiating',
-            'created_at': datetime.now().isoformat()
-        }
-        logger.info(f"Added {whatsapp_call_id} to active_calls")
+#         # Add to active_calls BEFORE creating Twilio call
+#         active_calls[whatsapp_call_id] = {
+#             'twilio_sid': None,
+#             'whatsapp_from': from_number,
+#             'whatsapp_to': BUSINESS_PHONE_NUMBER,
+#             'status': 'initiating',
+#             'created_at': datetime.now().isoformat()
+#         }
+#         logger.info(f"Added {whatsapp_call_id} to active_calls")
         
-        # Construct callback URLs
-        callback_url = f"{BASE_URL_t}/twilio-connect/{whatsapp_call_id}/"
-        status_callback_url = f"{BASE_URL_t}/twilio-status/{whatsapp_call_id}/"
+#         # Construct callback URLs
+#         callback_url = f"{BASE_URL_t}/twilio-connect/{whatsapp_call_id}/"
+#         status_callback_url = f"{BASE_URL_t}/twilio-status/{whatsapp_call_id}/"
         
-        logger.info(f"Creating Twilio call:")
-        logger.info(f"  From: {TWILIO_PHONE_NUMBER}")
-        logger.info(f"  To: {BUSINESS_PHONE_NUMBER}")
-        logger.info(f"  Callback: {callback_url}")
+#         logger.info(f"Creating Twilio call:")
+#         logger.info(f"  From: {TWILIO_PHONE_NUMBER}")
+#         logger.info(f"  To: {BUSINESS_PHONE_NUMBER}")
+#         logger.info(f"  Callback: {callback_url}")
         
-        # Create the call
-        call = twilio_client.calls.create(
-            to=BUSINESS_PHONE_NUMBER,
-            from_=TWILIO_PHONE_NUMBER,
-            url=callback_url,
-            status_callback=status_callback_url,
-            status_callback_event=['initiated', 'ringing', 'answered', 'completed'],
-            status_callback_method='POST',
-            timeout=60
-        )
+#         # Create the call
+#         call = twilio_client.calls.create(
+#             to=BUSINESS_PHONE_NUMBER,
+#             from_=TWILIO_PHONE_NUMBER,
+#             url=callback_url,
+#             status_callback=status_callback_url,
+#             status_callback_event=['initiated', 'ringing', 'answered', 'completed'],
+#             status_callback_method='POST',
+#             timeout=60
+#         )
         
-        # Update with Twilio SID
-        active_calls[whatsapp_call_id]['twilio_sid'] = call.sid
-        active_calls[whatsapp_call_id]['status'] = 'connecting'
+#         # Update with Twilio SID
+#         active_calls[whatsapp_call_id]['twilio_sid'] = call.sid
+#         active_calls[whatsapp_call_id]['status'] = 'connecting'
         
-        logger.info(f"Successfully created Twilio call {call.sid}")
-        return call.sid
+#         logger.info(f"Successfully created Twilio call {call.sid}")
+#         return call.sid
         
-    except Exception as e:
-        logger.error(f"Failed to create Twilio call: {e}")
+#     except Exception as e:
+#         logger.error(f"Failed to create Twilio call: {e}")
         
-        # Clean up on failure
-        if whatsapp_call_id in active_calls:
-            del active_calls[whatsapp_call_id]
+#         # Clean up on failure
+#         if whatsapp_call_id in active_calls:
+#             del active_calls[whatsapp_call_id]
         
-        return None
+#         return None
 
-@csrf_exempt 
-@require_http_methods(["POST", "GET"])
-def twilio_status_fast(request, whatsapp_call_id):
-    """Fast-responding status webhook"""
+# @csrf_exempt 
+# @require_http_methods(["POST", "GET"])
+# def twilio_status_fast(request, whatsapp_call_id):
+#     """Fast-responding status webhook"""
     
-    call_status = request.POST.get('CallStatus', 'unknown')
-    logger.info(f"Status: {call_status} for {whatsapp_call_id}")
+#     call_status = request.POST.get('CallStatus', 'unknown')
+#     logger.info(f"Status: {call_status} for {whatsapp_call_id}")
     
-    try:
-        if call_status in ['completed', 'canceled', 'failed']:
-            # Clean up quickly
-            call_whatsapp_api(whatsapp_call_id, 'terminate')
+#     try:
+#         if call_status in ['completed', 'canceled', 'failed']:
+#             # Clean up quickly
+#             call_whatsapp_api(whatsapp_call_id, 'terminate')
             
-            if whatsapp_call_id in active_calls:
-                del active_calls[whatsapp_call_id]
+#             if whatsapp_call_id in active_calls:
+#                 del active_calls[whatsapp_call_id]
         
-        return HttpResponse('OK')
+#         return HttpResponse('OK')
         
-    except Exception as e:
-        logger.error(f"Status error: {e}")
-        return HttpResponse('ERROR', status=500)
+#     except Exception as e:
+#         logger.error(f"Status error: {e}")
+#         return HttpResponse('ERROR', status=500)
 
 
-# ALTERNATIVE: Direct dial without webhooks
-def create_twilio_call_direct(whatsapp_call_id, from_number):
-    """Create Twilio call with direct dialing (no webhooks)"""
-    global active_calls
+# # ALTERNATIVE: Direct dial without webhooks
+# def create_twilio_call_direct(whatsapp_call_id, from_number):
+#     """Create Twilio call with direct dialing (no webhooks)"""
+#     global active_calls
     
-    if not twilio_client:
-        return None
+#     if not twilio_client:
+#         return None
     
-    try:
-        # Add to active calls
-        active_calls[whatsapp_call_id] = {
-            'status': 'connecting',
-            'created_at': datetime.now().isoformat()
-        }
+#     try:
+#         # Add to active calls
+#         active_calls[whatsapp_call_id] = {
+#             'status': 'connecting',
+#             'created_at': datetime.now().isoformat()
+#         }
         
-        # Create call that directly dials without webhooks
-        call = twilio_client.calls.create(
-            to=BUSINESS_PHONE_NUMBER,
-            from_=TWILIO_PHONE_NUMBER,
-            # Use TwiML directly instead of webhook URL
-            twiml=f'<Response><Say>Connecting WhatsApp call</Say><Dial timeout="30">{BUSINESS_PHONE_NUMBER}</Dial></Response>',
-            status_callback=f"{BASE_URL_t}/twilio-status/{whatsapp_call_id}/",
-            status_callback_event=['completed']
-        )
+#         # Create call that directly dials without webhooks
+#         call = twilio_client.calls.create(
+#             to=BUSINESS_PHONE_NUMBER,
+#             from_=TWILIO_PHONE_NUMBER,
+#             # Use TwiML directly instead of webhook URL
+#             twiml=f'<Response><Say>Connecting WhatsApp call</Say><Dial timeout="30">{BUSINESS_PHONE_NUMBER}</Dial></Response>',
+#             status_callback=f"{BASE_URL_t}/twilio-status/{whatsapp_call_id}/",
+#             status_callback_event=['completed']
+#         )
         
-        active_calls[whatsapp_call_id]['twilio_sid'] = call.sid
-        logger.info(f"Created direct call {call.sid}")
-        return call.sid
+#         active_calls[whatsapp_call_id]['twilio_sid'] = call.sid
+#         logger.info(f"Created direct call {call.sid}")
+#         return call.sid
         
-    except Exception as e:
-        logger.error(f"Direct call failed: {e}")
-        if whatsapp_call_id in active_calls:
-            del active_calls[whatsapp_call_id]
-        return None
+#     except Exception as e:
+#         logger.error(f"Direct call failed: {e}")
+#         if whatsapp_call_id in active_calls:
+#             del active_calls[whatsapp_call_id]
+#         return None
     
-def handle_calling_webhook_direct(change, contact):
-    """Handle calling with direct Twilio dialing"""
-    global active_calls
+# def handle_calling_webhook_direct(change, contact):
+#     """Handle calling with direct Twilio dialing"""
+#     global active_calls
     
-    if not isinstance(active_calls, dict):
-        active_calls = {}
+#     if not isinstance(active_calls, dict):
+#         active_calls = {}
     
-    if change.get('field') == 'calls':
-        calls = change.get('value', {}).get('calls', [])
+#     if change.get('field') == 'calls':
+#         calls = change.get('value', {}).get('calls', [])
         
-        for call in calls:
-            call_id = call.get('id')
-            event = call.get('event')
-            from_number = call.get('from')
+#         for call in calls:
+#             call_id = call.get('id')
+#             event = call.get('event')
+#             from_number = call.get('from')
             
-            logger.info(f"Call {event}: {call_id}")
+#             logger.info(f"Call {event}: {call_id}")
             
-            if event == 'connect':
-                # Pre-accept
-                sdp_answer = generate_twilio_sdp_offer()
-                pre_accept_response = call_whatsapp_api(call_id, 'pre_accept', sdp_answer)
+#             if event == 'connect':
+#                 # Pre-accept
+#                 sdp_answer = generate_twilio_sdp_offer()
+#                 pre_accept_response = call_whatsapp_api(call_id, 'pre_accept', sdp_answer)
                 
-                if pre_accept_response and pre_accept_response.get('success'):
-                    # Use direct calling instead of webhooks
-                    twilio_call_sid = create_twilio_call_direct(call_id, from_number)
+#                 if pre_accept_response and pre_accept_response.get('success'):
+#                     # Use direct calling instead of webhooks
+#                     twilio_call_sid = create_twilio_call_direct(call_id, from_number)
                     
-                    if twilio_call_sid:
-                        # Accept WhatsApp call
-                        accept_response = call_whatsapp_api(
-                            call_id, 
-                            'accept', 
-                            sdp_answer,
-                            f"twilio_sid:{twilio_call_sid}"
-                        )
+#                     if twilio_call_sid:
+#                         # Accept WhatsApp call
+#                         accept_response = call_whatsapp_api(
+#                             call_id, 
+#                             'accept', 
+#                             sdp_answer,
+#                             f"twilio_sid:{twilio_call_sid}"
+#                         )
                         
-                        if accept_response and accept_response.get('success'):
-                            logger.info(f"SUCCESS: Direct call setup for {call_id}")
-                        else:
-                            logger.error(f"Failed to accept {call_id}")
+#                         if accept_response and accept_response.get('success'):
+#                             logger.info(f"SUCCESS: Direct call setup for {call_id}")
+#                         else:
+#                             logger.error(f"Failed to accept {call_id}")
             
-            elif event == 'terminate':
-                logger.info(f"Call terminated: {call_id}")
-                if call_id in active_calls:
-                    twilio_sid = active_calls[call_id].get('twilio_sid')
-                    if twilio_sid:
-                        try:
-                            twilio_client.calls(twilio_sid).update(status='completed')
-                        except:
-                            pass
-                    del active_calls[call_id]
-# Use this fixed function in your webhook
-# Replace handle_calling_webhook with handle_calling_webhook_fixed
-@csrf_exempt
-@require_http_methods(["POST"])
-def terminate_call(request):
-    """Manually terminate a call"""
-    try:
-        data = json.loads(request.body)
-        call_id = data.get('call_id')
+#             elif event == 'terminate':
+#                 logger.info(f"Call terminated: {call_id}")
+#                 if call_id in active_calls:
+#                     twilio_sid = active_calls[call_id].get('twilio_sid')
+#                     if twilio_sid:
+#                         try:
+#                             twilio_client.calls(twilio_sid).update(status='completed')
+#                         except:
+#                             pass
+#                     del active_calls[call_id]
+# # Use this fixed function in your webhook
+# # Replace handle_calling_webhook with handle_calling_webhook_fixed
+# @csrf_exempt
+# @require_http_methods(["POST"])
+# def terminate_call(request):
+#     """Manually terminate a call"""
+#     try:
+#         data = json.loads(request.body)
+#         call_id = data.get('call_id')
         
-        if not call_id:
-            return JsonResponse({'error': 'call_id is required'}, status=400)
+#         if not call_id:
+#             return JsonResponse({'error': 'call_id is required'}, status=400)
         
-        # Terminate WhatsApp call
-        response = call_whatsapp_api(call_id, 'terminate')
+#         # Terminate WhatsApp call
+#         response = call_whatsapp_api(call_id, 'terminate')
         
-        # Terminate associated Twilio call
-        if call_id in active_calls:
-            twilio_sid = active_calls[call_id]['twilio_sid']
-            try:
-                twilio_client.calls(twilio_sid).update(status='completed')
-            except:
-                pass
-            del active_calls[call_id]
+#         # Terminate associated Twilio call
+#         if call_id in active_calls:
+#             twilio_sid = active_calls[call_id]['twilio_sid']
+#             try:
+#                 twilio_client.calls(twilio_sid).update(status='completed')
+#             except:
+#                 pass
+#             del active_calls[call_id]
         
-        if response and response.get('success'):
-            return JsonResponse({'status': 'Call terminated successfully'})
-        else:
-            return JsonResponse({'error': 'Failed to terminate call'}, status=500)
+#         if response and response.get('success'):
+#             return JsonResponse({'status': 'Call terminated successfully'})
+#         else:
+#             return JsonResponse({'error': 'Failed to terminate call'}, status=500)
     
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+#     except json.JSONDecodeError:
+#         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     
-    except Exception as e:
-        logger.error(f"Error terminating call: {e}")
-        return JsonResponse({'error': 'Internal server error'}, status=500)
-debug_active_calls()
+#     except Exception as e:
+#         logger.error(f"Error terminating call: {e}")
+#         return JsonResponse({'error': 'Internal server error'}, status=500)
+# debug_active_calls()
 
 
-@csrf_exempt
-@require_http_methods(["POST", "GET"])
-def twilio_connect_fast(request, whatsapp_call_id):
-    """Fast-responding webhook to prevent timeouts"""
+# @csrf_exempt
+# @require_http_methods(["POST", "GET"])
+# def twilio_connect_fast(request, whatsapp_call_id):
+#     """Fast-responding webhook to prevent timeouts"""
     
-    logger.info(f"Twilio connect: {whatsapp_call_id}")
+#     logger.info(f"Twilio connect: {whatsapp_call_id}")
     
-    # Create response immediately
-    response = VoiceResponse()
+#     # Create response immediately
+#     response = VoiceResponse()
     
-    try:
-        # Simple, fast response
-        response.say("Connecting your WhatsApp call...")
-        response.dial(BUSINESS_PHONE_NUMBER, timeout=30)
+#     try:
+#         # Simple, fast response
+#         response.say("Connecting your WhatsApp call...")
+#         response.dial(BUSINESS_PHONE_NUMBER, timeout=30)
         
-        # Log success
-        logger.info(f"Connected call {whatsapp_call_id}")
+#         # Log success
+#         logger.info(f"Connected call {whatsapp_call_id}")
         
-        return HttpResponse(str(response), content_type='text/xml')
+#         return HttpResponse(str(response), content_type='text/xml')
         
-    except Exception as e:
-        logger.error(f"Connect error: {e}")
+#     except Exception as e:
+#         logger.error(f"Connect error: {e}")
         
-        # Fast error response
-        response = VoiceResponse()
-        response.say("Call connection failed.")
-        response.hangup()
+#         # Fast error response
+#         response = VoiceResponse()
+#         response.say("Call connection failed.")
+#         response.hangup()
         
-        return HttpResponse(str(response), content_type='text/xml')
+#         return HttpResponse(str(response), content_type='text/xml')
 
 
-# Add a new endpoint to handle dial action results
-@csrf_exempt
-@require_http_methods(["POST"])
-def twilio_dial_action(request, whatsapp_call_id):
-    """Handle the result of the dial action"""
+# # Add a new endpoint to handle dial action results
+# @csrf_exempt
+# @require_http_methods(["POST"])
+# def twilio_dial_action(request, whatsapp_call_id):
+#     """Handle the result of the dial action"""
     
-    logger.info(f"=== TWILIO DIAL ACTION ===")
-    logger.info(f"WhatsApp Call ID: {whatsapp_call_id}")
-    logger.info(f"POST params: {dict(request.POST)}")
+#     logger.info(f"=== TWILIO DIAL ACTION ===")
+#     logger.info(f"WhatsApp Call ID: {whatsapp_call_id}")
+#     logger.info(f"POST params: {dict(request.POST)}")
     
-    dial_status = request.POST.get('DialCallStatus')
-    call_duration = request.POST.get('DialCallDuration', '0')
+#     dial_status = request.POST.get('DialCallStatus')
+#     call_duration = request.POST.get('DialCallDuration', '0')
     
-    logger.info(f"Dial Status: {dial_status}")
-    logger.info(f"Dial Duration: {call_duration}")
+#     logger.info(f"Dial Status: {dial_status}")
+#     logger.info(f"Dial Duration: {call_duration}")
     
-    response = VoiceResponse()
+#     response = VoiceResponse()
     
-    if dial_status in ['completed', 'answered']:
-        logger.info("Call was successful")
-        response.say("Thank you for using our service. Goodbye.")
-    else:
-        logger.info(f"Call failed with status: {dial_status}")
-        response.say("We were unable to connect your call. Please try again later or contact us directly.")
+#     if dial_status in ['completed', 'answered']:
+#         logger.info("Call was successful")
+#         response.say("Thank you for using our service. Goodbye.")
+#     else:
+#         logger.info(f"Call failed with status: {dial_status}")
+#         response.say("We were unable to connect your call. Please try again later or contact us directly.")
     
-    response.hangup()
-    return HttpResponse(str(response), content_type='text/xml')
+#     response.hangup()
+#     return HttpResponse(str(response), content_type='text/xml')
 
 
-# Add a simple test endpoint to verify your webhooks work
-@csrf_exempt
-def test_twilio_webhook(request):
-    """Test endpoint to verify Twilio can reach your server"""
+# # Add a simple test endpoint to verify your webhooks work
+# @csrf_exempt
+# def test_twilio_webhook(request):
+#     """Test endpoint to verify Twilio can reach your server"""
     
-    logger.info(f"=== TWILIO TEST WEBHOOK ===")
-    logger.info(f"Method: {request.method}")
-    logger.info(f"Path: {request.path}")
-    logger.info(f"Headers: {dict(request.META)}")
+#     logger.info(f"=== TWILIO TEST WEBHOOK ===")
+#     logger.info(f"Method: {request.method}")
+#     logger.info(f"Path: {request.path}")
+#     logger.info(f"Headers: {dict(request.META)}")
     
-    if request.method == 'POST':
-        logger.info(f"POST data: {dict(request.POST)}")
+#     if request.method == 'POST':
+#         logger.info(f"POST data: {dict(request.POST)}")
     
-    response = VoiceResponse()
-    response.say("This is a test. Your webhook is working correctly.")
-    response.hangup()
+#     response = VoiceResponse()
+#     response.say("This is a test. Your webhook is working correctly.")
+#     response.hangup()
     
-    logger.info(f"Returning test TwiML: {str(response)}")
-    return HttpResponse(str(response), content_type='text/xml')
+#     logger.info(f"Returning test TwiML: {str(response)}")
+#     return HttpResponse(str(response), content_type='text/xml')
 
 
 
 
-# Also add this function to test if your business number needs verification
-def check_business_number_verification():
-    """Check if the business number is verified"""
-    try:
-        if not twilio_client:
-            logger.error("Twilio client not available")
-            return
+# # Also add this function to test if your business number needs verification
+# def check_business_number_verification():
+#     """Check if the business number is verified"""
+#     try:
+#         if not twilio_client:
+#             logger.error("Twilio client not available")
+#             return
         
-        logger.info("=== CHECKING BUSINESS NUMBER VERIFICATION ===")
+#         logger.info("=== CHECKING BUSINESS NUMBER VERIFICATION ===")
         
-        # Check verified caller IDs
-        caller_ids = twilio_client.outgoing_caller_ids.list()
-        verified_numbers = [cid.phone_number for cid in caller_ids]
+#         # Check verified caller IDs
+#         caller_ids = twilio_client.outgoing_caller_ids.list()
+#         verified_numbers = [cid.phone_number for cid in caller_ids]
         
-        logger.info(f"Verified caller IDs: {verified_numbers}")
-        logger.info(f"Business number: {BUSINESS_PHONE_NUMBER}")
-        logger.info(f"Is business number verified: {BUSINESS_PHONE_NUMBER in verified_numbers}")
+#         logger.info(f"Verified caller IDs: {verified_numbers}")
+#         logger.info(f"Business number: {BUSINESS_PHONE_NUMBER}")
+#         logger.info(f"Is business number verified: {BUSINESS_PHONE_NUMBER in verified_numbers}")
         
-        if BUSINESS_PHONE_NUMBER not in verified_numbers:
-            logger.warning("🚨 BUSINESS NUMBER NOT VERIFIED 🚨")
-            logger.warning("This will cause calls to fail on trial accounts!")
-        else:
-            logger.info("✅ Business number is properly verified")
+#         if BUSINESS_PHONE_NUMBER not in verified_numbers:
+#             logger.warning("🚨 BUSINESS NUMBER NOT VERIFIED 🚨")
+#             logger.warning("This will cause calls to fail on trial accounts!")
+#         else:
+#             logger.info("✅ Business number is properly verified")
     
-    except Exception as e:
-        logger.error(f"Error checking verification: {e}")
+#     except Exception as e:
+#         logger.error(f"Error checking verification: {e}")
 
-# Call this on startup
-check_business_number_verification()
+# # Call this on startup
+# check_business_number_verification()
 
-# Alternative simpler approach - just test if we can make a basic call
-def test_basic_twilio_call():
-    """Test making a basic Twilio call to see if credentials work"""
-    try:
-        if not twilio_client:
-            logger.error("Cannot test - Twilio client not available")
-            return
+# # Alternative simpler approach - just test if we can make a basic call
+# def test_basic_twilio_call():
+#     """Test making a basic Twilio call to see if credentials work"""
+#     try:
+#         if not twilio_client:
+#             logger.error("Cannot test - Twilio client not available")
+#             return
         
-        logger.info("=== TESTING BASIC TWILIO CALL ===")
+#         logger.info("=== TESTING BASIC TWILIO CALL ===")
         
-        # Try to make a very simple call to your own Twilio number
-        test_call = twilio_client.calls.create(
-            to=TWILIO_PHONE_NUMBER,  # Call your own Twilio number
-            from_=TWILIO_PHONE_NUMBER,  # From the same number
-            url=f"{BASE_URL_t}/test-twilio/",  # Simple test webhook
-            timeout=10
-        )
+#         # Try to make a very simple call to your own Twilio number
+#         test_call = twilio_client.calls.create(
+#             to=TWILIO_PHONE_NUMBER,  # Call your own Twilio number
+#             from_=TWILIO_PHONE_NUMBER,  # From the same number
+#             url=f"{BASE_URL_t}/test-twilio/",  # Simple test webhook
+#             timeout=10
+#         )
         
-        logger.info(f"✅ Test call created successfully: {test_call.sid}")
-        logger.info("This means your Twilio credentials work!")
+#         logger.info(f"✅ Test call created successfully: {test_call.sid}")
+#         logger.info("This means your Twilio credentials work!")
         
-    except Exception as e:
-        logger.error(f"❌ Test call failed: {e}")
-        logger.error("This indicates an issue with your Twilio setup")
+#     except Exception as e:
+#         logger.error(f"❌ Test call failed: {e}")
+#         logger.error("This indicates an issue with your Twilio setup")
 
 
 @csrf_exempt
@@ -1547,21 +1547,25 @@ def whatsapp_webhook_view(request):
             logger.info("DEBUG: No flows data in this webhook call")
         
         try:
-            for entry in data.get('entry', []):
+             for entry in data.get('entry', []):
                 for change in entry.get('changes', []):
-                    value = change.get('value', {})
                     
-                    # --- HANDLE CALLING WEBHOOKS FIRST (NO CONTACT NEEDED) ---
+                    # Handle call events
                     if change.get('field') == 'calls':
-                        # Create a dummy contact for calling webhook or get from call data
-                        # We need to extract contact info from the call data itself
-                        calls = value.get('calls', [])
+                        calls = change.get('value', {}).get('calls', [])
+                        
                         for call in calls:
-                            from_number = call.get('from')
-                            if from_number:
-                                contact, _ = ChatContact.objects.get_or_create(wa_id=from_number)
-                                handle_calling_webhook_direct(change, contact)
-                        continue  # Skip further processing for call webhooks
+                            event = call.get('event')
+                            
+                            if event == 'connect':
+                                success = handle_whatsapp_call_connect(call)
+                                if not success:
+                                    logger.error(f"Failed to handle call connect: {call.get('id')}")
+                                    
+                            elif event == 'terminate':
+                                handle_whatsapp_call_terminate(call)
+                                
+                    value = change.get('value',{})  # Skip further processing for call webhooks
                     
                     # --- PROCESS MESSAGES ---
                     if 'messages' in value:
@@ -2538,3 +2542,501 @@ def upload_image_to_meta_api(request):
             return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
 
     return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+
+
+BASE_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp'
+
+@csrf_exempt
+def debug_active_calls(request):
+    """Debug endpoint to view active calls"""
+    return JsonResponse({
+        'active_calls': active_calls,
+        'count': len(active_calls),
+        'timestamp': datetime.now().isoformat()
+    })
+
+@csrf_exempt
+def test_business_number(request):
+    """Test endpoint to check if business number is reachable"""
+    
+    if not twilio_client:
+        return JsonResponse({'error': 'Twilio client not available'}, status=500)
+    
+    try:
+        test_call = twilio_client.calls.create(
+            to=ACTUAL_BUSINESS_PHONE,
+            from_=TWILIO_PHONE_NUMBER,
+            twiml=f'''<Response>
+                <Say voice="alice">This is a test call from your WhatsApp integration system. 
+                If you can hear this message clearly, your business number is working correctly.</Say>
+                <Pause length="2"/>
+                <Say voice="alice">This test call will end in 3 seconds.</Say>
+                <Pause length="3"/>
+                <Hangup/>
+            </Response>'''
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Test call initiated',
+            'call_sid': test_call.sid,
+            'business_number': ACTUAL_BUSINESS_PHONE
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'business_number': ACTUAL_BUSINESS_PHONE
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def terminate_call(request):
+    """Manually terminate a specific call"""
+    try:
+        data = json.loads(request.body)
+        call_id = data.get('call_id')
+        
+        if not call_id:
+            return JsonResponse({'error': 'call_id required'}, status=400)
+        
+        if call_id in active_calls:
+            cleanup_failed_call(call_id)
+            return JsonResponse({'success': True, 'message': f'Terminated call {call_id}'})
+        else:
+            return JsonResponse({'error': 'Call not found'}, status=404)
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def system_health(request):
+    """System health check endpoint"""
+    
+    health_status = {
+        'timestamp': datetime.now().isoformat(),
+        'twilio_client': twilio_client is not None,
+        'active_calls_count': len(active_calls),
+        'configuration': {
+            'whatsapp_business_number': WHATSAPP_BUSINESS_NUMBER,
+            'actual_business_phone': ACTUAL_BUSINESS_PHONE,
+            'twilio_phone_number': TWILIO_PHONE_NUMBER,
+            'base_url': BASE_URL
+        }
+    }
+    
+    # Test Twilio connectivity
+    if twilio_client:
+        try:
+            account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+            health_status['twilio_account'] = account.friendly_name
+            health_status['twilio_status'] = 'connected'
+        except Exception as e:
+            health_status['twilio_status'] = f'error: {e}'
+    else:
+        health_status['twilio_status'] = 'not_initialized'
+    
+    return JsonResponse(health_status)
+
+
+
+def generate_conference_name():
+    """Generate unique conference room name"""
+    return f"whatsapp_call_{uuid.uuid4().hex[:12]}"
+
+def generate_twilio_sdp_answer():
+    """Generate SDP answer for WhatsApp WebRTC"""
+    return """v=0
+o=- 4611731400430051336 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE 0
+a=extmap-allow-mixed
+a=msid-semantic: WMS
+m=audio 9 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=ice-ufrag:TwilioICE
+a=ice-pwd:TwilioWebRTCBridge2024
+a=ice-options:trickle
+a=fingerprint:sha-256 28:E8:97:FC:B8:53:24:B8:1F:AB:C1:29:E3:A0:1E:8B:38:36:C2:14:D7:76:66:83:1A:B4:EA:98:AA:64:15:1C
+a=setup:active
+a=mid:0
+a=sendrecv
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=rtcp-fb:111 transport-cc
+a=fmtp:111 minptime=10;useinbandfec=1
+a=ssrc:1009384203 cname:TwilioWhatsAppBridge"""
+
+def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
+    """Call WhatsApp Business API"""
+    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
+    
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    
+    data = {
+        "messaging_product": "whatsapp",
+        "call_id": call_id,
+        "action": action
+    }
+    
+    if sdp and action in ['pre_accept', 'accept']:
+        data["session"] = {
+            "sdp_type": "answer",
+            "sdp": sdp
+        }
+    
+    if callback_data:
+        data["biz_opaque_callback_data"] = callback_data
+    
+    try:
+        logger.info(f"[WhatsApp API] {action.upper()} for call {call_id}")
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"[WhatsApp API] {action} successful")
+            return {"success": True, "data": result}
+        else:
+            error_data = response.json() if response.content else {}
+            logger.error(f"[WhatsApp API] {action} failed: {error_data}")
+            return {"success": False, "error": error_data}
+            
+    except Exception as e:
+        logger.error(f"[WhatsApp API] {action} exception: {e}")
+        return {"success": False, "error": str(e)}
+
+# =============================================================================
+# MAIN CALL HANDLING LOGIC
+# =============================================================================
+
+def handle_whatsapp_call_connect(call_data):
+    """Handle incoming WhatsApp call - the main entry point"""
+    call_id = call_data.get('id')
+    from_number = call_data.get('from')
+    to_number = call_data.get('to')
+    
+    logger.info(f"=== WHATSAPP CALL CONNECT ===")
+    logger.info(f"Call ID: {call_id}")
+    logger.info(f"From: {from_number}")
+    logger.info(f"To: {to_number}")
+    
+    if not twilio_client:
+        logger.error("Cannot handle call - Twilio client not available")
+        return False
+    
+    try:
+        # Step 1: Pre-accept the WhatsApp call
+        logger.info(f"[STEP 1] Pre-accepting WhatsApp call...")
+        sdp_answer = generate_twilio_sdp_answer()
+        pre_accept_result = call_whatsapp_api(call_id, 'pre_accept', sdp_answer)
+        
+        if not pre_accept_result.get('success'):
+            logger.error(f"Pre-accept failed: {pre_accept_result}")
+            return False
+        
+        # Step 2: Create conference room and call business number
+        logger.info(f"[STEP 2] Creating conference and calling business...")
+        conference_name = generate_conference_name()
+        
+        # Store call information
+        active_calls[call_id] = {
+            'conference_name': conference_name,
+            'whatsapp_from': from_number,
+            'status': 'connecting',
+            'created_at': datetime.now().isoformat(),
+            'business_call_sid': None,
+            'bridge_call_sid': None
+        }
+        
+        # Create call to business number
+        business_call = twilio_client.calls.create(
+            to=ACTUAL_BUSINESS_PHONE,
+            from_=TWILIO_PHONE_NUMBER,
+            url=f"{BASE_URL}/register/whatsapp/business-answer/{call_id}/",
+            status_callback=f"{BASE_URL}/register/whatsapp/call-status/{call_id}/business/",
+            status_callback_event=['answered', 'completed', 'busy', 'no-answer', 'failed'],
+            timeout=30
+        )
+        
+        active_calls[call_id]['business_call_sid'] = business_call.sid
+        logger.info(f"Business call created: {business_call.sid}")
+        
+        # Step 3: Accept WhatsApp call
+        logger.info(f"[STEP 3] Accepting WhatsApp call...")
+        accept_result = call_whatsapp_api(
+            call_id, 
+            'accept', 
+            sdp_answer, 
+            f"conference:{conference_name}"
+        )
+        
+        if accept_result.get('success'):
+            logger.info(f"✅ WhatsApp call {call_id} successfully accepted")
+            return True
+        else:
+            logger.error(f"Accept failed: {accept_result}")
+            cleanup_failed_call(call_id)
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error in handle_whatsapp_call_connect: {e}")
+        cleanup_failed_call(call_id)
+        return False
+
+def handle_whatsapp_call_terminate(call_data):
+    """Handle WhatsApp call termination"""
+    call_id = call_data.get('id')
+    
+    logger.info(f"=== WHATSAPP CALL TERMINATE ===")
+    logger.info(f"Call ID: {call_id}")
+    
+    if call_id in active_calls:
+        call_info = active_calls[call_id]
+        
+        # Terminate associated Twilio calls
+        for call_type in ['business_call_sid', 'bridge_call_sid']:
+            sid = call_info.get(call_type)
+            if sid:
+                try:
+                    twilio_client.calls(sid).update(status='completed')
+                    logger.info(f"Terminated {call_type}: {sid}")
+                except Exception as e:
+                    logger.warning(f"Could not terminate {call_type} {sid}: {e}")
+        
+        del active_calls[call_id]
+        logger.info(f"Cleaned up call {call_id}")
+    else:
+        logger.warning(f"Call {call_id} not found in active_calls")
+
+def cleanup_failed_call(call_id):
+    """Clean up a failed call"""
+    logger.info(f"Cleaning up failed call {call_id}")
+    
+    if call_id in active_calls:
+        call_info = active_calls[call_id]
+        
+        # Terminate any Twilio calls
+        for call_type in ['business_call_sid', 'bridge_call_sid']:
+            sid = call_info.get(call_type)
+            if sid:
+                try:
+                    twilio_client.calls(sid).update(status='completed')
+                except:
+                    pass
+        
+        del active_calls[call_id]
+    
+    # Try to terminate WhatsApp call
+    call_whatsapp_api(call_id, 'terminate')
+
+# =============================================================================
+# TWILIO WEBHOOK HANDLERS
+# =============================================================================
+
+@csrf_exempt
+@require_http_methods(["POST", "GET"])
+def business_answer_webhook(request, call_id):
+    """Handle business number pickup - play greeting and wait for key press"""
+    
+    logger.info(f"=== BUSINESS ANSWER WEBHOOK ===")
+    logger.info(f"Call ID: {call_id}")
+    logger.info(f"Method: {request.method}")
+    
+    if call_id not in active_calls:
+        logger.error(f"Call {call_id} not found in active calls")
+        response = VoiceResponse()
+        response.say("This call session has expired.")
+        response.hangup()
+        return HttpResponse(str(response), content_type='text/xml')
+    
+    call_info = active_calls[call_id]
+    whatsapp_caller = call_info['whatsapp_from']
+    
+    response = VoiceResponse()
+    
+    # Format caller number for readability
+    caller_display = whatsapp_caller[-4:] if len(whatsapp_caller) > 4 else whatsapp_caller
+    
+    response.say(f"Incoming WhatsApp call from {caller_display}.", voice='alice')
+    
+    # Gather key press to accept call
+    gather = response.gather(
+        num_digits=1,
+        timeout=15,
+        action=f"{BASE_URL}/register/whatsapp/business-accept/{call_id}/",
+        method='POST'
+    )
+    gather.say("Press any key to accept the call.", voice='alice')
+    
+    # If no key pressed, reject call
+    response.say("No response received. Call will be disconnected.")
+    response.hangup()
+    
+    logger.info(f"Sent business greeting for call {call_id}")
+    return HttpResponse(str(response), content_type='text/xml')
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def business_accept_webhook(request, call_id):
+    """Handle business person accepting call by pressing a key"""
+    
+    logger.info(f"=== BUSINESS ACCEPT WEBHOOK ===")
+    logger.info(f"Call ID: {call_id}")
+    
+    digits = request.POST.get('Digits')
+    logger.info(f"Digits pressed: {digits}")
+    
+    if call_id not in active_calls:
+        logger.error(f"Call {call_id} not found")
+        response = VoiceResponse()
+        response.say("Call session expired.")
+        response.hangup()
+        return HttpResponse(str(response), content_type='text/xml')
+    
+    call_info = active_calls[call_id]
+    conference_name = call_info['conference_name']
+    
+    response = VoiceResponse()
+    
+    if digits:
+        logger.info(f"Business accepted call {call_id}")
+        
+        # Connect business person to conference
+        response.say("Connecting your call now.", voice='alice')
+        
+        dial = Dial()
+        conference = Conference(
+            conference_name,
+            start_conference_on_enter=True,
+            end_conference_on_exit=True,
+            wait_url="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient",
+            status_callback=f"{BASE_URL}/register/whatsapp/conference-status/{call_id}/",
+            status_callback_event=['start', 'end', 'join', 'leave']
+        )
+        dial.append(conference)
+        response.append(dial)
+        
+        # Now create bridge call to connect WhatsApp audio to conference
+        try:
+            bridge_call = twilio_client.calls.create(
+                to=TWILIO_PHONE_NUMBER,
+                from_=TWILIO_PHONE_NUMBER,
+                url=f"{BASE_URL}/register/whatsapp/bridge-connect/{call_id}/",
+                status_callback=f"{BASE_URL}/register/whatsapp/call-status/{call_id}/bridge/"
+            )
+            
+            active_calls[call_id]['bridge_call_sid'] = bridge_call.sid
+            active_calls[call_id]['status'] = 'connected'
+            
+            logger.info(f"Created bridge call: {bridge_call.sid}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create bridge call: {e}")
+            response.say("Sorry, there was an error connecting the call.")
+            response.hangup()
+            cleanup_failed_call(call_id)
+        
+    else:
+        logger.info(f"Business rejected call {call_id}")
+        response.say("Call declined.")
+        response.hangup()
+        cleanup_failed_call(call_id)
+    
+    return HttpResponse(str(response), content_type='text/xml')
+
+@csrf_exempt 
+@require_http_methods(["POST", "GET"])
+def bridge_connect_webhook(request, call_id):
+    """Connect WhatsApp audio stream to conference"""
+    
+    logger.info(f"=== BRIDGE CONNECT WEBHOOK ===")
+    logger.info(f"Call ID: {call_id}")
+    
+    if call_id not in active_calls:
+        logger.error(f"Call {call_id} not found for bridge")
+        response = VoiceResponse()
+        response.hangup()
+        return HttpResponse(str(response), content_type='text/xml')
+    
+    conference_name = active_calls[call_id]['conference_name']
+    
+    response = VoiceResponse()
+    
+    # Connect to the same conference (WhatsApp audio will be bridged here)
+    dial = Dial()
+    conference = Conference(
+        conference_name,
+        start_conference_on_enter=False,  # Don't start conference on WhatsApp join
+        end_conference_on_exit=True       # End when WhatsApp leaves
+    )
+    dial.append(conference)
+    response.append(dial)
+    
+    logger.info(f"Bridge connected to conference {conference_name}")
+    return HttpResponse(str(response), content_type='text/xml')
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def call_status_webhook(request, call_id, call_type):
+    """Handle status updates for both business and bridge calls"""
+    
+    call_status = request.POST.get('CallStatus', 'unknown')
+    call_sid = request.POST.get('CallSid', 'unknown')
+    
+    logger.info(f"=== CALL STATUS WEBHOOK ===")
+    logger.info(f"Call ID: {call_id}")
+    logger.info(f"Call Type: {call_type}")
+    logger.info(f"Status: {call_status}")
+    logger.info(f"SID: {call_sid}")
+    
+    # Handle final call states
+    if call_status in ['completed', 'failed', 'canceled', 'busy', 'no-answer']:
+        logger.info(f"Final state reached for {call_type} call: {call_status}")
+        
+        if call_status in ['busy', 'no-answer', 'failed']:
+            logger.warning(f"Call failed with status: {call_status}")
+            # Terminate WhatsApp call on failure
+            if call_id in active_calls:
+                cleanup_failed_call(call_id)
+        elif call_status == 'completed':
+            logger.info(f"Call completed normally")
+            # Clean up when either call completes
+            if call_id in active_calls:
+                # Check if this is the last call ending
+                call_info = active_calls[call_id]
+                if call_type == 'business':
+                    call_info['business_completed'] = True
+                elif call_type == 'bridge': 
+                    call_info['bridge_completed'] = True
+                
+                # If both calls are done, clean up
+                if call_info.get('business_completed') or call_info.get('bridge_completed'):
+                    cleanup_failed_call(call_id)
+    
+    return HttpResponse('OK')
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def conference_status_webhook(request, call_id):
+    """Handle conference status events"""
+    
+    status_event = request.POST.get('StatusCallbackEvent', 'unknown')
+    conference_sid = request.POST.get('ConferenceSid', 'unknown')
+    
+    logger.info(f"=== CONFERENCE STATUS ===")
+    logger.info(f"Call ID: {call_id}")
+    logger.info(f"Event: {status_event}")
+    logger.info(f"Conference SID: {conference_sid}")
+    
+    if status_event == 'conference-end':
+        logger.info(f"Conference ended for call {call_id}")
+        if call_id in active_calls:
+            cleanup_failed_call(call_id)
+    
+    return HttpResponse('OK')

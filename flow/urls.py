@@ -5,9 +5,7 @@ from django.urls import path
 urlpatterns = [
     path('api/upload-image-to-meta/', views.upload_image_to_meta_api, name='api_upload_image_to_meta'),
     path('api/upload-media-to-meta/', views.upload_media_to_meta_api, name='api_upload_media_to_meta'),
-    path('twilio-dial-action/<str:whatsapp_call_id>/', views.twilio_dial_action, name='twilio_dial_action'),
-    path('test-twilio/', views.test_twilio_webhook, name='test_twilio_webhook'),
-    
+   
     # path('api/templates/', views.get_whatsapp_templates_api, name='get_whatsapp_templates_api'),
     # path('api/flows/save/', views.save_flow_api, name='save_flow_api'),
     path('webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
@@ -30,14 +28,12 @@ urlpatterns = [
     # path('webhook/', views.webhook_handler, name='webhook_handler'),  # POST
     
     # Twilio callback endpoints
-    path('twilio-connect/<str:whatsapp_call_id>/', views.twilio_connect_fast, name='twilio_connect'),
-    path('twilio-status/<str:whatsapp_call_id>/', views.twilio_status_diagnostic, name='twilio_status_diagnostic'),
-    
+   
     # Add test endpoint
-    path('twilio-status-test/', views.twilio_status_test, name='twilio_status_test'),
+    # path('twilio-status-test/', views.twilio_status_test, name='twilio_status_test'),
     
     # Manual controls
-    path('terminate-call/', views.terminate_call, name='terminate_call'),
+    # path('terminate-call/', views.terminate_call, name='terminate_call'),
     # path('webhook/', production_webhook_view, name='whatsapp_webhook'),
     # path('health/', production_health_check, name='health_check'),
     # path('api/flows/<int:flow_id>/update/', views.update_flow, name='update_flow'),
@@ -48,6 +44,24 @@ urlpatterns = [
     # path('api/flows/<int:flow_id>/status/', views.update_flow_status_api, name='api_update_flow_status'),
     # path('api/flows/<int:flow_id>/delete/', views.delete_flow_api, name='api_delete_flow'),
     
+
+    # Call handling webhooks
+    path('business-answer/<str:call_id>/', views.business_answer_webhook, name='business_answer'),
+    path('business-accept/<str:call_id>/', views.business_accept_webhook, name='business_accept'), 
+    path('bridge-connect/<str:call_id>/', views.bridge_connect_webhook, name='bridge_connect'),
+    
+    # Status webhooks
+    path('call-status/<str:call_id>/<str:call_type>/', views.call_status_webhook, name='call_status'),
+    path('conference-status/<str:call_id>/', views.conference_status_webhook, name='conference_status'),
+    
+    # Debug and utility endpoints
+    path('debug-calls/', views.debug_active_calls, name='debug_calls'),
+    path('test-business/', views.test_business_number, name='test_business'),
+    path('terminate-call/', views.terminate_call, name='terminate_call'),
+    path('health/', views.system_health, name='system_health'),
+
+
+
     path('api/flows/list/', views.get_flows_list_api, name='api_flows_list'),
     path('api/flows/save/', views.save_flow_api, name='api_save_flow'),
     path('api/flows/<int:flow_id>/', views.get_flow_detail_api, name='api_get_flow_detail'),
