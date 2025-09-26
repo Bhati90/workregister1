@@ -772,135 +772,6 @@ TWILIO_PHONE_NUMBER = '+17375302454'
 BUSINESS_PHONE_NUMBER = '+919965377088'
 
 
-if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
-    logger.error("Missing Twilio credentials! Check your environment variables or settings.")
-    logger.error(f"TWILIO_ACCOUNT_SID: {'Set' if TWILIO_ACCOUNT_SID else 'Missing'}")
-    logger.error(f"TWILIO_AUTH_TOKEN: {'Set' if TWILIO_AUTH_TOKEN else 'Missing'}")
-    logger.error(f"TWILIO_PHONE_NUMBER: {'Set' if TWILIO_PHONE_NUMBER else 'Missing'}")
-
-# Initialize Twilio client with error handling
-try:
-    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-    # Test the credentials
-    account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
-    logger.info(f"Twilio client initialized successfully. Account: {account.friendly_name}")
-except Exception as e:
-    logger.error(f"Failed to initialize Twilio client: {e}")
-    twilio_client = None
-
-import os
-@csrf_exempt
-@require_http_methods(["POST"])
-def initiate_whatsapp_call_view(request):
-    """
-    API endpoint to initiate a WhatsApp call from the business to a user.
-    Expects a JSON payload: {"wa_id": "91xxxxxxxxxx"}
-    """
-    try:
-        data = json.loads(request.body)
-        user_wa_id = data.get('wa_id')
-
-        if not user_wa_id:
-            return JsonResponse({'status': 'error', 'message': 'wa_id is required.'}, status=400)
-        
-        contact, _ = ChatContact.objects.get_or_create(wa_id=user_wa_id)
-        api_url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
-        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
-        payload = {"recipient": user_wa_id}
-
-        logger.info(f"Attempting to initiate WhatsApp call to {user_wa_id}...")
-        response = requests.post(api_url, headers=headers, json=payload)
-        response_data = response.json()
-
-        if response.status_code >= 400:
-            logger.error(f"Meta API Error (Call Initiation): {response_data}")
-            return JsonResponse({'status': 'error', 'meta_response': response_data}, status=response.status_code)
-
-        call_id = response_data.get("call_id")
-        if call_id:
-            # Create a log for the outbound call
-            WhatsAppCall.objects.create(
-                call_id=call_id,
-                contact=contact,
-                direction='outbound',
-                status='initiated' # The status will be updated by the webhook
-            )
-            logger.info(f"Successfully initiated call to {user_wa_id}. Call ID: {call_id}")
-        
-        return JsonResponse({'status': 'success', 'message': 'Call initiated.', 'call_id': call_id})
-
-    except Exception as e:
-        logger.error(f"Error in initiate_whatsapp_call_view: {e}", exc_info=True)
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-def initiate_outbound_call(recipient_wa_id):
-    """
-    Initiate an outbound WhatsApp call to the specified recipient
-    """
-    if not twilio_client:
-        logger.error("[Outbound Call] Twilio client not initialized. Cannot make outbound calls.")
-        return False
-    
-    logger.info(f"[Outbound Call] Attempting to initiate WhatsApp call to {recipient_wa_id}...")
-    
-    # WhatsApp Calling API endpoint
-    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
-    
-    headers = {
-        'Authorization': f'Bearer {ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
-    
-    # Generate a unique call ID
-    import uuid
-    call_id = f"outbound_{uuid.uuid4().hex[:16]}"
-    
-    # Corrected payload structure for outbound calls
-    data = {
-        "messaging_product": "whatsapp",
-        "to": recipient_wa_id,
-        "call_id": call_id,
-        "action": "initiate"
-    }
-    
-    try:
-        logger.info(f"[Outbound Call] Sending request to WhatsApp API...")
-        logger.info(f"[Outbound Call] URL: {url}")
-        logger.info(f"[Outbound Call] Payload: {json.dumps(data, indent=2)}")
-        
-        response = requests.post(url, headers=headers, json=data)
-        
-        logger.info(f"[Outbound Call] Response Status: {response.status_code}")
-        logger.info(f"[Outbound Call] Response Headers: {dict(response.headers)}")
-        logger.info(f"[Outbound Call] Response Body: {response.text}")
-        
-        if response.status_code == 200:
-            response_data = response.json()
-            logger.info(f"[Outbound Call] Successfully initiated outbound call: {response_data}")
-            
-            # Store the outbound call info
-            active_calls[call_id] = {
-                'type': 'outbound',
-                'recipient': recipient_wa_id,
-                'status': 'initiated',
-                'twilio_sid': None  # Will be set when Twilio call is created
-            }
-            
-            return True
-        else:
-            error_data = response.json() if response.content else {}
-            logger.error(f"[Outbound Call] Meta API Error: {error_data}")
-            return False
-            
-    except requests.exceptions.RequestException as e:
-        logger.error(f"[Outbound Call] Request failed: {e}")
-        return False
-    except Exception as e:
-        logger.error(f"[Outbound Call] Unexpected error: {e}")
-        return False
-
-
 # Complete fix for your calling system
 
 import json
@@ -925,35 +796,29 @@ TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
 TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
 TWILIO_PHONE_NUMBER = '+17375302454'
 
-# FIXED: Clean business phone number (remove spaces and trailing space)
-BUSINESS_PHONE_NUMBER = '+919965377088'  # Cleaned from '+91 90802 89501 '
+# Phone Numbers (from your logs)
+WHATSAPP_BUSINESS_NUMBER = '+918433776745'  # WhatsApp Business API number
+ACTUAL_BUSINESS_PHONE = '+919080289501' 
+
 
 BASE_URL_t = 'https://workregister1-g7pf.onrender.com/register/whatsapp'
 
-# Initialize Twilio client
-try:
-    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-    account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
-    logger.info(f"Twilio client initialized successfully. Account: {account.friendly_name}")
-except Exception as e:
-    logger.error(f"Failed to initialize Twilio client: {e}")
-    twilio_client = None
 
 # CRITICAL: Ensure active_calls is a dictionary (not a set)
-active_calls = {}  # This MUST be a dictionary, not set()
+# active_calls = {}  # This MUST be a dictionary, not set()
 
-def debug_active_calls():
-    """Debug function to ensure active_calls is correct type"""
-    global active_calls
-    logger.info(f"active_calls type: {type(active_calls)}")
-    logger.info(f"active_calls content: {active_calls}")
+# def debug_active_calls():
+    # """Debug function to ensure active_calls is correct type"""
+    # global active_calls
+    # logger.info(f"active_calls type: {type(active_calls)}")
+    # logger.info(f"active_calls content: {active_calls}")
     
-    if not isinstance(active_calls, dict):
-        logger.error("CRITICAL: active_calls is not a dictionary! Converting...")
-        active_calls = {}
-        logger.info("Fixed: active_calls is now a dictionary")
-    else:
-        logger.info("active_calls is correctly a dictionary")
+    # if not isinstance(active_calls, dict):
+    #     logger.error("CRITICAL: active_calls is not a dictionary! Converting...")
+    #     active_calls = {}
+    #     logger.info("Fixed: active_calls is now a dictionary")
+    # else:
+    #     logger.info("active_calls is correctly a dictionary")
 
 # Call this on startup
 # Add this enhanced status webhook to see exactly what's happening
@@ -2545,8 +2410,23 @@ def upload_image_to_meta_api(request):
 
 
 
-BASE_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp'
+import json
+import requests
+import uuid
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.conf import settings
+from twilio.rest import Client
+from twilio.twiml.voice_response import VoiceResponse, Dial, Conference
+import logging
+from datetime import datetime, timedelta
 
+logger = logging.getLogger(__name__)
+
+
+BASE_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp'
+active_calls = {}
 @csrf_exempt
 def debug_active_calls(request):
     """Debug endpoint to view active calls"""
@@ -2555,6 +2435,24 @@ def debug_active_calls(request):
         'count': len(active_calls),
         'timestamp': datetime.now().isoformat()
     })
+if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
+    logger.error("Missing Twilio credentials! Check your environment variables or settings.")
+    logger.error(f"TWILIO_ACCOUNT_SID: {'Set' if TWILIO_ACCOUNT_SID else 'Missing'}")
+    logger.error(f"TWILIO_AUTH_TOKEN: {'Set' if TWILIO_AUTH_TOKEN else 'Missing'}")
+    logger.error(f"TWILIO_PHONE_NUMBER: {'Set' if TWILIO_PHONE_NUMBER else 'Missing'}")
+
+# Initialize Twilio client with error handling
+try:
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    # Test the credentials
+    account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+    logger.info(f"Twilio client initialized successfully. Account: {account.friendly_name}")
+except Exception as e:
+    logger.error(f"Failed to initialize Twilio client: {e}")
+    twilio_client = None
+
+
+
 
 @csrf_exempt
 def test_business_number(request):
@@ -2758,8 +2656,8 @@ def handle_whatsapp_call_connect(call_data):
         business_call = twilio_client.calls.create(
             to=ACTUAL_BUSINESS_PHONE,
             from_=TWILIO_PHONE_NUMBER,
-            url=f"{BASE_URL}/register/whatsapp/business-answer/{call_id}/",
-            status_callback=f"{BASE_URL}/register/whatsapp/call-status/{call_id}/business/",
+            url=f"{BASE_URL}/business-answer/{call_id}/",
+            status_callback=f"{BASE_URL}/call-status/{call_id}/business/",
             status_callback_event=['answered', 'completed', 'busy', 'no-answer', 'failed'],
             timeout=30
         )
@@ -3040,3 +2938,119 @@ def conference_status_webhook(request, call_id):
             cleanup_failed_call(call_id)
     
     return HttpResponse('OK')
+
+
+
+
+import os
+@csrf_exempt
+@require_http_methods(["POST"])
+def initiate_whatsapp_call_view(request):
+    """
+    API endpoint to initiate a WhatsApp call from the business to a user.
+    Expects a JSON payload: {"wa_id": "91xxxxxxxxxx"}
+    """
+    try:
+        data = json.loads(request.body)
+        user_wa_id = data.get('wa_id')
+
+        if not user_wa_id:
+            return JsonResponse({'status': 'error', 'message': 'wa_id is required.'}, status=400)
+        
+        contact, _ = ChatContact.objects.get_or_create(wa_id=user_wa_id)
+        api_url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
+        payload = {"recipient": user_wa_id}
+
+        logger.info(f"Attempting to initiate WhatsApp call to {user_wa_id}...")
+        response = requests.post(api_url, headers=headers, json=payload)
+        response_data = response.json()
+
+        if response.status_code >= 400:
+            logger.error(f"Meta API Error (Call Initiation): {response_data}")
+            return JsonResponse({'status': 'error', 'meta_response': response_data}, status=response.status_code)
+
+        call_id = response_data.get("call_id")
+        if call_id:
+            # Create a log for the outbound call
+            WhatsAppCall.objects.create(
+                call_id=call_id,
+                contact=contact,
+                direction='outbound',
+                status='initiated' # The status will be updated by the webhook
+            )
+            logger.info(f"Successfully initiated call to {user_wa_id}. Call ID: {call_id}")
+        
+        return JsonResponse({'status': 'success', 'message': 'Call initiated.', 'call_id': call_id})
+
+    except Exception as e:
+        logger.error(f"Error in initiate_whatsapp_call_view: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def initiate_outbound_call(recipient_wa_id):
+    """
+    Initiate an outbound WhatsApp call to the specified recipient
+    """
+    if not twilio_client:
+        logger.error("[Outbound Call] Twilio client not initialized. Cannot make outbound calls.")
+        return False
+    
+    logger.info(f"[Outbound Call] Attempting to initiate WhatsApp call to {recipient_wa_id}...")
+    
+    # WhatsApp Calling API endpoint
+    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
+    
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    
+    # Generate a unique call ID
+    import uuid
+    call_id = f"outbound_{uuid.uuid4().hex[:16]}"
+    
+    # Corrected payload structure for outbound calls
+    data = {
+        "messaging_product": "whatsapp",
+        "to": recipient_wa_id,
+        "call_id": call_id,
+        "action": "initiate"
+    }
+    
+    try:
+        logger.info(f"[Outbound Call] Sending request to WhatsApp API...")
+        logger.info(f"[Outbound Call] URL: {url}")
+        logger.info(f"[Outbound Call] Payload: {json.dumps(data, indent=2)}")
+        
+        response = requests.post(url, headers=headers, json=data)
+        
+        logger.info(f"[Outbound Call] Response Status: {response.status_code}")
+        logger.info(f"[Outbound Call] Response Headers: {dict(response.headers)}")
+        logger.info(f"[Outbound Call] Response Body: {response.text}")
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            logger.info(f"[Outbound Call] Successfully initiated outbound call: {response_data}")
+            
+            # Store the outbound call info
+            active_calls[call_id] = {
+                'type': 'outbound',
+                'recipient': recipient_wa_id,
+                'status': 'initiated',
+                'twilio_sid': None  # Will be set when Twilio call is created
+            }
+            
+            return True
+        else:
+            error_data = response.json() if response.content else {}
+            logger.error(f"[Outbound Call] Meta API Error: {error_data}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[Outbound Call] Request failed: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"[Outbound Call] Unexpected error: {e}")
+        return False
+
