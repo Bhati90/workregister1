@@ -734,6 +734,59 @@ import json
 # In contact_app/views.py
 from .models import WhatsAppCall # Add this import
 from django.views.decorators.http import require_http_methods
+
+# At the top of your views.py file, update your Twilio configuration
+
+import os
+from django.conf import settings
+
+# Twilio Configuration
+TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
+TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
+TWILIO_PHONE_NUMBER = '+918209818471'
+
+# Verify credentials are loaded
+if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
+    logger.error("Missing Twilio credentials! Check your environment variables or settings.")
+    logger.error(f"TWILIO_ACCOUNT_SID: {'Set' if TWILIO_ACCOUNT_SID else 'Missing'}")
+    logger.error(f"TWILIO_AUTH_TOKEN: {'Set' if TWILIO_AUTH_TOKEN else 'Missing'}")
+    logger.error(f"TWILIO_PHONE_NUMBER: {'Set' if TWILIO_PHONE_NUMBER else 'Missing'}")
+
+# Initialize Twilio client with error handling
+try:
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    # Test the credentials
+    account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+    logger.info(f"Twilio client initialized successfully. Account: {account.friendly_name}")
+except Exception as e:
+    logger.error(f"Failed to initialize Twilio client: {e}")
+    twilio_client = None
+
+
+   # views.py
+import json
+import requests
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.conf import settings
+from twilio.rest import Client
+from twilio.twiml.voice_response import VoiceResponse
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Configuration - Add these to your settings.py
+ACCESS_TOKEN = 'EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ'
+PHONE_NUMBER_ID = '694609297073147'
+
+# Twilio Configuration
+TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
+TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
+TWILIO_PHONE_NUMBER = '+918209818471'
+BUSINESS_PHONE_NUMBER = '+918433776745'
+
+import os
 @csrf_exempt
 @require_http_methods(["POST"])
 def initiate_whatsapp_call_view(request):
@@ -896,59 +949,6 @@ def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
         logger.error(f"[WhatsApp API] Unexpected error for {action}: {e}")
         return {"success": False, "error": str(e)}
 
-
-# At the top of your views.py file, update your Twilio configuration
-
-import os
-from django.conf import settings
-
-# Twilio Configuration
-TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
-TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
-TWILIO_PHONE_NUMBER = '+918209818471'
-
-# Verify credentials are loaded
-if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
-    logger.error("Missing Twilio credentials! Check your environment variables or settings.")
-    logger.error(f"TWILIO_ACCOUNT_SID: {'Set' if TWILIO_ACCOUNT_SID else 'Missing'}")
-    logger.error(f"TWILIO_AUTH_TOKEN: {'Set' if TWILIO_AUTH_TOKEN else 'Missing'}")
-    logger.error(f"TWILIO_PHONE_NUMBER: {'Set' if TWILIO_PHONE_NUMBER else 'Missing'}")
-
-# Initialize Twilio client with error handling
-try:
-    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-    # Test the credentials
-    account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
-    logger.info(f"Twilio client initialized successfully. Account: {account.friendly_name}")
-except Exception as e:
-    logger.error(f"Failed to initialize Twilio client: {e}")
-    twilio_client = None
-
-
-   # views.py
-import json
-import requests
-from django.http import JsonResponse, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.conf import settings
-from twilio.rest import Client
-from twilio.twiml.voice_response import VoiceResponse
-import logging
-
-logger = logging.getLogger(__name__)
-
-# Configuration - Add these to your settings.py
-ACCESS_TOKEN = 'EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ'
-PHONE_NUMBER_ID = '694609297073147'
-
-# Twilio Configuration
-TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
-TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
-TWILIO_PHONE_NUMBER = '+918209818471'
-BUSINESS_PHONE_NUMBER = '+918433776745'
-
-import os
 
 
 # Initialize Twilio client
