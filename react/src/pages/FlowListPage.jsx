@@ -1,15 +1,16 @@
-// src/pages/FlowListPage.jsx
+// src/pages/FlowListPage.jsx - Updated version
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import './FlowListPage.css'; // We'll create this CSS file next
+import './FlowListPage.css';
 
-const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp'; // Your Django backend URL
+const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
 
 const FlowListPage = () => {
   const [flows, setFlows] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchFlows();
@@ -17,6 +18,8 @@ const FlowListPage = () => {
 
   const fetchFlows = () => {
     setLoading(true);
+    setError(null);
+    
     axios.get(`${API_URL}/api/flows/list/`)
       .then(response => {
         setFlows(response.data);
@@ -24,6 +27,7 @@ const FlowListPage = () => {
       })
       .catch(error => {
         console.error("Error fetching flows:", error);
+        setError("Failed to load flows. Please try again.");
         setLoading(false);
       });
   };
@@ -31,9 +35,13 @@ const FlowListPage = () => {
   const handleDelete = (flowId) => {
     if (window.confirm("Are you sure you want to delete this flow?")) {
       axios.delete(`${API_URL}/api/flows/${flowId}/delete/`)
-        .then(() => {
-          alert("Flow deleted successfully.");
-          fetchFlows(); // Refresh the list
+        .then(response => {
+          if (response.data.status === 'success') {
+            alert("Flow deleted successfully.");
+            fetchFlows(); // Refresh the list
+          } else {
+            alert(`Error: ${response.data.message}`);
+          }
         })
         .catch(error => {
           console.error("Error deleting flow:", error);
@@ -44,9 +52,13 @@ const FlowListPage = () => {
   
   const handleStatusToggle = (flowId, currentStatus) => {
     axios.post(`${API_URL}/api/flows/${flowId}/status/`, { is_active: !currentStatus })
-      .then(() => {
-        // Optimistically update the UI
-        setFlows(flows.map(f => f.id === flowId ? { ...f, is_active: !currentStatus } : f));
+      .then(response => {
+        if (response.data.status === 'success') {
+          // Optimistically update the UI
+          setFlows(flows.map(f => f.id === flowId ? { ...f, is_active: !currentStatus } : f));
+        } else {
+          alert(`Error: ${response.data.message}`);
+        }
       })
       .catch(error => {
         console.error("Error updating status:", error);
@@ -58,13 +70,17 @@ const FlowListPage = () => {
     flow.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleString();
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
   return (
     <div className="flow-list-page">
-      {/* <aside className="sidebar-nav">
-        You can build out this sidebar as needed
-        <div className="sidebar-nav-item active">Flow Builder</div> 
-         ... other items ... 
-      </aside> */}
       <main className="main-content">
         <header className="page-header">
           <h1>Flows</h1>
@@ -87,36 +103,84 @@ const FlowListPage = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            <button onClick={fetchFlows} disabled={loading}>
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
+
+          {error && (
+            <div className="error-message" style={{
+              padding: '10px',
+              background: '#fee',
+              color: '#c00',
+              borderRadius: '4px',
+              margin: '10px 0'
+            }}>
+              {error}
+            </div>
+          )}
+
           <table className="flow-table">
             <thead>
               <tr>
                 <th>Flow Name</th>
+                <th>Template</th>
                 <th>Status</th>
+                <th>Last Updated</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="3">Loading flows...</td></tr>
+                <tr><td colSpan="5">Loading flows...</td></tr>
               ) : filteredFlows.length > 0 ? (
                 filteredFlows.map(flow => (
                   <tr key={flow.id}>
-                    <td>{flow.name}</td>
+                    <td>
+                      <strong>{flow.name}</strong>
+                    </td>
+                    <td>
+                      <span className="template-name">
+                        {flow.template_name || 'No template'}
+                      </span>
+                    </td>
                     <td>
                       <label className="switch">
-                        <input type="checkbox" checked={flow.is_active} onChange={() => handleStatusToggle(flow.id, flow.is_active)} />
+                        <input 
+                          type="checkbox" 
+                          checked={flow.is_active} 
+                          onChange={() => handleStatusToggle(flow.id, flow.is_active)} 
+                        />
                         <span className="slider round"></span>
                       </label>
+                      <span className="status-text">
+                        {flow.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="date-text">
+                        {formatDate(flow.updated_at)}
+                      </span>
                     </td>
                     <td className="actions">
-                      <Link to={`/flow/${flow.id}`} className="action-btn">✏️ Edit</Link>
-                      <button onClick={() => handleDelete(flow.id)} className="action-btn delete">🗑️ Delete</button>
+                      <Link to={`/flow/${flow.id}`} className="action-btn edit">
+                        ✏️ Edit
+                      </Link>
+                      <button 
+                        onClick={() => handleDelete(flow.id)} 
+                        className="action-btn delete"
+                      >
+                        🗑️ Delete
+                      </button>
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="3">No flows found.</td></tr>
+                <tr>
+                  <td colSpan="5">
+                    {searchTerm ? 'No flows match your search.' : 'No flows found. Create your first flow!'}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
