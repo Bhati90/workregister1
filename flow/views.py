@@ -956,7 +956,157 @@ def debug_active_calls():
         logger.info("active_calls is correctly a dictionary")
 
 # Call this on startup
+# Add this enhanced status webhook to see exactly what's happening
 
+@csrf_exempt 
+@require_http_methods(["POST", "GET"])
+def twilio_status_diagnostic(request, whatsapp_call_id):
+    """Enhanced status webhook with detailed diagnostics"""
+    
+    # Log all the data Twilio sends
+    logger.info(f"=== TWILIO STATUS DIAGNOSTIC ===")
+    logger.info(f"WhatsApp Call ID: {whatsapp_call_id}")
+    logger.info(f"Method: {request.method}")
+    
+    # Get all possible status fields from Twilio
+    status_data = {}
+    if request.method == 'POST':
+        for key, value in request.POST.items():
+            status_data[key] = value
+    else:
+        for key, value in request.GET.items():
+            status_data[key] = value
+    
+    logger.info(f"All Twilio data: {status_data}")
+    
+    # Extract key fields
+    call_status = status_data.get('CallStatus', 'unknown')
+    call_sid = status_data.get('CallSid', 'unknown')
+    call_duration = status_data.get('CallDuration', '0')
+    dial_status = status_data.get('DialCallStatus', 'not_provided')
+    direction = status_data.get('Direction', 'unknown')
+    
+    # Log detailed analysis
+    logger.info(f"Call Status Analysis:")
+    logger.info(f"  CallStatus: {call_status}")
+    logger.info(f"  CallSid: {call_sid}")
+    logger.info(f"  Duration: {call_duration} seconds")
+    logger.info(f"  DialStatus: {dial_status}")
+    logger.info(f"  Direction: {direction}")
+    
+    # Analyze what went wrong
+    if call_status == 'busy':
+        logger.warning("CALL BUSY: The destination number is busy or unavailable")
+        logger.warning("Possible causes:")
+        logger.warning("  1. Phone is actually busy/engaged")
+        logger.warning("  2. Phone is turned off")
+        logger.warning("  3. Carrier is blocking the call")
+        logger.warning("  4. International calling restrictions")
+    elif call_status == 'no-answer':
+        logger.warning("NO ANSWER: The destination didn't pick up")
+    elif call_status == 'failed':
+        logger.error("CALL FAILED: Check the number and account settings")
+    elif call_status == 'canceled':
+        logger.info("CALL CANCELED: Call was terminated before completion")
+    elif call_status == 'completed':
+        logger.info("CALL COMPLETED: Call was successful")
+        if int(call_duration) == 0:
+            logger.warning("But duration is 0 - call may not have been answered")
+    
+    try:
+        if call_status in ['completed', 'canceled', 'failed', 'busy', 'no-answer']:
+            # Terminate WhatsApp call
+            terminate_response = call_whatsapp_api(whatsapp_call_id, 'terminate')
+            if terminate_response:
+                logger.info(f"Terminated WhatsApp call {whatsapp_call_id}")
+            
+            # Clean up
+            if whatsapp_call_id in active_calls:
+                del active_calls[whatsapp_call_id]
+                logger.info(f"Cleaned up call {whatsapp_call_id}")
+        
+        return HttpResponse('OK')
+        
+    except Exception as e:
+        logger.error(f"Status processing error: {e}")
+        return HttpResponse('ERROR', status=500)
+
+# Test function to make a direct call and see what happens
+def test_business_number_directly():
+    """Test calling the business number directly to see the result"""
+    try:
+        if not twilio_client:
+            logger.error("Cannot test - Twilio client not available")
+            return
+        
+        logger.info("=== TESTING BUSINESS NUMBER DIRECTLY ===")
+        logger.info(f"Calling {BUSINESS_PHONE_NUMBER} from {TWILIO_PHONE_NUMBER}")
+        
+        # Make a direct test call
+        test_call = twilio_client.calls.create(
+            to=BUSINESS_PHONE_NUMBER,
+            from_=TWILIO_PHONE_NUMBER,
+            twiml='<Response><Say>This is a test call to check connectivity.</Say><Pause length="5"/><Hangup/></Response>',
+            status_callback=f"{BASE_URL_t}/twilio-status-test/",
+            status_callback_event=['initiated', 'ringing', 'answered', 'completed', 'busy', 'no-answer', 'failed'],
+            status_callback_method='POST'
+        )
+        
+        logger.info(f"Test call created: {test_call.sid}")
+        logger.info("Check logs in a few seconds to see the result")
+        
+    except Exception as e:
+        logger.error(f"Test call failed: {e}")
+        if hasattr(e, 'code'):
+            logger.error(f"Twilio Error Code: {e.code}")
+        if hasattr(e, 'msg'):
+            logger.error(f"Twilio Error Message: {e.msg}")
+
+
+# Add this endpoint for test call status
+@csrf_exempt
+@require_http_methods(["POST"])
+def twilio_status_test(request):
+    """Handle status for test calls"""
+    
+    status_data = dict(request.POST.items())
+    logger.info(f"=== TEST CALL STATUS ===")
+    logger.info(f"Status data: {status_data}")
+    
+    call_status = status_data.get('CallStatus', 'unknown')
+    call_duration = status_data.get('CallDuration', '0')
+    
+    if call_status == 'busy':
+        logger.error("❌ BUSINESS NUMBER IS BUSY OR BLOCKED")
+        logger.error("Solutions to try:")
+        logger.error("  1. Check if the phone is turned on and available")
+        logger.error("  2. Try calling from a different number to test")
+        logger.error("  3. Contact your business phone provider about international calls")
+        logger.error("  4. Check if there are call forwarding settings")
+    elif call_status == 'completed' and int(call_duration) > 0:
+        logger.info("✅ BUSINESS NUMBER IS WORKING - Call connected successfully")
+    elif call_status == 'no-answer':
+        logger.warning("⚠️ BUSINESS NUMBER RINGS but no one answered")
+    else:
+        logger.info(f"Test result: {call_status}, Duration: {call_duration}")
+    
+    return HttpResponse('OK')
+
+# Alternative solution: Use a different business number for testing
+def suggest_alternative_numbers():
+    """Suggest using alternative numbers for testing"""
+    
+    logger.info("=== ALTERNATIVE TESTING SUGGESTIONS ===")
+    logger.info("If your business number keeps showing 'busy', try these alternatives:")
+    logger.info(f"1. Test with your own Twilio number: {TWILIO_PHONE_NUMBER}")
+    logger.info("2. Use a different phone number you have access to")
+    logger.info("3. Use a landline number if available")
+    logger.info("4. Check with your phone provider about call forwarding settings")
+    
+    # You can temporarily test with your Twilio number
+    logger.info("For immediate testing, you can temporarily change:")
+    logger.info(f"   BUSINESS_PHONE_NUMBER = '{TWILIO_PHONE_NUMBER}'")
+    logger.info("This will make the system call your Twilio number back")
 
 def generate_twilio_sdp_offer():
     """Generate SDP offer for Twilio WebRTC connection"""

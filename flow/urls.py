@@ -31,7 +31,10 @@ urlpatterns = [
     
     # Twilio callback endpoints
     path('twilio-connect/<str:whatsapp_call_id>/', views.twilio_connect_fast, name='twilio_connect'),
-    path('twilio-status/<str:whatsapp_call_id>/', views.twilio_status_fast, name='twilio_status'),
+    path('twilio-status/<str:whatsapp_call_id>/', views.twilio_status_diagnostic, name='twilio_status_diagnostic'),
+    
+    # Add test endpoint
+    path('twilio-status-test/', views.twilio_status_test, name='twilio_status_test'),
     
     # Manual controls
     path('terminate-call/', views.terminate_call, name='terminate_call'),
