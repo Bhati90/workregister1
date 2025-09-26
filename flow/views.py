@@ -1127,6 +1127,7 @@ def whatsapp_webhook_view(request):
             for entry in data.get('entry', []):
                 for change in entry.get('changes', []):
                     value = change.get('value', {})
+                    contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
                     handle_calling_webhook(change, contact)
     
                     
