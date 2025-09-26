@@ -2825,7 +2825,7 @@ def business_accept_webhook(request, call_id):
             bridge_call = twilio_client.calls.create(
                 to=TWILIO_PHONE_NUMBER,
                 from_=TWILIO_PHONE_NUMBER,
-                url=f"{BASE_URL}/register/whatsapp/bridge-connect/{call_id}/",
+                url=f"{BASE_URL}/bridge-connect/{call_id}/",
                 status_callback=f"{BASE_URL}/call-status/{call_id}/bridge/"
             )
             
