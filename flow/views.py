@@ -1108,7 +1108,6 @@ def handle_calling_webhook(change, contact):
                     
                     del active_calls[call_id]
 
-
 @csrf_exempt
 def whatsapp_webhook_view(request):
     """
@@ -1127,21 +1126,27 @@ def whatsapp_webhook_view(request):
             for entry in data.get('entry', []):
                 for change in entry.get('changes', []):
                     value = change.get('value', {})
-                    contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
-                    handle_calling_webhook(change, contact)
-    
                     
-                    # --- CORRECTED LOGIC: Process messages and statuses independently ---
+                    # --- HANDLE CALLING WEBHOOKS FIRST (NO CONTACT NEEDED) ---
+                    if change.get('field') == 'calls':
+                        # Create a dummy contact for calling webhook or get from call data
+                        # We need to extract contact info from the call data itself
+                        calls = value.get('calls', [])
+                        for call in calls:
+                            from_number = call.get('from')
+                            if from_number:
+                                contact, _ = ChatContact.objects.get_or_create(wa_id=from_number)
+                                handle_calling_webhook(change, contact)
+                        continue  # Skip further processing for call webhooks
                     
-                    # 1. Check for and process any incoming messages
-                    # --- NEW LOGIC TO HANDLE CALLS ---
-                    
+                    # --- PROCESS MESSAGES ---
                     if 'messages' in value:
                         for msg in value.get('messages', []):
                             contact, _ = ChatContact.objects.get_or_create(wa_id=msg['from'])
                             message_type = msg.get('type')
                             replied_to_wamid = msg.get('context', {}).get('id')
                             user_input = None
+                            
                             # Fix the location processing in webhook:
                             if message_type == 'location':
                                 location = msg.get('location', {})
@@ -1286,8 +1291,7 @@ def whatsapp_webhook_view(request):
                                 
                                 else:
                                     logger.info(f"DEBUG-QUESTION: No session waiting for text input from {contact.wa_id}")
- # Stop further processing
-    
+
                             elif message_type == 'button':
                                 user_input = msg.get('button', {}).get('text')
                             elif message_type == 'interactive':
@@ -1315,15 +1319,12 @@ def whatsapp_webhook_view(request):
                                     call_permission = interactive.get('call_permission_reply', {})
                                     if call_permission.get('response') == 'accept':
                                         logger.info(f"Received call permission from {contact.wa_id}. Triggering outbound call NOW.")
-                                    # THIS IS THE MISSING STEP:
+                                        # THIS IS THE MISSING STEP:
                                         initiate_outbound_call(contact.wa_id)
                                     else:
                                         logger.warning(f"User {contact.wa_id} denied call permission.")
-                                
                                     continue 
 
-                            
-                            
                             logger.info(f"DEBUG-FLOW: Extracted user_input='{user_input}' and replied_to_wamid='{replied_to_wamid}'")
                             flow_handled = False
                             if user_input and replied_to_wamid:
@@ -1335,9 +1336,8 @@ def whatsapp_webhook_view(request):
                             if flow_handled:
                                 logger.info("DEBUG-FLOW: Flow was successfully handled. Skipping fallback logic.")
                                 continue
-                    # 2. Check for and process any status updates
-                    # 2. Check for and process any status updates
-                   
+
+                    # --- PROCESS STATUS UPDATES ---
                     if 'statuses' in value:
                         for status in value.get('statuses', []):
                             if status.get('status') == 'read':
@@ -1347,6 +1347,9 @@ def whatsapp_webhook_view(request):
             logger.error(f"Error in webhook: {e}", exc_info=True)
             
     return JsonResponse({"status": "success"}, status=200)
+
+
+
 
 def get_media_url_from_id(media_id):
     """Uses the Meta API to get a permanent URL for a media object."""
@@ -1608,6 +1611,9 @@ def handle_nfm_reply_in_webhook(msg, contact):
     
     return False  # Not an nfm_reply
 
+
+
+
 from django.shortcuts import get_object_or_404
 def flow_form_detail_api(request, form_id):
     """
@@ -1702,6 +1708,16 @@ def update_flow_status_api(request, flow_id):
 
 # In your views.py
 from .models import WhatsAppFlowForm # Make sure this is imported
+
+
+
+
+
+
+
+
+
+
 
 
 def get_whatsapp_forms_api(request):
