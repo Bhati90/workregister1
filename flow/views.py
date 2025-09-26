@@ -779,45 +779,150 @@ def initiate_whatsapp_call_view(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
-def initiate_outbound_call(user_wa_id):
-    """Helper function to make the API call to start a call."""
+def initiate_outbound_call(recipient_wa_id):
+    """
+    Initiate an outbound WhatsApp call to the specified recipient
+    """
+    if not twilio_client:
+        logger.error("[Outbound Call] Twilio client not initialized. Cannot make outbound calls.")
+        return False
+    
+    logger.info(f"[Outbound Call] Attempting to initiate WhatsApp call to {recipient_wa_id}...")
+    
+    # WhatsApp Calling API endpoint
+    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
+    
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    
+    # Generate a unique call ID
+    import uuid
+    call_id = f"outbound_{uuid.uuid4().hex[:16]}"
+    
+    # Corrected payload structure for outbound calls
+    data = {
+        "messaging_product": "whatsapp",
+        "to": recipient_wa_id,
+        "call_id": call_id,
+        "action": "initiate"
+    }
+    
     try:
-        contact, _ = ChatContact.objects.get_or_create(wa_id=user_wa_id)
-        api_url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
-        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}", "Content-Type": "application/json"}
-          # The 'messaging_product' parameter is required by the API.
-        payload = {
-            "messaging_product": "whatsapp",
-            "recipient": user_wa_id
-        }
-
-        logger.info(f"[Outbound Call] Attempting to initiate WhatsApp call to {user_wa_id}...")
-        response = requests.post(api_url, headers=headers, json=payload)
-        response_data = response.json()
-
-        if response.status_code >= 400:
-            logger.error(f"[Outbound Call] Meta API Error: {response_data}")
-            return False
-
-        call_id = response_data.get("call_id")
-        if call_id:
-            WhatsAppCall.objects.create(
-                call_id=call_id,
-                contact=contact,
-                direction='outbound',
-                status='initiated'
-            )
-            logger.info(f"[Outbound Call] Successfully initiated. Call ID: {call_id}")
+        logger.info(f"[Outbound Call] Sending request to WhatsApp API...")
+        logger.info(f"[Outbound Call] URL: {url}")
+        logger.info(f"[Outbound Call] Payload: {json.dumps(data, indent=2)}")
+        
+        response = requests.post(url, headers=headers, json=data)
+        
+        logger.info(f"[Outbound Call] Response Status: {response.status_code}")
+        logger.info(f"[Outbound Call] Response Headers: {dict(response.headers)}")
+        logger.info(f"[Outbound Call] Response Body: {response.text}")
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            logger.info(f"[Outbound Call] Successfully initiated outbound call: {response_data}")
+            
+            # Store the outbound call info
+            active_calls[call_id] = {
+                'type': 'outbound',
+                'recipient': recipient_wa_id,
+                'status': 'initiated',
+                'twilio_sid': None  # Will be set when Twilio call is created
+            }
+            
             return True
+        else:
+            error_data = response.json() if response.content else {}
+            logger.error(f"[Outbound Call] Meta API Error: {error_data}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[Outbound Call] Request failed: {e}")
         return False
     except Exception as e:
-        logger.error(f"[Outbound Call] Error: {e}", exc_info=True)
+        logger.error(f"[Outbound Call] Unexpected error: {e}")
         return False
-   
 
 
+def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
+    """Make API call to WhatsApp Calling API - Updated version"""
+    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
+    
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    
+    # Base data structure
+    data = {
+        "messaging_product": "whatsapp",
+        "call_id": call_id,
+        "action": action
+    }
+    
+    # Add SDP session data for pre_accept and accept actions
+    if sdp and action in ['pre_accept', 'accept']:
+        data["session"] = {
+            "sdp_type": "answer",
+            "sdp": sdp
+        }
+    
+    # Add callback data for accept action
+    if callback_data and action == 'accept':
+        data["biz_opaque_callback_data"] = callback_data
+    
+    try:
+        logger.info(f"[WhatsApp API] Calling {action} for call {call_id}")
+        logger.info(f"[WhatsApp API] Payload: {json.dumps(data, indent=2)}")
+        
+        response = requests.post(url, headers=headers, json=data)
+        
+        logger.info(f"[WhatsApp API] Response Status: {response.status_code}")
+        logger.info(f"[WhatsApp API] Response: {response.text}")
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            error_data = response.json() if response.content else {}
+            logger.error(f"[WhatsApp API] Error response: {error_data}")
+            return {"success": False, "error": error_data}
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[WhatsApp API] Request failed for {action}: {e}")
+        return {"success": False, "error": str(e)}
+    except Exception as e:
+        logger.error(f"[WhatsApp API] Unexpected error for {action}: {e}")
+        return {"success": False, "error": str(e)}
 
 
+# At the top of your views.py file, update your Twilio configuration
+
+import os
+from django.conf import settings
+
+# Twilio Configuration
+TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
+TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
+TWILIO_PHONE_NUMBER = '+918209818471'
+
+# Verify credentials are loaded
+if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
+    logger.error("Missing Twilio credentials! Check your environment variables or settings.")
+    logger.error(f"TWILIO_ACCOUNT_SID: {'Set' if TWILIO_ACCOUNT_SID else 'Missing'}")
+    logger.error(f"TWILIO_AUTH_TOKEN: {'Set' if TWILIO_AUTH_TOKEN else 'Missing'}")
+    logger.error(f"TWILIO_PHONE_NUMBER: {'Set' if TWILIO_PHONE_NUMBER else 'Missing'}")
+
+# Initialize Twilio client with error handling
+try:
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    # Test the credentials
+    account = twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+    logger.info(f"Twilio client initialized successfully. Account: {account.friendly_name}")
+except Exception as e:
+    logger.error(f"Failed to initialize Twilio client: {e}")
+    twilio_client = None
 
 
    # views.py
@@ -839,7 +944,7 @@ PHONE_NUMBER_ID = '694609297073147'
 
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
-TWILIO_AUTH_TOKEN = 'dd2955ed9a4ce90e286b367e19974ec5'
+TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
 TWILIO_PHONE_NUMBER = '+918209818471'
 BUSINESS_PHONE_NUMBER = '+918433776745'
 import os
@@ -890,47 +995,29 @@ a=rtpmap:126 telephone-event/8000
 a=ssrc:1009384203 cname:nKXm1Y4g3wAKu91t
 a=ssrc:1009384203 msid:- 750e164d-7709-4d6b-b17f-0b9d2e4ca9de"""
 
-def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
-    """Make API call to WhatsApp Calling API"""
-    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/calls"
-    
-    headers = {
-        'Authorization': f'Bearer {ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
-    
-    data = {
-        "messaging_product": "whatsapp",
-        "call_id": call_id,
-        "action": action
-    }
-    
-    if sdp and action in ['pre_accept', 'accept']:
-        data["session"] = {
-            "sdp_type": "answer",
-            "sdp": sdp
-        }
-    
-    if callback_data and action == 'accept':
-        data["biz_opaque_callback_data"] = callback_data
-    
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"WhatsApp API call failed: {e}")
-        return None
+
 BASE_URL_t = 'https://workregister1-g7pf.onrender.com' 
 def create_twilio_call(whatsapp_call_id, from_number):
     """Create a Twilio call to bridge with WhatsApp call"""
+    
+    if not twilio_client:
+        logger.error("Twilio client not initialized. Cannot create call.")
+        return None
+    
+    if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
+        logger.error("Missing Twilio configuration. Cannot create call.")
+        return None
+    
     try:
-        # FIXED: Proper f-string formatting
+        # Construct callback URLs
         callback_url = f"{BASE_URL_t}/whatsapp/twilio-connect/{whatsapp_call_id}/"
         status_callback_url = f"{BASE_URL_t}/whatsapp/twilio-status/{whatsapp_call_id}/"
         
         logger.info(f"Creating Twilio call with callback: {callback_url}")
+        logger.info(f"From: {TWILIO_PHONE_NUMBER} To: {BUSINESS_PHONE_NUMBER}")
+        logger.info(f"Account SID: {TWILIO_ACCOUNT_SID}")
         
+        # Create the call
         call = twilio_client.calls.create(
             to=BUSINESS_PHONE_NUMBER,
             from_=TWILIO_PHONE_NUMBER,
@@ -940,13 +1027,23 @@ def create_twilio_call(whatsapp_call_id, from_number):
             status_callback_method='POST'
         )
         
-        logger.info(f"Created Twilio call {call.sid} for WhatsApp call {whatsapp_call_id}")
+        logger.info(f"Successfully created Twilio call {call.sid} for WhatsApp call {whatsapp_call_id}")
         return call.sid
     
     except Exception as e:
         logger.error(f"Failed to create Twilio call: {e}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        
+        # Log specific error details if it's a Twilio error
+        if hasattr(e, 'code'):
+            logger.error(f"Twilio Error Code: {e.code}")
+        if hasattr(e, 'msg'):
+            logger.error(f"Twilio Error Message: {e.msg}")
+        if hasattr(e, 'status'):
+            logger.error(f"Twilio HTTP Status: {e.status}")
+            
         return None
-
+    
 @csrf_exempt
 @require_http_methods(["POST"])
 def twilio_connect(request, whatsapp_call_id):
