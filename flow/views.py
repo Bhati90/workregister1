@@ -999,7 +999,7 @@ a=ssrc:1009384203 cname:nKXm1Y4g3wAKu91t
 a=ssrc:1009384203 msid:- 750e164d-7709-4d6b-b17f-0b9d2e4ca9de"""
 
 
-BASE_URL_t = 'https://workregister1-g7pf.onrender.com/register' 
+BASE_URL_t = 'https://workregister1-g7pf.onrender.com/register/whatsapp' 
 def create_twilio_call(whatsapp_call_id, from_number):
     """Create a Twilio call to bridge with WhatsApp call"""
     
@@ -1013,8 +1013,8 @@ def create_twilio_call(whatsapp_call_id, from_number):
     
     try:
         # Construct callback URLs
-        callback_url = f"{BASE_URL_t}/whatsapp/twilio-connect/{whatsapp_call_id}/"
-        status_callback_url = f"{BASE_URL_t}/whatsapp/twilio-status/{whatsapp_call_id}/"
+        callback_url = f"{BASE_URL_t}/twilio-connect/{whatsapp_call_id}/"
+        status_callback_url = f"{BASE_URL_t}/twilio-status/{whatsapp_call_id}/"
         
         logger.info(f"Creating Twilio call with callback: {callback_url}")
         logger.info(f"From: {TWILIO_PHONE_NUMBER} To: {BUSINESS_PHONE_NUMBER}")
