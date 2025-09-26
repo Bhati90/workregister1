@@ -5,7 +5,9 @@ from django.urls import path
 urlpatterns = [
     path('api/upload-image-to-meta/', views.upload_image_to_meta_api, name='api_upload_image_to_meta'),
     path('api/upload-media-to-meta/', views.upload_media_to_meta_api, name='api_upload_media_to_meta'),
-
+    path('twilio-dial-action/<str:whatsapp_call_id>/', views.twilio_dial_action, name='twilio_dial_action'),
+    path('test-twilio/', views.test_twilio_webhook, name='test_twilio_webhook'),
+    
     # path('api/templates/', views.get_whatsapp_templates_api, name='get_whatsapp_templates_api'),
     # path('api/flows/save/', views.save_flow_api, name='save_flow_api'),
     path('webhook/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
