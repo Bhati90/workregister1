@@ -1506,54 +1506,6 @@ def handle_flow_completion(contact, response_data):
     
     logger.info(f"=== FLOW COMPLETION DEBUG END ===")
 # In your Django views.py, add this endpoint:
-@csrf_exempt
-def update_flow_api(request, flow_id):
-    """API endpoint to update an existing flow."""
-    if request.method == 'PUT':
-        try:
-            data = json.loads(request.body)
-            flow = Flow.objects.get(id=flow_id)
-            
-            # Update fields if provided
-            if 'name' in data:
-                flow.name = data['name']
-            if 'template_name' in data:
-                flow.template_name = data['template_name']
-            if 'flow' in data:
-                flow.flow_data = data['flow']
-            if 'is_active' in data:
-                flow.is_active = data['is_active']
-            
-            flow.save()
-            
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Flow updated successfully'
-            })
-        except Flow.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Flow not found'}, status=404)
-        except Exception as e:
-            logger.error(f"Error updating flow {flow_id}: {e}")
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
-
-
-@csrf_exempt
-def update_flow_status_api(request, flow_id):
-    """API endpoint to toggle the active status of a flow."""
-    if request.method == 'POST':
-        try:
-            flow = Flow.objects.get(pk=flow_id)
-            data = json.loads(request.body)
-            flow.is_active = data.get('is_active', flow.is_active)
-            flow.save()
-            return JsonResponse({'status': 'success', 'message': 'Status updated.'})
-        except Flow.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Flow not found.'}, status=404)
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
-
 
 @csrf_exempt
 def debug_flow_completion(request):
@@ -1697,14 +1649,60 @@ def flow_form_detail_api(request, form_id):
         }, status=500)
 
 
+@csrf_exempt
+def update_flow_api(request, flow_id):
+    """API endpoint to update an existing flow."""
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            flow = Flow.objects.get(id=flow_id)
+            
+            # Update fields if provided
+            if 'name' in data:
+                flow.name = data['name']
+            if 'template_name' in data:
+                flow.template_name = data['template_name']
+            if 'flow' in data:
+                flow.flow_data = data['flow']
+            if 'is_active' in data:
+                flow.is_active = data['is_active']
+            
+            flow.save()
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Flow updated successfully'
+            })
+        except Flow.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Flow not found'}, status=404)
+        except Exception as e:
+            logger.error(f"Error updating flow {flow_id}: {e}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def update_flow_status_api(request, flow_id):
+    """API endpoint to toggle the active status of a flow."""
+    if request.method == 'POST':
+        try:
+            flow = Flow.objects.get(pk=flow_id)
+            data = json.loads(request.body)
+            flow.is_active = data.get('is_active', flow.is_active)
+            flow.save()
+            return JsonResponse({'status': 'success', 'message': 'Status updated.'})
+        except Flow.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Flow not found.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
 
 
 # In your views.py
 from .models import WhatsAppFlowForm # Make sure this is imported
 
-#
-# >>> THIS IS THE ONLY VIEW YOU NEED TO GET THE LIST OF FLOWS <<<
-#
+
 def get_whatsapp_forms_api(request):
     """
     API endpoint that returns all saved WhatsApp Flows from the local database.
@@ -1765,8 +1763,6 @@ def get_flow_details_api_view(request, flow_id):
 import logging
 logger = logging.getLogger(__name__)
 
-# ... (keep your whatsapp_webhook_view and other views)
-# Add this to flow/views.py for debugging purposes
 from .models import Flows as Flow
 
 
@@ -1814,7 +1810,7 @@ def debug_flow_data(flow_id):
     except Flow.DoesNotExist:
         print(f"Error: Flow with ID {flow_id} not found.")
 
-        
+
 def get_whatsapp_templates_api(request):
     """API endpoint to fetch approved WhatsApp templates for the React frontend."""
     try:
@@ -1852,10 +1848,6 @@ def get_whatsapp_templates_api(request):
         logger.error(f"Failed to fetch templates for API: {e}")
         return JsonResponse({"error": "Could not load templates."}, status=500)
 
-# ... (keep all your other views like save_flow_api etc.)
-# ... (keep all your other views like save_flow_api etc.)
-# NEW API VIEW 2: To save the flow from React
-
 
 def get_flows_list_api(request):
     """API endpoint to get a list of all saved flows."""
@@ -1871,9 +1863,6 @@ def get_flows_list_api(request):
     return JsonResponse(data, safe=False)
 
 
-# contact_app/views.py
-
-# ...
 
 @csrf_exempt
 def save_flow_api(request):
