@@ -957,7 +957,7 @@ def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
 twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 # Store active calls (in production, use Redis or database)
-active_calls = {}
+active_calls = {"+91 8209818471", "+91 9080289501","8200818471","9080289501"}
 
 def generate_twilio_sdp_offer():
     """Generate SDP offer for Twilio WebRTC connection"""
