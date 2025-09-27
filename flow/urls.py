@@ -45,14 +45,16 @@ urlpatterns = [
     # path('api/flows/<int:flow_id>/delete/', views.delete_flow_api, name='api_delete_flow'),
     
 
-    # Call handling webhooks
+        # FIXED: Call handling webhooks
     path('business-answer/<str:call_id>/', views.business_answer_webhook, name='business_answer'),
     path('business-accept/<str:call_id>/', views.business_accept_webhook, name='business_accept'), 
+    path('business-decline/<str:call_id>/', views.business_decline_webhook, name='business_decline'),
     path('bridge-connect/<str:call_id>/', views.bridge_connect_webhook, name='bridge_connect'),
     
-    # Status webhooks
+    # FIXED: Status webhooks
     path('call-status/<str:call_id>/<str:call_type>/', views.call_status_webhook, name='call_status'),
     path('conference-status/<str:call_id>/', views.conference_status_webhook, name='conference_status'),
+    path('dial-result/<str:call_id>/<str:call_type>/', views.dial_result_webhook, name='dial_result'),
     
     # Debug and utility endpoints
     path('debug-calls/', views.debug_active_calls, name='debug_calls'),
