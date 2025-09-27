@@ -740,10 +740,10 @@ from django.views.decorators.http import require_http_methods
 import os
 from django.conf import settings
 
-# Twilio Configuration
-TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
-TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
-TWILIO_PHONE_NUMBER = '+17375302454'
+# # Twilio Configuration
+# TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
+# TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
+# TWILIO_PHONE_NUMBER = '+17375302454'
 
 # Verify credentials are loaded
 
@@ -765,11 +765,11 @@ logger = logging.getLogger(__name__)
 ACCESS_TOKEN = 'EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ'
 PHONE_NUMBER_ID = '694609297073147'
 
-# Twilio Configuration
-TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
-TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
-TWILIO_PHONE_NUMBER = '+17375302454'
-BUSINESS_PHONE_NUMBER = '+919965377088'
+# # Twilio Configuration
+# TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
+# TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
+# TWILIO_PHONE_NUMBER = '+17375302454'
+# BUSINESS_PHONE_NUMBER = '+919965377088'
 
 
 # Complete fix for your calling system
@@ -791,17 +791,17 @@ logger = logging.getLogger(__name__)
 ACCESS_TOKEN = 'EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ'
 PHONE_NUMBER_ID = '694609297073147'
 
-# Twilio Configuration  
-TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
-TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
-TWILIO_PHONE_NUMBER = '+17375302454'
+# # Twilio Configuration  
+# TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
+# TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
+# TWILIO_PHONE_NUMBER = '+17375302454'
 
-# Phone Numbers (from your logs)
-WHATSAPP_BUSINESS_NUMBER = '+918433776745'  # WhatsApp Business API number
-ACTUAL_BUSINESS_PHONE = '+919080289501' 
+# # Phone Numbers (from your logs)
+# WHATSAPP_BUSINESS_NUMBER = '+918433776745'  # WhatsApp Business API number
+# ACTUAL_BUSINESS_PHONE = '+919080289501' 
 
 
-BASE_URL_t = 'https://workregister1-g7pf.onrender.com/register/whatsapp'
+# BASE_URL_t = 'https://workregister1-g7pf.onrender.com/register/whatsapp'
 
 
 # CRITICAL: Ensure active_calls is a dictionary (not a set)
@@ -2424,7 +2424,14 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+# Twilio Configuration  
+TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
+TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
+TWILIO_PHONE_NUMBER = '+17375302454'
 
+# Phone Numbers (from your logs)
+WHATSAPP_BUSINESS_NUMBER = '+918433776745'  # WhatsApp Business API number
+ACTUAL_BUSINESS_PHONE = '+919080289501' 
 BASE_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp'
 active_calls = {}
 @csrf_exempt
