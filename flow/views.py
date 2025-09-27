@@ -2461,30 +2461,120 @@ def generate_conference_name():
     """Generate unique conference room name"""
     return f"whatsapp_call_{uuid.uuid4().hex[:12]}"
 
+
 def generate_twilio_sdp_answer():
-    """Generate SDP answer for WhatsApp WebRTC"""
+    """Generate SDP answer that matches WhatsApp's offer exactly"""
     return """v=0
 o=- 4611731400430051336 2 IN IP4 127.0.0.1
 s=-
 t=0 0
-a=group:BUNDLE 0
-a=extmap-allow-mixed
-a=msid-semantic: WMS
-m=audio 9 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126
+a=group:BUNDLE audio
+a=msid-semantic: WMS TwilioWhatsAppBridge
+a=ice-lite
+m=audio 9 UDP/TLS/RTP/SAVPF 111 126
 c=IN IP4 0.0.0.0
 a=rtcp:9 IN IP4 0.0.0.0
-a=ice-ufrag:TwilioICE
+a=ice-ufrag:TwilioICE2024
 a=ice-pwd:TwilioWebRTCBridge2024
 a=ice-options:trickle
 a=fingerprint:sha-256 28:E8:97:FC:B8:53:24:B8:1F:AB:C1:29:E3:A0:1E:8B:38:36:C2:14:D7:76:66:83:1A:B4:EA:98:AA:64:15:1C
 a=setup:active
-a=mid:0
+a=mid:audio
 a=sendrecv
+a=msid:TwilioWhatsAppBridge WhatsAppTrack1
 a=rtcp-mux
 a=rtpmap:111 opus/48000/2
 a=rtcp-fb:111 transport-cc
-a=fmtp:111 minptime=10;useinbandfec=1
+a=fmtp:111 maxaveragebitrate=20000;maxplaybackrate=16000;minptime=20;sprop-maxcapturerate=16000;useinbandfec=1
+a=rtpmap:126 telephone-event/8000
+a=maxptime:20
+a=ptime:20
 a=ssrc:1009384203 cname:TwilioWhatsAppBridge"""
+
+# CRITICAL FIX: Use Media Streams instead of Conference
+@csrf_exempt
+@require_http_methods(["POST"])
+def business_accept_webhook_media_streams(request, call_id):
+    """Handle business accepting call using Media Streams for WhatsApp audio"""
+    
+    logger.info(f"=== BUSINESS ACCEPT WEBHOOK (MEDIA STREAMS) ===")
+    logger.info(f"Call ID: {call_id}")
+    
+    digits = request.POST.get('Digits', '')
+    logger.info(f"Digits pressed: '{digits}'")
+    
+    if call_id not in active_calls:
+        logger.error(f"Call {call_id} not found")
+        response = VoiceResponse()
+        response.say("Call session expired.")
+        response.hangup()
+        return HttpResponse(str(response), content_type='text/xml')
+    
+    call_info = active_calls[call_id]
+    
+    response = VoiceResponse()
+    
+    if digits:
+        logger.info(f"Business accepted call {call_id} with digit: {digits}")
+        
+        response.say("Connecting your call now.", voice='alice')
+        
+        # FIXED: Use Media Streams to bridge WhatsApp audio directly
+        # Start a media stream that will capture WhatsApp audio
+        
+        # Connect business to a simple call first
+        dial = Dial(
+            timeout=60,
+            action=f"{BASE_URL}/call-connected/{call_id}/",
+            method='POST'
+        )
+        
+        # Use Number instead of Conference for direct connection
+        dial.number(
+            ACTUAL_BUSINESS_PHONE,
+            status_callback=f"{BASE_URL}/call-status/{call_id}/business/",
+            status_callback_event=['answered', 'completed']
+        )
+        
+        response.append(dial)
+        
+        # Mark as accepted and create media stream bridge
+        active_calls[call_id]['status'] = 'business_accepted'
+        
+        # Create media stream for WhatsApp audio
+        try:
+            logger.info(f"Creating media stream bridge for WhatsApp audio...")
+            
+            # Use Twilio's Media Streams for real-time audio
+            stream_twiml = f'''<Response>
+                <Start>
+                    <Stream url="wss://workregister1-8g56.onrender.com/register/whatsapp/media-stream/{call_id}/">
+                        <Parameter name="callId" value="{call_id}" />
+                        <Parameter name="track" value="inbound_track" />
+                    </Stream>
+                </Start>
+                <Pause length="3600"/>
+            </Response>'''
+            
+            bridge_call = twilio_client.calls.create(
+                to=TWILIO_PHONE_NUMBER,
+                from_=TWILIO_PHONE_NUMBER,
+                twiml=stream_twiml,
+                status_callback=f"{BASE_URL}/call-status/{call_id}/bridge/"
+            )
+            
+            active_calls[call_id]['bridge_call_sid'] = bridge_call.sid
+            logger.info(f"✅ Created media stream bridge: {bridge_call.sid}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to create media stream: {e}")
+    else:
+        logger.info(f"Business declined call {call_id}")
+        response.say("Call declined. Goodbye.")
+        response.hangup()
+        cleanup_failed_call(call_id)
+    
+    return HttpResponse(str(response), content_type='text/xml')
 
 def call_whatsapp_api(call_id, action, sdp=None, callback_data=None):
     """Call WhatsApp Business API"""
@@ -2697,10 +2787,12 @@ def business_answer_webhook(request, call_id):
     
     logger.info(f"Sent business greeting for call {call_id}")
     return HttpResponse(str(response), content_type='text/xml')
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def business_accept_webhook(request, call_id):
-    """Handle business person accepting call - SIMPLIFIED VERSION"""
+    """Simple fix - direct dial without conference"""
     
     logger.info(f"=== BUSINESS ACCEPT WEBHOOK ===")
     logger.info(f"Call ID: {call_id}")
@@ -2709,73 +2801,29 @@ def business_accept_webhook(request, call_id):
     logger.info(f"Digits pressed: '{digits}'")
     
     if call_id not in active_calls:
-        logger.error(f"Call {call_id} not found")
         response = VoiceResponse()
         response.say("Call session expired.")
         response.hangup()
         return HttpResponse(str(response), content_type='text/xml')
     
-    call_info = active_calls[call_id]
-    conference_name = call_info['conference_name']
-    
     response = VoiceResponse()
     
     if digits:
-        logger.info(f"Business accepted call {call_id} with digit: {digits}")
-        
-        # SIMPLIFIED: Connect business to conference AND create bridge call with direct TwiML
         response.say("Connecting your call now.", voice='alice')
         
-        # Put business person in conference
+        # Direct dial - no conference
         dial = Dial(timeout=30)
-        conference = Conference(
-            conference_name,
-            start_conference_on_enter=True,
-            end_conference_on_exit=False,
-            beep=False,
-            max_participants=3
-        )
-        dial.append(conference)
+        dial.number(ACTUAL_BUSINESS_PHONE)
         response.append(dial)
         
-        # FIXED: Create bridge call with direct TwiML instead of webhook URL
-        try:
-            logger.info(f"Creating WhatsApp bridge call with direct TwiML...")
-            
-            # Direct TwiML that connects to the same conference
-            bridge_twiml = f'''<Response>
-                <Dial>
-                    <Conference 
-                        startConferenceOnEnter="false" 
-                        endConferenceOnExit="true"
-                        beep="false">
-                        {conference_name}
-                    </Conference>
-                </Dial>
-            </Response>'''
-            
-            bridge_call = twilio_client.calls.create(
-                to=TWILIO_PHONE_NUMBER,
-                from_=TWILIO_PHONE_NUMBER,
-                twiml=bridge_twiml,  # Use direct TwiML instead of webhook URL
-                status_callback=f"{BASE_URL}/call-status/{call_id}/bridge/"
-            )
-            
-            active_calls[call_id]['bridge_call_sid'] = bridge_call.sid
-            active_calls[call_id]['status'] = 'fully_connected'
-            
-            logger.info(f"✅ Created bridge call with direct TwiML: {bridge_call.sid}")
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to create bridge call: {e}")
+        active_calls[call_id]['status'] = 'connected'
+        
     else:
-        logger.info(f"Business declined call {call_id} (no digits)")
-        response.say("Call declined. Goodbye.")
+        response.say("Call declined.")
         response.hangup()
         cleanup_failed_call(call_id)
     
     return HttpResponse(str(response), content_type='text/xml')
-
 # ALTERNATIVE APPROACH - Use a single conference room with proper timing
 @csrf_exempt
 @require_http_methods(["POST"])
