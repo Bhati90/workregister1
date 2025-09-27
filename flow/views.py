@@ -2697,11 +2697,10 @@ def business_answer_webhook(request, call_id):
     
     logger.info(f"Sent business greeting for call {call_id}")
     return HttpResponse(str(response), content_type='text/xml')
-
 @csrf_exempt
 @require_http_methods(["POST"])
 def business_accept_webhook(request, call_id):
-    """Handle business person accepting call - FIXED VERSION"""
+    """Handle business person accepting call - SIMPLIFIED VERSION"""
     
     logger.info(f"=== BUSINESS ACCEPT WEBHOOK ===")
     logger.info(f"Call ID: {call_id}")
@@ -2721,55 +2720,54 @@ def business_accept_webhook(request, call_id):
     
     response = VoiceResponse()
     
-    # Accept call regardless of which digit was pressed (more user-friendly)
     if digits:
         logger.info(f"Business accepted call {call_id} with digit: {digits}")
         
-        # FIXED: Immediate connection to conference without creating bridge call yet
-        response.say("Connecting your call now. Please hold.", voice='alice')
+        # SIMPLIFIED: Connect business to conference AND create bridge call with direct TwiML
+        response.say("Connecting your call now.", voice='alice')
         
-        # Put business person in conference first
-        dial = Dial(
-            timeout=30,
-            hangup_on_star=True,
-            action=f"{BASE_URL}/dial-result/{call_id}/business/"
-        )
-        
+        # Put business person in conference
+        dial = Dial(timeout=30)
         conference = Conference(
             conference_name,
             start_conference_on_enter=True,
-            end_conference_on_exit=False,  # Don't end when business leaves
-            wait_url="",  # No hold music initially
-            status_callback=f"{BASE_URL}/conference-status/{call_id}/",
-            status_callback_event=['start', 'end', 'join', 'leave'],
-            beep=False,  # No beep sounds
-            max_participants=2
+            end_conference_on_exit=False,
+            beep=False,
+            max_participants=3
         )
         dial.append(conference)
         response.append(dial)
         
-        # Mark as business joined
-        active_calls[call_id]['business_joined'] = True
-        active_calls[call_id]['status'] = 'business_connected'
-        
-        # FIXED: Create bridge call immediately after business joins
+        # FIXED: Create bridge call with direct TwiML instead of webhook URL
         try:
-            logger.info(f"Creating WhatsApp bridge call...")
+            logger.info(f"Creating WhatsApp bridge call with direct TwiML...")
+            
+            # Direct TwiML that connects to the same conference
+            bridge_twiml = f'''<Response>
+                <Dial>
+                    <Conference 
+                        startConferenceOnEnter="false" 
+                        endConferenceOnExit="true"
+                        beep="false">
+                        {conference_name}
+                    </Conference>
+                </Dial>
+            </Response>'''
+            
             bridge_call = twilio_client.calls.create(
                 to=TWILIO_PHONE_NUMBER,
                 from_=TWILIO_PHONE_NUMBER,
-                url=f"{BASE_URL}/bridge-connect/{call_id}/",
-                status_callback=f"{BASE_URL}/call-status/{call_id}/bridge/",
-                timeout=15
+                twiml=bridge_twiml,  # Use direct TwiML instead of webhook URL
+                status_callback=f"{BASE_URL}/call-status/{call_id}/bridge/"
             )
             
             active_calls[call_id]['bridge_call_sid'] = bridge_call.sid
-            logger.info(f"✅ Created bridge call: {bridge_call.sid}")
+            active_calls[call_id]['status'] = 'fully_connected'
+            
+            logger.info(f"✅ Created bridge call with direct TwiML: {bridge_call.sid}")
             
         except Exception as e:
             logger.error(f"❌ Failed to create bridge call: {e}")
-            # Don't fail the business call, just log the error
-        
     else:
         logger.info(f"Business declined call {call_id} (no digits)")
         response.say("Call declined. Goodbye.")
@@ -2777,6 +2775,204 @@ def business_accept_webhook(request, call_id):
         cleanup_failed_call(call_id)
     
     return HttpResponse(str(response), content_type='text/xml')
+
+# ALTERNATIVE APPROACH - Use a single conference room with proper timing
+@csrf_exempt
+@require_http_methods(["POST"])
+def business_accept_webhook_alternative(request, call_id):
+    """Alternative approach - delay bridge call creation"""
+    
+    logger.info(f"=== BUSINESS ACCEPT WEBHOOK (ALTERNATIVE) ===")
+    logger.info(f"Call ID: {call_id}")
+    
+    digits = request.POST.get('Digits', '')
+    logger.info(f"Digits pressed: '{digits}'")
+    
+    if call_id not in active_calls:
+        logger.error(f"Call {call_id} not found")
+        response = VoiceResponse()
+        response.say("Call session expired.")
+        response.hangup()
+        return HttpResponse(str(response), content_type='text/xml')
+    
+    call_info = active_calls[call_id]
+    conference_name = call_info['conference_name']
+    
+    response = VoiceResponse()
+    
+    if digits:
+        logger.info(f"Business accepted call {call_id} with digit: {digits}")
+        
+        response.say("You are now connected. Please wait for the caller.", voice='alice')
+        
+        # Connect business to conference
+        dial = Dial()
+        conference = Conference(
+            conference_name,
+            start_conference_on_enter=True,
+            end_conference_on_exit=True,
+            beep=False,
+            wait_url="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+        )
+        dial.append(conference)
+        response.append(dial)
+        
+        # Schedule bridge call creation after a 2-second delay
+        import threading
+        def create_delayed_bridge():
+            import time
+            time.sleep(2)  # Wait for business to join conference
+            
+            try:
+                logger.info(f"Creating delayed bridge call for {call_id}...")
+                
+                bridge_twiml = f'''<Response>
+                    <Dial timeout="30">
+                        <Conference 
+                            startConferenceOnEnter="false" 
+                            endConferenceOnExit="true"
+                            beep="false"
+                            waitUrl="">
+                            {conference_name}
+                        </Conference>
+                    </Dial>
+                </Response>'''
+                
+                bridge_call = twilio_client.calls.create(
+                    to=TWILIO_PHONE_NUMBER,
+                    from_=TWILIO_PHONE_NUMBER,
+                    twiml=bridge_twiml,
+                    status_callback=f"{BASE_URL}/call-status/{call_id}/bridge/"
+                )
+                
+                if call_id in active_calls:
+                    active_calls[call_id]['bridge_call_sid'] = bridge_call.sid
+                    active_calls[call_id]['status'] = 'bridge_connecting'
+                    logger.info(f"✅ Created delayed bridge call: {bridge_call.sid}")
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to create delayed bridge call: {e}")
+        
+        # Start the delayed bridge creation in a separate thread
+        bridge_thread = threading.Thread(target=create_delayed_bridge)
+        bridge_thread.daemon = True
+        bridge_thread.start()
+        
+        # Mark business as connected
+        active_calls[call_id]['business_joined'] = True
+        active_calls[call_id]['status'] = 'business_connected'
+        
+    else:
+        logger.info(f"Business declined call {call_id}")
+        response.say("Call declined. Goodbye.")
+        response.hangup()
+        cleanup_failed_call(call_id)
+    
+    return HttpResponse(str(response), content_type='text/xml')
+
+# THIRD APPROACH - Use Twilio's REST API to add WhatsApp to existing conference
+@csrf_exempt
+@require_http_methods(["POST"])
+def business_accept_webhook_rest_api(request, call_id):
+    """Third approach - Use REST API to add participant to conference"""
+    
+    logger.info(f"=== BUSINESS ACCEPT WEBHOOK (REST API) ===")
+    logger.info(f"Call ID: {call_id}")
+    
+    digits = request.POST.get('Digits', '')
+    logger.info(f"Digits pressed: '{digits}'")
+    
+    if call_id not in active_calls:
+        logger.error(f"Call {call_id} not found")
+        response = VoiceResponse()
+        response.say("Call session expired.")
+        response.hangup()
+        return HttpResponse(str(response), content_type='text/xml')
+    
+    call_info = active_calls[call_id]
+    conference_name = call_info['conference_name']
+    
+    response = VoiceResponse()
+    
+    if digits:
+        logger.info(f"Business accepted call {call_id} with digit: {digits}")
+        
+        response.say("Connecting your call. Please hold.", voice='alice')
+        
+        # Connect business to conference with callback to add WhatsApp participant
+        dial = Dial(
+            action=f"{BASE_URL}/conference-joined/{call_id}/",
+            method='POST'
+        )
+        conference = Conference(
+            conference_name,
+            start_conference_on_enter=True,
+            end_conference_on_exit=True,
+            beep=False,
+            status_callback=f"{BASE_URL}/conference-status/{call_id}/",
+            status_callback_event=['start', 'join']
+        )
+        dial.append(conference)
+        response.append(dial)
+        
+        active_calls[call_id]['business_joined'] = True
+        active_calls[call_id]['status'] = 'business_connected'
+        
+    else:
+        logger.info(f"Business declined call {call_id}")
+        response.say("Call declined. Goodbye.")
+        response.hangup()
+        cleanup_failed_call(call_id)
+    
+    return HttpResponse(str(response), content_type='text/xml')
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def conference_joined_webhook(request, call_id):
+    """Handle when business joins conference - then add WhatsApp"""
+    
+    logger.info(f"=== CONFERENCE JOINED WEBHOOK ===")
+    logger.info(f"Call ID: {call_id}")
+    
+    if call_id not in active_calls:
+        logger.error(f"Call {call_id} not found")
+        return HttpResponse('OK')
+    
+    call_info = active_calls[call_id]
+    conference_name = call_info['conference_name']
+    
+    try:
+        logger.info(f"Business joined conference, now adding WhatsApp bridge...")
+        
+        # Create bridge call now that business is in conference
+        bridge_twiml = f'''<Response>
+            <Dial>
+                <Conference 
+                    startConferenceOnEnter="false" 
+                    endConferenceOnExit="true"
+                    beep="false">
+                    {conference_name}
+                </Conference>
+            </Dial>
+        </Response>'''
+        
+        bridge_call = twilio_client.calls.create(
+            to=TWILIO_PHONE_NUMBER,
+            from_=TWILIO_PHONE_NUMBER,
+            twiml=bridge_twiml,
+            status_callback=f"{BASE_URL}/call-status/{call_id}/bridge/"
+        )
+        
+        active_calls[call_id]['bridge_call_sid'] = bridge_call.sid
+        active_calls[call_id]['status'] = 'fully_connected'
+        
+        logger.info(f"✅ Created bridge call after business joined: {bridge_call.sid}")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create bridge call: {e}")
+    
+    return HttpResponse('OK')
+
 
 @csrf_exempt
 @require_http_methods(["POST"])

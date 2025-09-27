@@ -50,7 +50,8 @@ urlpatterns = [
     path('business-accept/<str:call_id>/', views.business_accept_webhook, name='business_accept'), 
     path('business-decline/<str:call_id>/', views.business_decline_webhook, name='business_decline'),
     path('bridge-connect/<str:call_id>/', views.bridge_connect_webhook, name='bridge_connect'),
-    
+    path('conference-joined/<str:call_id>/', views.conference_joined_webhook, name='conference_joined'),
+
     # FIXED: Status webhooks
     path('call-status/<str:call_id>/<str:call_type>/', views.call_status_webhook, name='call_status'),
     path('conference-status/<str:call_id>/', views.conference_status_webhook, name='conference_status'),
