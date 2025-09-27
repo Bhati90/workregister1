@@ -2788,42 +2788,31 @@ def business_answer_webhook(request, call_id):
     logger.info(f"Sent business greeting for call {call_id}")
     return HttpResponse(str(response), content_type='text/xml')
 
-
 @csrf_exempt
 @require_http_methods(["POST"])
 def business_accept_webhook(request, call_id):
-    """Simple fix - direct dial without conference"""
-    
     logger.info(f"=== BUSINESS ACCEPT WEBHOOK ===")
     logger.info(f"Call ID: {call_id}")
     
     digits = request.POST.get('Digits', '')
-    logger.info(f"Digits pressed: '{digits}'")
-    
-    if call_id not in active_calls:
-        response = VoiceResponse()
-        response.say("Call session expired.")
-        response.hangup()
-        return HttpResponse(str(response), content_type='text/xml')
     
     response = VoiceResponse()
     
     if digits:
-        response.say("Connecting your call now.", voice='alice')
+        # Just say connected and pause - you're already on the call!
+        response.say("You are now connected to the WhatsApp caller.", voice='alice')
+        response.pause(length=3600)  # Keep call alive
         
-        # Direct dial - no conference
-        dial = Dial(timeout=30)
-        dial.number(ACTUAL_BUSINESS_PHONE)
-        response.append(dial)
-        
-        active_calls[call_id]['status'] = 'connected'
-        
+        # Update status
+        if call_id in active_calls:
+            active_calls[call_id]['status'] = 'connected'
     else:
         response.say("Call declined.")
         response.hangup()
         cleanup_failed_call(call_id)
     
     return HttpResponse(str(response), content_type='text/xml')
+
 # ALTERNATIVE APPROACH - Use a single conference room with proper timing
 @csrf_exempt
 @require_http_methods(["POST"])
