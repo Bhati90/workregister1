@@ -2426,7 +2426,7 @@ logger = logging.getLogger(__name__)
 
 # Twilio Configuration  
 TWILIO_ACCOUNT_SID = 'ACb1492fb21e0c67f4d1f1871e79aa56e7'
-TWILIO_AUTH_TOKEN = 'dbf9980f385bc98b1d8948cbfc287df9'
+TWILIO_AUTH_TOKEN = '6390679bb5ea805fc63e3165d1b1a12d'
 TWILIO_PHONE_NUMBER = '+17375302454'
 
 # Phone Numbers (from your logs)
