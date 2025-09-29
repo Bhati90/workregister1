@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import './FlowListPage.css';
 
-const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
+const API_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp';
 
 const FlowListPage = () => {
   const [flows, setFlows] = useState([]);
@@ -88,6 +88,7 @@ const FlowListPage = () => {
           <Link to="/flow/new" className="create-flow-btn">
             + Create Flow
           </Link>
+          <Link to="/ai-flow-generator">AI Flow Generator</Link>
         </header>
 
         <div className="card quota-card">

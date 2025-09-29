@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import FlowBuilder from '../components/FlowBuilder';
 
-const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
+const API_URL = 'workregister1https://workregister1-8g56.onrender.com/register/whatsapp/';
 
 const FlowEditorPage = () => {
   const { flowId } = useParams(); // Get flow ID from URL

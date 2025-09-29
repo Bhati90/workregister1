@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './FlowListPage.css'; // Reuse styles for consistency
 
-const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp/api/attributes/';
+const API_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp/api/attributes/';
 
 const AttributesPage = () => {
     const [attributes, setAttributes] = useState([]);

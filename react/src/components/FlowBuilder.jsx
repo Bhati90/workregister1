@@ -42,7 +42,7 @@ const nodeTypes = {
   askApiNode: ApiNode
 };
 
-const API_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
+const API_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp';
 
 let id = 0;
 const getId = () => `dndnode_${id++}`;

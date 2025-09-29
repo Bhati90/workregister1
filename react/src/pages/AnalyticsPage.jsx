@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import './AnalyticsPage.css'; // We will create this file for styling
 
 // IMPORTANT: Update this to your Django backend's URL
-const API_URL = 'https://workregister1-g7pf.onrender.com/register/api/analytics';
+const API_URL = 'https://workregister1-8g56.onrender.com/register/api/analytics';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1943'];
 

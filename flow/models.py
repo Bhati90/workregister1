@@ -20,6 +20,7 @@ class WhatsAppCall(models.Model):
 
     def __str__(self):
         return f"{self.direction.capitalize()} call with {self.contact.wa_id} - {self.status}"
+
 class Flows(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
     name = models.CharField(max_length=255, unique=True, default="Untitled Flow")

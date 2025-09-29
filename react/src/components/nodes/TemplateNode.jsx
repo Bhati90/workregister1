@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
-const API_BASE_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp'; // Make sure this matches your Django backend URL
+const API_BASE_URL = 'https://workregister1-8g56.onrender.com/register/template-sender/whatsapp'; // Make sure this matches your Django backend URL
 import axios from 'axios';
 // Helper function to find variables like {{1}}, {{2}} in the text
 const findVariables = (text) => {

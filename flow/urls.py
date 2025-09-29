@@ -21,7 +21,7 @@ urlpatterns = [
     # Webhook endpoints
     # path('webhook/whatsapp/', views.whatsapp_webhook_view, name='whatsapp_webhook'),
     # path('webhook/whatsapp-flows/', views.whatsapp_flow_webhook_view, name='whatsapp_flow_webhook'),
-    path('api/save-flow/', views.save_flow_api, name='save_flow'),
+    # path('api/save-flow/', views.save_flow_api, name='save_flow'),
     # path('flow-builder/', views.flow_builder_view, name='flow_builder'),
     # 
     #  path('webhook/', views.webhook_verify, name='webhook_verify'),  # GET
@@ -62,7 +62,9 @@ urlpatterns = [
     path('test-business/', views.test_business_number, name='test_business'),
     path('terminate-call/', views.terminate_call, name='terminate_call'),
     path('health/', views.system_health, name='system_health'),
-
+    path('api/flows/generate-ai/', views.generate_flow_with_ai, name='api_generate_flow_ai'),
+    path('api/flows/ai-list/', views.get_ai_generated_flows, name='api_ai_flows_list'),
+    
 
 
     path('api/flows/list/', views.get_flows_list_api, name='api_flows_list'),
