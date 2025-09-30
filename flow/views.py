@@ -3529,7 +3529,7 @@ def analyze_requirements_with_ai(requirements, existing_templates):
     template or generate a new one.
     """
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         prompt = f"""
 You are a WhatsApp Business API template expert. Analyze the user's requirements and decide:
