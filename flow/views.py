@@ -3476,6 +3476,421 @@ def fetch_whatsapp_templates():
         return []
 
 
+
+
+@csrf_exempt
+def analyze_and_generate_template(request):
+    """
+    Analyzes user requirements and either suggests existing template
+    or generates a new template that meets Meta's approval guidelines.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        user_requirements = data.get('requirements', '')
+        
+        if not user_requirements:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Requirements are needed'
+            }, status=400)
+        
+        # Step 1: Fetch existing templates
+        existing_templates = fetch_whatsapp_templates()
+        
+        # Step 2: Analyze with Gemini
+        analysis = analyze_requirements_with_ai(user_requirements, existing_templates)
+        
+        if not analysis:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to analyze requirements'
+            }, status=500)
+        
+        # Step 3: Return analysis with recommendation
+        return JsonResponse({
+            'status': 'success',
+            'analysis': analysis
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in template analysis: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+def analyze_requirements_with_ai(requirements, existing_templates):
+    """
+    Uses Gemini to analyze requirements and decide whether to use existing
+    template or generate a new one.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-1.5-pro')
+        
+        prompt = f"""
+You are a WhatsApp Business API template expert. Analyze the user's requirements and decide:
+1. Can an existing approved template be used?
+2. Or should a new template be created?
+
+USER REQUIREMENTS:
+{requirements}
+
+EXISTING APPROVED TEMPLATES:
+{json.dumps(existing_templates, indent=2)}
+
+META'S TEMPLATE APPROVAL GUIDELINES:
+- Templates must provide value to users
+- No promotional content in UTILITY category
+- Use MARKETING category for promotional content
+- Variables {{{{1}}}}, {{{{2}}}} etc. for dynamic content
+- Keep body under 1024 characters
+- Header optional (TEXT, IMAGE, VIDEO, or DOCUMENT)
+- Footer optional (up to 60 characters)
+- Buttons optional (max 3 quick reply buttons OR 2 call-to-action buttons)
+- Language must be specified (en, hi, es, etc.)
+
+DECISION TASK:
+If an existing template is suitable, recommend it.
+If not, generate a NEW template following Meta's guidelines.
+
+OUTPUT FORMAT (JSON):
+{{
+  "recommendation": "use_existing" or "create_new",
+  "reasoning": "Why this decision was made",
+  "existing_template": "template_name" (if use_existing),
+  "new_template": {{
+    "name": "descriptive_lowercase_with_underscores",
+    "language": "en",
+    "category": "UTILITY" or "MARKETING",
+    "components": [
+      {{
+        "type": "HEADER",
+        "format": "TEXT" or "IMAGE" or "VIDEO" or "DOCUMENT",
+        "text": "Header text if TEXT format",
+        "example": {{
+          "header_handle": ["https://example.com/image.jpg"]
+        }} (if IMAGE/VIDEO/DOCUMENT - will need actual upload)
+      }},
+      {{
+        "type": "BODY",
+        "text": "Body text with {{{{1}}}} for variables",
+        "example": {{
+          "body_text": [["Example value for variable 1", "Example for variable 2"]]
+        }}
+      }},
+      {{
+        "type": "FOOTER",
+        "text": "Footer text"
+      }},
+      {{
+        "type": "BUTTONS",
+        "buttons": [
+          {{
+            "type": "QUICK_REPLY",
+            "text": "Button text"
+          }}
+        ]
+      }}
+    ]
+  }} (if create_new),
+  "variables_needed": [
+    {{"name": "customer_name", "description": "Customer's name", "example": "John"}},
+    {{"name": "order_number", "description": "Order ID", "example": "ORD123"}}
+  ],
+  "needs_media": true/false,
+  "media_type": "image" or "video" or "document" (if needs_media),
+  "suggested_flow": {{
+    "description": "How the flow should work after template is approved",
+    "steps": ["Step 1", "Step 2", "Step 3"]
+  }}
+}}
+
+Generate ONLY valid JSON, no markdown.
+"""
+        
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean response
+        if response_text.startswith('```'):
+            lines = response_text.split('\n')
+            response_text = '\n'.join(lines[1:-1])
+            if response_text.startswith('json'):
+                response_text = response_text[4:].strip()
+        
+        analysis = json.loads(response_text)
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Error in AI analysis: {e}", exc_info=True)
+        return None
+
+
+@csrf_exempt
+def submit_template_to_meta(request):
+    """
+    Submits the approved template design to Meta for review.
+    Handles media upload if needed.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        # Get template data from request
+        template_data = json.loads(request.POST.get('template_data'))
+        
+        # Handle media upload if needed
+        if 'media_file' in request.FILES:
+            media_file = request.FILES['media_file']
+            media_id = upload_media_to_meta(media_file)
+            
+            if not media_id:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Failed to upload media'
+                }, status=500)
+            
+            # Update template with media ID
+            for component in template_data['components']:
+                if component.get('type') == 'HEADER' and component.get('format') in ['IMAGE', 'VIDEO', 'DOCUMENT']:
+                    component['example'] = {
+                        'header_handle': [media_id]
+                    }
+        
+        # Submit to Meta
+        url = f"{META_API_URL}/{WABA_ID}/message_templates"
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        logger.info(f"Submitting template to Meta: {json.dumps(template_data, indent=2)}")
+        response = requests.post(url, json=template_data, headers=headers)
+        response_data = response.json()
+        
+        if response.status_code == 200:
+            # Template submitted successfully
+            template_id = response_data.get('id')
+            template_name = template_data.get('name')
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Template submitted for approval',
+                'template_id': template_id,
+                'template_name': template_name,
+                'meta_response': response_data
+            })
+        else:
+            return JsonResponse({
+                'status': 'error',
+                'message': response_data.get('error', {}).get('message', 'Submission failed'),
+                'meta_response': response_data
+            }, status=response.status_code)
+        
+    except Exception as e:
+        logger.error(f"Error submitting template: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def check_template_status(request, template_name):
+    """
+    Checks the approval status of a template.
+    """
+    try:
+        url = f"{META_API_URL}/{WABA_ID}/message_templates"
+        params = {
+            'name': template_name,
+            'fields': 'name,status,id'
+        }
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        
+        response = requests.get(url, params=params, headers=headers)
+        response.raise_for_status()
+        
+        templates = response.json().get('data', [])
+        if templates:
+            template = templates[0]
+            return JsonResponse({
+                'status': 'success',
+                'template_status': template.get('status'),
+                'template_id': template.get('id'),
+                'template_name': template.get('name')
+            })
+        else:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Template not found'
+            }, status=404)
+        
+    except Exception as e:
+        logger.error(f"Error checking template status: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def auto_create_flow_after_approval(request):
+    """
+    Automatically creates a flow once the template is approved.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        template_name = data.get('template_name')
+        original_requirements = data.get('original_requirements')
+        suggested_flow = data.get('suggested_flow')
+        
+        if not all([template_name, original_requirements]):
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Missing required data'
+            }, status=400)
+        
+        # Fetch all available resources
+        templates = fetch_whatsapp_templates()
+        flow_forms = list(WhatsAppFlowForm.objects.all().values(
+            'id', 'name', 'template_body', 'template_button_text',
+            'template_category', 'screens_data'
+        ))
+        attributes = list(Attribute.objects.all().values('id', 'name', 'description'))
+        
+        # Generate flow with the new template
+        flow_requirements = f"""
+Original Requirements: {original_requirements}
+
+Suggested Flow Structure: {json.dumps(suggested_flow, indent=2)}
+
+IMPORTANT: Use template '{template_name}' as the first node (trigger).
+Build the complete flow based on the original requirements and suggested structure.
+"""
+        
+        generated_flow = generate_flow_with_gemini(
+            user_info=flow_requirements,
+            templates=templates,
+            flow_forms=flow_forms,
+            attributes=attributes
+        )
+        
+        if not generated_flow:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to generate flow'
+            }, status=500)
+        
+        # Validate and create attributes
+        if not validate_generated_flow(generated_flow, templates):
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Generated flow validation failed'
+            }, status=500)
+        
+        created_attributes = create_missing_attributes(generated_flow)
+        
+        # Save flow
+        flow_obj = Flow.objects.create(
+            name=generated_flow['name'],
+            template_name=generated_flow['template_name'],
+            flow_data=generated_flow['flow_data'],
+            is_active=True
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Flow created successfully',
+            'flow': {
+                'id': flow_obj.id,
+                'name': flow_obj.name,
+                'template_name': flow_obj.template_name,
+                'explanation': generated_flow.get('explanation', ''),
+                'flow_data': generated_flow['flow_data'],
+                'created_attributes': created_attributes
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error auto-creating flow: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+def fetch_whatsapp_templates():
+    """Fetch approved WhatsApp templates from Meta API."""
+    try:
+        url = f"{META_API_URL}/{WABA_ID}/message_templates"
+        params = {"fields": "name,components,status,language,category"}
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        
+        all_templates = response.json().get('data', [])
+        approved_templates = [t for t in all_templates if t.get('status') == 'APPROVED']
+        
+        processed_templates = []
+        for t in approved_templates:
+            buttons = []
+            for comp in t.get('components', []):
+                if comp.get('type') == 'BUTTONS':
+                    for btn in comp.get('buttons', []):
+                        if btn.get('type') == 'QUICK_REPLY':
+                            buttons.append({'text': btn.get('text')})
+            
+            processed_templates.append({
+                'name': t.get('name'),
+                'components': t.get('components', []),
+                'buttons': buttons,
+                'language': t.get('language', 'en'),
+                'category': t.get('category', 'UTILITY')
+            })
+        
+        return processed_templates
+    except Exception as e:
+        logger.error(f"Error fetching templates: {e}")
+        return []
+
+
+def upload_media_to_meta(file_object):
+    """
+    Uploads a file object to the Meta API and returns the media ID.
+    """
+    try:
+        url = f"{META_API_URL}/{PHONE_NUMBER_ID}/media"
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        
+        file_object.seek(0)
+        file_name = os.path.basename(file_object.name)
+        content_type, _ = mimetypes.guess_type(file_name)
+        if content_type is None:
+            content_type = 'application/octet-stream'
+        
+        files = {
+            'file': (file_name, file_object, content_type),
+        }
+        data = {
+            'messaging_product': 'whatsapp',
+        }
+        response = requests.post(url, headers=headers, files=files, data=data)
+        response.raise_for_status()
+        return response.json().get('id')
+        
+    except Exception as e:
+        logger.error(f"Failed to upload media: {e}", exc_info=True)
+        return None
+
 def generate_flow_with_gemini(user_info, templates, flow_forms, attributes):
     """
     Use Gemini AI to analyze user info and generate optimal flow.

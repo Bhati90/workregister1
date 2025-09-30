@@ -59,7 +59,7 @@ const AIFlowGenerator = () => {
   };
 
   const handleViewFlow = (flowId) => {
-    navigate(`/edit-flow/${flowId}`);
+    navigate(`/flow/${flowId}`);
   };
 
   const examplePrompts = [

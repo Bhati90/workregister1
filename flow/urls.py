@@ -66,6 +66,13 @@ urlpatterns = [
     path('api/flows/ai-list/', views.get_ai_generated_flows, name='api_ai_flows_list'),
     
 
+    path('api/template-flow/analyze/', views.analyze_and_generate_template, name='analyze_template'),
+    path('api/template-flow/submit/', views.submit_template_to_meta, name='submit_template'),
+    path('api/template-flow/status/<str:template_name>/', views.check_template_status, name='check_template_status'),
+    path('api/template-flow/create-flow/', views.auto_create_flow_after_approval, name='auto_create_flow'),
+    
+
+    
 
     path('api/flows/list/', views.get_flows_list_api, name='api_flows_list'),
     path('api/flows/save/', views.save_flow_api, name='api_save_flow'),

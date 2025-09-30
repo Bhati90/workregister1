@@ -8,6 +8,7 @@ import './App.css';
 import AttributesPage from './pages/AttributePage';
 import FlowEditorPage from './pages/FlowEditorPage';
 import AIFlowGenerator from './components/AiFlowGenerator';
+import TemplateFlowCreator from './pages/TemplateFlowCreator';
 
 function App() {
   return (
@@ -22,7 +23,8 @@ function App() {
            <Route path="/flow/:flowId" element={<FlowEditorPage />} />
            <Route path="/flow/new" element={<FlowEditorPage />} />
            <Route path="/ai-flow-generator" element={<AIFlowGenerator/>} />
-
+           
+           <Route path="/template-flow-creator" element={<TemplateFlowCreator />} />
           {/* <Route path="/analytics" element={<AnalyticsPage />} /> <-- Add the route */}
         </Routes>
       </div>
