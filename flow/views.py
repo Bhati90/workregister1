@@ -3413,7 +3413,7 @@ def generate_flow_with_ai(request):
             logger.info(f"Auto-created {len(created_attributes)} attributes: {created_attributes}")
         
         # Step 6: Save the generated flow to database
-        flow_obj = Flows.objects.create(
+        flow_obj = Flow.objects.create(
             name=generated_flow['name'],
             template_name=generated_flow['template_name'],
             flow_data=generated_flow['flow_data'],
@@ -3839,7 +3839,7 @@ def validate_generated_flow(flow, templates):
 def get_ai_generated_flows(request):
     """Get list of all flows with metadata."""
     try:
-        flows = Flows.objects.all().order_by('-created_at')
+        flows = Flow.objects.all().order_by('-created_at')
         
         flows_data = []
         for flow in flows:
