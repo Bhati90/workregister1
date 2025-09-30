@@ -3381,12 +3381,25 @@ def generate_flow_with_ai(request):
         attributes = list(Attribute.objects.all().values('id', 'name', 'description'))
         
         # Step 4: Generate flow using Gemini AI
-        generated_flow = generate_flow_with_gemini(
-            user_info=user_info,
-            templates=templates,
-            flow_forms=flow_forms,
-            attributes=attributes
-        )
+        max_attempts = 3
+        generated_flow = None
+        
+        for attempt in range(max_attempts):
+            logger.info(f"AI Generation attempt {attempt + 1}/{max_attempts}")
+            
+            generated_flow = generate_flow_with_gemini(
+                user_info=user_info,
+                templates=templates,
+                flow_forms=flow_forms,
+                attributes=attributes
+            )
+            
+            if generated_flow and validate_generated_flow(generated_flow, templates):
+                logger.info("Flow generated and validated successfully")
+                break
+            else:
+                logger.warning(f"Attempt {attempt + 1} failed validation")
+                generated_flow = None
         
         if not generated_flow:
             return JsonResponse({
@@ -3400,7 +3413,7 @@ def generate_flow_with_ai(request):
             logger.info(f"Auto-created {len(created_attributes)} attributes: {created_attributes}")
         
         # Step 6: Save the generated flow to database
-        flow_obj = Flow.objects.create(
+        flow_obj = Flows.objects.create(
             name=generated_flow['name'],
             template_name=generated_flow['template_name'],
             flow_data=generated_flow['flow_data'],
@@ -3468,7 +3481,7 @@ def generate_flow_with_gemini(user_info, templates, flow_forms, attributes):
     Use Gemini AI to analyze user info and generate optimal flow.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-1.5-pro')
         
         # Create the prompt for Gemini
         prompt = f"""
@@ -3567,8 +3580,27 @@ OUTPUT FORMAT (JSON):
       }},
       {{
         "id": "dndnode_2",
-        "type": "textNode",
+        "type": "askLocationNode",
         "position": {{"x": 700, "y": 100}},
+        "data": {{
+          "questionText": "Please share your location",
+          "longitudeAttributeId": "user_longitude",
+          "latitudeAttributeId": "user_latitude"
+        }}
+      }},
+      {{
+        "id": "dndnode_3",
+        "type": "askForImageNode",
+        "position": {{"x": 1050, "y": 100}},
+        "data": {{
+          "questionText": "Upload a photo",
+          "saveAttributeId": "user_photo"
+        }}
+      }},
+      {{
+        "id": "dndnode_4",
+        "type": "textNode",
+        "position": {{"x": 1400, "y": 100}},
         "data": {{
           "text": "Thank you! We will contact you soon."
         }}
@@ -3586,12 +3618,36 @@ OUTPUT FORMAT (JSON):
         "source": "dndnode_1",
         "target": "dndnode_2",
         "sourceHandle": "onAnswer"
+      }},
+      {{
+        "id": "edge_2",
+        "source": "dndnode_2",
+        "target": "dndnode_3",
+        "sourceHandle": "onLocationReceived"
+      }},
+      {{
+        "id": "edge_3",
+        "source": "dndnode_3",
+        "target": "dndnode_4",
+        "sourceHandle": "onImageReceived"
       }}
     ]
   }}
 }}
 
-IMPORTANT: Generate ONLY valid JSON, no markdown, no additional text. Use askQuestionNode for questions, textNode only for statements.
+IMPORTANT: Generate ONLY valid JSON, no markdown, no additional text. Use correct sourceHandle values for each node type.
+
+EDGE EXAMPLES:
+- Template to next node: {{"sourceHandle": "onRead"}} or {{"sourceHandle": "Button Text"}}
+- askQuestionNode to next: {{"sourceHandle": "onAnswer"}}
+- askLocationNode to next: {{"sourceHandle": "onLocationReceived"}}
+- askForImageNode to next: {{"sourceHandle": "onImageReceived"}}
+- buttonsNode to next: {{"sourceHandle": "Button 1"}} (exact button text)
+- flowFormNode to next: {{"sourceHandle": "onSuccess"}}
+- askApiNode to success: {{"sourceHandle": "onSuccess"}}
+- askApiNode to error: {{"sourceHandle": "onError"}}
+
+DOUBLE CHECK YOUR EDGES BEFORE OUTPUTTING!
 """
         
         response = model.generate_content(prompt)
@@ -3626,8 +3682,9 @@ def create_missing_attributes(flow_data):
     created_attributes = []
     
     try:
-        existing_attributes = {attr.id: attr.name for attr in Attribute.objects.all()}
-        existing_names = set(existing_attributes.values())
+        # Get existing attributes
+        existing_attributes = {attr.name: attr.id for attr in Attribute.objects.all()}
+        existing_ids = {attr.id for attr in Attribute.objects.all()}
         
         # Scan through all nodes looking for attribute references
         for node in flow_data['flow_data']['nodes']:
@@ -3644,38 +3701,59 @@ def create_missing_attributes(flow_data):
             
             for field in attribute_fields:
                 attr_ref = node_data.get(field)
-                if attr_ref and isinstance(attr_ref, str):
-                    # If it's not a number, it might be a name reference
-                    if not attr_ref.isdigit() and attr_ref not in existing_names:
-                        # Create the attribute
+                if not attr_ref:
+                    continue
+                    
+                # Check if it's a string name (needs to be created/converted)
+                if isinstance(attr_ref, str) and not attr_ref.isdigit():
+                    # Check if attribute exists by name
+                    if attr_ref in existing_attributes:
+                        # Use existing attribute ID
+                        node_data[field] = existing_attributes[attr_ref]
+                    else:
+                        # Create new attribute
                         new_attr = Attribute.objects.create(
                             name=attr_ref,
                             description=f"Auto-created for {flow_data['name']}"
                         )
                         created_attributes.append(attr_ref)
-                        existing_names.add(attr_ref)
+                        existing_attributes[attr_ref] = new_attr.id
+                        existing_ids.add(new_attr.id)
                         
-                        # Update the node data with the actual ID
+                        # Update node data with actual ID
                         node_data[field] = new_attr.id
+                        logger.info(f"Created attribute '{attr_ref}' with ID {new_attr.id}")
+                
+                # If it's already a valid integer ID, leave it
+                elif isinstance(attr_ref, int) or (isinstance(attr_ref, str) and attr_ref.isdigit()):
+                    attr_id = int(attr_ref)
+                    if attr_id not in existing_ids:
+                        logger.warning(f"Attribute ID {attr_id} referenced but doesn't exist")
             
             # Check response mappings in API nodes
             if 'responseMappings' in node_data:
                 for mapping in node_data['responseMappings']:
                     attr_ref = mapping.get('attributeId')
-                    if attr_ref and isinstance(attr_ref, str) and not attr_ref.isdigit():
-                        if attr_ref not in existing_names:
+                    if not attr_ref:
+                        continue
+                        
+                    if isinstance(attr_ref, str) and not attr_ref.isdigit():
+                        if attr_ref in existing_attributes:
+                            mapping['attributeId'] = existing_attributes[attr_ref]
+                        else:
                             new_attr = Attribute.objects.create(
                                 name=attr_ref,
                                 description=f"Auto-created for API response in {flow_data['name']}"
                             )
                             created_attributes.append(attr_ref)
-                            existing_names.add(attr_ref)
+                            existing_attributes[attr_ref] = new_attr.id
                             mapping['attributeId'] = new_attr.id
+                            logger.info(f"Created attribute '{attr_ref}' for API mapping with ID {new_attr.id}")
         
         return created_attributes
         
     except Exception as e:
-        logger.error(f"Error creating missing attributes: {e}")
+        logger.error(f"Error creating missing attributes: {e}", exc_info=True)
         return []
 
 
@@ -3704,11 +3782,12 @@ def validate_generated_flow(flow, templates):
             logger.error("First node must be templateNode")
             return False
         
-        # Validate that ask nodes have required fields
-        for node in flow_data['nodes']:
+        # Validate that ask nodes have required fields and correct sourceHandles
+        for i, node in enumerate(flow_data['nodes']):
             node_type = node.get('type')
             node_data = node.get('data', {})
             
+            # Validate data fields
             if node_type == 'askQuestionNode':
                 if not node_data.get('questionText'):
                     logger.warning(f"askQuestionNode {node['id']} missing questionText")
@@ -3718,10 +3797,37 @@ def validate_generated_flow(flow, templates):
             elif node_type == 'askLocationNode':
                 if not node_data.get('questionText'):
                     logger.warning(f"askLocationNode {node['id']} missing questionText")
+                if not node_data.get('longitudeAttributeId'):
+                    logger.warning(f"askLocationNode {node['id']} missing longitudeAttributeId")
+                if not node_data.get('latitudeAttributeId'):
+                    logger.warning(f"askLocationNode {node['id']} missing latitudeAttributeId")
             
             elif node_type == 'askForImageNode':
                 if not node_data.get('questionText'):
                     logger.warning(f"askForImageNode {node['id']} missing questionText")
+                if not node_data.get('saveAttributeId'):
+                    logger.warning(f"askForImageNode {node['id']} missing saveAttributeId")
+        
+        # Validate sourceHandles in edges
+        for edge in flow_data.get('edges', []):
+            source_node = next((n for n in flow_data['nodes'] if n['id'] == edge['source']), None)
+            if source_node:
+                node_type = source_node.get('type')
+                source_handle = edge.get('sourceHandle')
+                
+                # Check if sourceHandle matches node type
+                if node_type == 'askLocationNode' and source_handle != 'onLocationReceived':
+                    logger.error(f"INVALID: askLocationNode must use sourceHandle='onLocationReceived', got '{source_handle}'")
+                    return False
+                elif node_type == 'askForImageNode' and source_handle != 'onImageReceived':
+                    logger.error(f"INVALID: askForImageNode must use sourceHandle='onImageReceived', got '{source_handle}'")
+                    return False
+                elif node_type == 'askQuestionNode' and source_handle != 'onAnswer':
+                    logger.error(f"INVALID: askQuestionNode must use sourceHandle='onAnswer', got '{source_handle}'")
+                    return False
+                elif node_type == 'flowFormNode' and source_handle not in ['onSuccess', 'onError']:
+                    logger.error(f"INVALID: flowFormNode must use sourceHandle='onSuccess', got '{source_handle}'")
+                    return False
         
         return True
         
@@ -3733,7 +3839,7 @@ def validate_generated_flow(flow, templates):
 def get_ai_generated_flows(request):
     """Get list of all flows with metadata."""
     try:
-        flows = Flow.objects.all().order_by('-created_at')
+        flows = Flows.objects.all().order_by('-created_at')
         
         flows_data = []
         for flow in flows:
