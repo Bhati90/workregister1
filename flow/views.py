@@ -3481,7 +3481,7 @@ def generate_flow_with_gemini(user_info, templates, flow_forms, attributes):
     Use Gemini AI to analyze user info and generate optimal flow.
     """
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         # Create the prompt for Gemini
         prompt = f"""
