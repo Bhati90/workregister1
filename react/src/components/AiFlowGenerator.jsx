@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import './AIFlowGenerator.css'; // Add this CSS file for animations
 
 const API_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp';
 
@@ -12,7 +13,6 @@ const AIFlowGenerator = () => {
   const [generatedFlow, setGeneratedFlow] = useState(null);
   const [error, setError] = useState('');
   const [allFlows, setAllFlows] = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     fetchAllFlows();
@@ -46,7 +46,7 @@ const AIFlowGenerator = () => {
 
       if (response.data.status === 'success') {
         setGeneratedFlow(response.data.flow);
-        fetchAllFlows(); // Refresh the list
+        fetchAllFlows();
       } else {
         setError(response.data.message || 'Failed to generate flow');
       }
@@ -72,8 +72,11 @@ const AIFlowGenerator = () => {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={styles.title}>AI Flow Generator</h1>
+        <h1 style={styles.title}>🤖 AI Flow Generator</h1>
         <p style={styles.subtitle}>Describe your requirements and let AI create the perfect WhatsApp flow</p>
+        <button style={styles.backButton} onClick={() => navigate('/')}>
+          ← Back to Flows
+        </button>
       </div>
 
       <div style={styles.content}>
@@ -90,7 +93,7 @@ const AIFlowGenerator = () => {
             />
 
             <div style={styles.examplesSection}>
-              <h3 style={styles.examplesTitle}>Example Prompts:</h3>
+              <h3 style={styles.examplesTitle}>💡 Example Prompts (Click to use):</h3>
               {examplePrompts.map((prompt, index) => (
                 <div
                   key={index}
@@ -112,24 +115,24 @@ const AIFlowGenerator = () => {
             >
               {isGenerating ? (
                 <>
-                  <span style={styles.spinner}></span>
+                  <span className="spinner"></span>
                   Generating Flow...
                 </>
               ) : (
-                'Generate Flow'
+                '✨ Generate Flow'
               )}
             </button>
 
             {error && (
               <div style={styles.errorBox}>
-                <strong>Error:</strong> {error}
+                <strong>⚠️ Error:</strong> {error}
               </div>
             )}
           </div>
 
           {generatedFlow && (
             <div style={styles.card}>
-              <h2 style={styles.cardTitle}>Generated Flow</h2>
+              <h2 style={styles.cardTitle}>✅ Generated Flow</h2>
               
               <div style={styles.flowInfo}>
                 <div style={styles.infoRow}>
@@ -148,8 +151,24 @@ const AIFlowGenerator = () => {
 
               {generatedFlow.explanation && (
                 <div style={styles.explanation}>
-                  <h3 style={styles.explanationTitle}>Design Explanation:</h3>
+                  <h3 style={styles.explanationTitle}>📋 Design Explanation:</h3>
                   <p style={styles.explanationText}>{generatedFlow.explanation}</p>
+                </div>
+              )}
+
+              {generatedFlow.created_attributes && generatedFlow.created_attributes.length > 0 && (
+                <div style={{...styles.explanation, borderLeft: '4px solid #2196F3', marginTop: '16px'}}>
+                  <h3 style={styles.explanationTitle}>✨ Auto-Created Attributes:</h3>
+                  <ul style={styles.attributesList}>
+                    {generatedFlow.created_attributes.map((attr, index) => (
+                      <li key={index} style={styles.attributeItem}>
+                        <strong>{attr}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                  <p style={{fontSize: '0.85rem', color: '#666', marginTop: '8px', marginBottom: 0}}>
+                    These attributes were automatically created and are now available in your system.
+                  </p>
                 </div>
               )}
 
@@ -173,13 +192,16 @@ const AIFlowGenerator = () => {
                   style={styles.viewButton}
                   onClick={() => handleViewFlow(generatedFlow.id)}
                 >
-                  View & Edit Flow
+                  👁️ View & Edit Flow
                 </button>
                 <button
                   style={styles.secondaryButton}
-                  onClick={() => setGeneratedFlow(null)}
+                  onClick={() => {
+                    setGeneratedFlow(null);
+                    setUserInfo('');
+                  }}
                 >
-                  Generate Another
+                  🔄 Generate Another
                 </button>
               </div>
             </div>
@@ -189,17 +211,17 @@ const AIFlowGenerator = () => {
         <div style={styles.rightPanel}>
           <div style={styles.card}>
             <div style={styles.historyHeader}>
-              <h2 style={styles.cardTitle}>All Flows</h2>
+              <h2 style={styles.cardTitle}>📚 All Flows</h2>
               <button
                 style={styles.refreshButton}
                 onClick={fetchAllFlows}
               >
-                Refresh
+                🔄 Refresh
               </button>
             </div>
 
             {allFlows.length === 0 ? (
-              <p style={styles.emptyState}>No flows generated yet</p>
+              <p style={styles.emptyState}>No flows generated yet. Create your first AI-powered flow!</p>
             ) : (
               <div style={styles.flowsList}>
                 {allFlows.map((flow) => (
@@ -214,12 +236,12 @@ const AIFlowGenerator = () => {
                         ...styles.statusBadge,
                         ...(flow.is_active ? styles.activeBadge : styles.inactiveBadge)
                       }}>
-                        {flow.is_active ? 'Active' : 'Inactive'}
+                        {flow.is_active ? '✓ Active' : '✗ Inactive'}
                       </span>
                     </div>
                     <div style={styles.flowCardDetails}>
                       <p style={styles.flowCardTemplate}>
-                        Template: {flow.template_name}
+                        📱 Template: {flow.template_name}
                       </p>
                       <div style={styles.flowCardStats}>
                         <span>{flow.node_count} nodes</span>
@@ -227,7 +249,7 @@ const AIFlowGenerator = () => {
                         <span>{flow.edge_count} connections</span>
                       </div>
                       <p style={styles.flowCardDate}>
-                        Created: {new Date(flow.created_at).toLocaleDateString()}
+                        📅 Created: {new Date(flow.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -249,7 +271,8 @@ const styles = {
   },
   header: {
     textAlign: 'center',
-    marginBottom: '30px'
+    marginBottom: '30px',
+    position: 'relative'
   },
   title: {
     fontSize: '2.5rem',
@@ -259,6 +282,18 @@ const styles = {
   subtitle: {
     fontSize: '1.1rem',
     color: '#666'
+  },
+  backButton: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    padding: '10px 20px',
+    fontSize: '1rem',
+    color: '#2196F3',
+    backgroundColor: 'white',
+    border: '1px solid #2196F3',
+    borderRadius: '6px',
+    cursor: 'pointer'
   },
   content: {
     display: 'grid',
@@ -303,7 +338,8 @@ const styles = {
   examplesTitle: {
     fontSize: '0.9rem',
     color: '#666',
-    marginBottom: '10px'
+    marginBottom: '10px',
+    fontWeight: '600'
   },
   examplePrompt: {
     padding: '10px',
@@ -335,14 +371,6 @@ const styles = {
     backgroundColor: '#1da851',
     cursor: 'not-allowed'
   },
-  spinner: {
-    width: '20px',
-    height: '20px',
-    border: '3px solid rgba(255,255,255,0.3)',
-    borderTop: '3px solid white',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite'
-  },
   errorBox: {
     marginTop: '16px',
     padding: '12px',
@@ -370,11 +398,24 @@ const styles = {
   explanationTitle: {
     fontSize: '1rem',
     color: '#333',
-    marginBottom: '8px'
+    marginBottom: '8px',
+    fontWeight: '600'
   },
   explanationText: {
     fontSize: '0.95rem',
     color: '#555',
+    lineHeight: '1.6',
+    margin: 0
+  },
+  attributesList: {
+    margin: '8px 0 0 20px',
+    padding: 0,
+    listStyle: 'disc'
+  },
+  attributeItem: {
+    fontSize: '0.95rem',
+    color: '#555',
+    marginBottom: '6px',
     lineHeight: '1.6'
   },
   flowStats: {

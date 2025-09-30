@@ -3342,6 +3342,8 @@ GEMINI_API_KEY = 'AIzaSyCh0DeWCZr8m3kF4LDB2A_xoAlqbmKjvgs'  # Add to settings.py
 genai.configure(api_key=GEMINI_API_KEY)
 
 
+
+
 @csrf_exempt
 def generate_flow_with_ai(request):
     """
@@ -3392,7 +3394,12 @@ def generate_flow_with_ai(request):
                 'message': 'Failed to generate flow'
             }, status=500)
         
-        # Step 5: Save the generated flow to database
+        # Step 5: Create missing attributes if needed
+        created_attributes = create_missing_attributes(generated_flow)
+        if created_attributes:
+            logger.info(f"Auto-created {len(created_attributes)} attributes: {created_attributes}")
+        
+        # Step 6: Save the generated flow to database
         flow_obj = Flow.objects.create(
             name=generated_flow['name'],
             template_name=generated_flow['template_name'],
@@ -3408,7 +3415,8 @@ def generate_flow_with_ai(request):
                 'name': flow_obj.name,
                 'template_name': flow_obj.template_name,
                 'explanation': generated_flow.get('explanation', ''),
-                'flow_data': generated_flow['flow_data']
+                'flow_data': generated_flow['flow_data'],
+                'created_attributes': created_attributes
             }
         })
         
@@ -3433,7 +3441,6 @@ def fetch_whatsapp_templates():
         all_templates = response.json().get('data', [])
         approved_templates = [t for t in all_templates if t.get('status') == 'APPROVED']
         
-        # Process templates to extract buttons
         processed_templates = []
         for t in approved_templates:
             buttons = []
@@ -3461,7 +3468,7 @@ def generate_flow_with_gemini(user_info, templates, flow_forms, attributes):
     Use Gemini AI to analyze user info and generate optimal flow.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-1.5-pro')
         
         # Create the prompt for Gemini
         prompt = f"""
@@ -3479,38 +3486,64 @@ AVAILABLE FLOW FORMS (Pre-built forms):
 AVAILABLE ATTRIBUTES (For storing user data):
 {json.dumps(attributes, indent=2)}
 
+IMPORTANT NODE TYPE USAGE RULES:
+
+1. **askQuestionNode**: Use this to ask the user ANY question and save their text response
+   - ALWAYS set "questionText" with the question you want to ask
+   - ALWAYS set "saveAttributeId" to an attribute ID from the available attributes list
+   - If no suitable attribute exists, use the attribute name (e.g., "user_name", "email", "phone_number") - the system will create it
+   - Example data: {{"questionText": "What is your email address?", "saveAttributeId": "email"}}
+
+2. **askLocationNode**: Use to request location and save coordinates
+   - Set "questionText" with the location request message
+   - Set "longitudeAttributeId" and "latitudeAttributeId" with attribute IDs or names
+   - Example: {{"questionText": "Share your location", "longitudeAttributeId": "user_longitude", "latitudeAttributeId": "user_latitude"}}
+
+3. **askForImageNode**: Use to request an image from user
+   - Set "questionText" with the image request message
+   - Set "saveAttributeId" to store the image URL
+   - Example: {{"questionText": "Upload a photo of the document", "saveAttributeId": "document_image"}}
+
+4. **textNode**: Use ONLY for sending information, NOT for asking questions
+   - Set "text" with the message content
+   - Use for confirmations, instructions, or information delivery
+   - Example: {{"text": "Thank you! We have received your information."}}
+
+5. **buttonsNode**: Use to present choices with buttons
+   - Set "text" with the message
+   - Set "buttons" array with button objects
+   - Example: {{"text": "Choose an option:", "buttons": [{{"text": "Option 1"}}, {{"text": "Option 2"}}]}}
+
+6. **flowFormNode**: Use to trigger WhatsApp Flow forms
+   - Set "selectedFormId" to a form ID from available forms
+   - Forms handle complex data collection
+   - Use when you need structured multi-field forms
+
+7. **askApiNode**: Use to make external API calls
+   - Set "method" (GET, POST, etc.)
+   - Set "apiUrl" with the endpoint
+   - Set "responseMappings" to save API response data to attributes
+
+CRITICAL RULES:
+- DO NOT use textNode for questions - use askQuestionNode, askLocationNode, or askForImageNode
+- ALWAYS set questionText when using ask* nodes
+- ALWAYS specify which attribute to save data to (use attribute ID or name)
+- If an attribute doesn't exist but is needed (like "email", "phone", "age"), just use the name - it will be auto-created
+- First node MUST be templateNode
+- Use meaningful attribute names (e.g., "customer_email", "user_age", "delivery_address")
+
 TASK:
 1. Analyze the user requirements carefully
-2. Select the BEST template that matches the use case (must be from available templates)
+2. Select the BEST template that matches the use case
 3. Design a conversation flow with appropriate nodes
-4. Create a meaningful flow name (be creative and descriptive)
-5. Explain your design decisions
-
-AVAILABLE NODE TYPES:
-- templateNode: WhatsApp template (MUST be first node, use for trigger)
-- textNode: Send text message
-- buttonsNode: Text with quick reply buttons
-- askQuestionNode: Ask user a question and save to attribute
-- askLocationNode: Request user's location
-- askForImageNode: Request user to upload image
-- imageNode: Send image with caption
-- interactiveImageNode: Image with buttons
-- interactiveListNode: Interactive list menu
-- mediaNode: Send document/video/audio
-- flowFormNode: Trigger WhatsApp Flow form
-- askApiNode: Make API request
-
-FLOW STRUCTURE RULES:
-1. First node MUST be templateNode with a selected template
-2. Each node needs: id, type, position, data
-3. Edges connect nodes: source, target, sourceHandle (optional)
-4. Node IDs format: "dndnode_0", "dndnode_1", etc.
-5. Positions: Arrange left to right, increment x by 350, y by 0 or vary slightly
-6. Use sourceHandle for buttons/choices (button text or handle ID)
+4. Use askQuestionNode for ALL user input collection (not textNode)
+5. Specify attributes for saving data (create new ones if needed)
+6. Create a meaningful flow name
+7. Explain your design decisions
 
 OUTPUT FORMAT (JSON):
 {{
-  "name": "Creative Flow Name",
+  "name": "Descriptive Flow Name",
   "template_name": "selected_template_name",
   "explanation": "Why this flow design works for the user requirements",
   "flow_data": {{
@@ -3520,16 +3553,24 @@ OUTPUT FORMAT (JSON):
         "type": "templateNode",
         "position": {{"x": 0, "y": 100}},
         "data": {{
-          "selectedTemplateName": "template_name_here",
-          "bodyVar1": "value if needed"
+          "selectedTemplateName": "template_name_here"
         }}
       }},
       {{
         "id": "dndnode_1",
-        "type": "textNode",
+        "type": "askQuestionNode",
         "position": {{"x": 350, "y": 100}},
         "data": {{
-          "text": "Your message here"
+          "questionText": "What is your email address?",
+          "saveAttributeId": "customer_email"
+        }}
+      }},
+      {{
+        "id": "dndnode_2",
+        "type": "textNode",
+        "position": {{"x": 700, "y": 100}},
+        "data": {{
+          "text": "Thank you! We will contact you soon."
         }}
       }}
     ],
@@ -3538,13 +3579,19 @@ OUTPUT FORMAT (JSON):
         "id": "edge_0",
         "source": "dndnode_0",
         "target": "dndnode_1",
-        "sourceHandle": "button_name_or_onRead"
+        "sourceHandle": "onRead"
+      }},
+      {{
+        "id": "edge_1",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "sourceHandle": "onAnswer"
       }}
     ]
   }}
 }}
 
-Generate ONLY valid JSON, no additional text.
+IMPORTANT: Generate ONLY valid JSON, no markdown, no additional text. Use askQuestionNode for questions, textNode only for statements.
 """
         
         response = model.generate_content(prompt)
@@ -3552,9 +3599,10 @@ Generate ONLY valid JSON, no additional text.
         
         # Remove markdown code blocks if present
         if response_text.startswith('```'):
-            response_text = response_text.split('```')[1]
+            lines = response_text.split('\n')
+            response_text = '\n'.join(lines[1:-1]) if len(lines) > 2 else response_text
             if response_text.startswith('json'):
-                response_text = response_text[4:]
+                response_text = response_text[4:].strip()
         
         generated_flow = json.loads(response_text)
         
@@ -3568,6 +3616,67 @@ Generate ONLY valid JSON, no additional text.
     except Exception as e:
         logger.error(f"Error in Gemini generation: {e}", exc_info=True)
         return None
+
+
+def create_missing_attributes(flow_data):
+    """
+    Automatically create attributes that are referenced in the flow but don't exist yet.
+    Returns list of created attribute names.
+    """
+    created_attributes = []
+    
+    try:
+        existing_attributes = {attr.id: attr.name for attr in Attribute.objects.all()}
+        existing_names = set(existing_attributes.values())
+        
+        # Scan through all nodes looking for attribute references
+        for node in flow_data['flow_data']['nodes']:
+            node_data = node.get('data', {})
+            
+            # Check various attribute fields
+            attribute_fields = [
+                'saveAttributeId',
+                'longitudeAttributeId', 
+                'latitudeAttributeId',
+                'waiting_for_attribute',
+                'statusCodeAttributeId'
+            ]
+            
+            for field in attribute_fields:
+                attr_ref = node_data.get(field)
+                if attr_ref and isinstance(attr_ref, str):
+                    # If it's not a number, it might be a name reference
+                    if not attr_ref.isdigit() and attr_ref not in existing_names:
+                        # Create the attribute
+                        new_attr = Attribute.objects.create(
+                            name=attr_ref,
+                            description=f"Auto-created for {flow_data['name']}"
+                        )
+                        created_attributes.append(attr_ref)
+                        existing_names.add(attr_ref)
+                        
+                        # Update the node data with the actual ID
+                        node_data[field] = new_attr.id
+            
+            # Check response mappings in API nodes
+            if 'responseMappings' in node_data:
+                for mapping in node_data['responseMappings']:
+                    attr_ref = mapping.get('attributeId')
+                    if attr_ref and isinstance(attr_ref, str) and not attr_ref.isdigit():
+                        if attr_ref not in existing_names:
+                            new_attr = Attribute.objects.create(
+                                name=attr_ref,
+                                description=f"Auto-created for API response in {flow_data['name']}"
+                            )
+                            created_attributes.append(attr_ref)
+                            existing_names.add(attr_ref)
+                            mapping['attributeId'] = new_attr.id
+        
+        return created_attributes
+        
+    except Exception as e:
+        logger.error(f"Error creating missing attributes: {e}")
+        return []
 
 
 def validate_generated_flow(flow, templates):
@@ -3595,6 +3704,25 @@ def validate_generated_flow(flow, templates):
             logger.error("First node must be templateNode")
             return False
         
+        # Validate that ask nodes have required fields
+        for node in flow_data['nodes']:
+            node_type = node.get('type')
+            node_data = node.get('data', {})
+            
+            if node_type == 'askQuestionNode':
+                if not node_data.get('questionText'):
+                    logger.warning(f"askQuestionNode {node['id']} missing questionText")
+                if not node_data.get('saveAttributeId'):
+                    logger.warning(f"askQuestionNode {node['id']} missing saveAttributeId")
+            
+            elif node_type == 'askLocationNode':
+                if not node_data.get('questionText'):
+                    logger.warning(f"askLocationNode {node['id']} missing questionText")
+            
+            elif node_type == 'askForImageNode':
+                if not node_data.get('questionText'):
+                    logger.warning(f"askForImageNode {node['id']} missing questionText")
+        
         return True
         
     except Exception as e:
@@ -3603,7 +3731,7 @@ def validate_generated_flow(flow, templates):
 
 
 def get_ai_generated_flows(request):
-    """Get list of all flows with metadata indicating if AI-generated."""
+    """Get list of all flows with metadata."""
     try:
         flows = Flow.objects.all().order_by('-created_at')
         

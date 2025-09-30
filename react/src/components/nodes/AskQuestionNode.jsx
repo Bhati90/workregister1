@@ -2,7 +2,7 @@ import React, { memo, useEffect, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import axios from 'axios';
 
-const API_BASE_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
+const API_BASE_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp';
 
 export default memo(({ data, isConnectable }) => {
     const [attributes, setAttributes] = useState([]);

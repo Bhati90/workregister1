@@ -5,7 +5,7 @@ import axios from 'axios';
 import { ReactFlowProvider } from 'reactflow';
 import FlowBuilder from '../components/FlowBuilder';
 
-const API_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp/';
+const API_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp';
 
 const FlowBuilderPage = () => {
   const { flowId } = useParams();

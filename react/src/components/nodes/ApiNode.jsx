@@ -11,7 +11,7 @@ const ApiIcon = () => (
 );
 
 
-const API_BASE_URL = 'https://workregister1-g7pf.onrender.com/register/whatsapp';
+const API_BASE_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp';
 
 // The main node component, now acting as a summary view
 export default memo(({ data, isConnectable }) => {
