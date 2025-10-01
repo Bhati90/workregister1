@@ -3443,6 +3443,7 @@ def generate_flow_with_ai(request):
 
 
 
+
 @csrf_exempt
 def analyze_and_generate_template(request):
     """
@@ -3494,7 +3495,7 @@ def analyze_requirements_with_ai(requirements, existing_templates):
     template or generate a new one.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-1.5-pro')
         
         prompt = f"""
 You are a WhatsApp Business API template expert. Analyze the user's requirements and decide:
@@ -3573,13 +3574,25 @@ OUTPUT FORMAT (JSON):
 
 TEMPLATE WRITING GUIDELINES:
 1. Use Marathi देवनागरी script (not English)
-2. Start with ⭐ or similar emoji
-3. Write 4-6 lines in body (detailed, not short)
-4. Mention specific services: बांधणी, डिपिंग, पातळणी, घड निवड
-5. Use bullet points with ✅ for benefits
-6. End with call-to-action: "इच्छुक असल्यास खाली क्लिक करा 👇"
-7. Professional farmer language
-8. Button text in Marathi: "मजूर हवे आहेत", "सेवा पहा", "संपर्क करा"
+2. ALWAYS include personalization variables {{1}}, {{2}} etc.
+   - {{1}} for farmer name
+   - {{2}} for location/village
+   - Use these in the greeting!
+3. Start with ⭐ नमस्कार {{1}},
+4. Write 4-6 lines in body (detailed, not short)
+5. Mention specific services: बांधणी, डिपिंग, पातळणी, घड निवड
+6. Use bullet points with ✅ for benefits
+7. End with call-to-action: "इच्छुक असल्यास खाली क्लिक करा 👇"
+8. Professional farmer language
+9. Button text in Marathi: "मजूर हवे आहेत", "सेवा पहा", "संपर्क करा"
+10. CRITICAL: If you use {{1}}, MUST provide example like ["राजू पाटील"]
+11. If you use {{1}} and {{2}}, MUST provide examples like ["राजू पाटील", "नाशिक"]
+
+EXAMPLE WITH VARIABLES (CORRECT):
+Body: "⭐ नमस्कार {{1}},\n\nआम्ही {{2}} मधील शेतकऱ्यांसाठी..."
+Example: {{"body_text": [["राजू पाटील", "नाशिक"]]}}
+
+NO VARIABLES = NO EXAMPLE FIELD (also acceptable but less personal)
 
 Generate ONLY valid JSON, no markdown.
 """
@@ -3650,10 +3663,37 @@ def submit_template_to_meta(request):
                         }
             
             elif component['type'] == 'BODY':
-                meta_component['text'] = component['text']
-                # Add examples if variables exist
-                if 'example' in component and component['example'].get('body_text'):
-                    meta_component['example'] = component['example']
+                body_text = component['text']
+                meta_component['text'] = body_text
+                
+                # Check if body has variables {{1}}, {{2}}, etc.
+                import re
+                variables = re.findall(r'\{\{(\d+)\}\}', body_text)
+                
+                if variables:
+                    # Has variables - must provide examples
+                    if 'example' in component and component['example'].get('body_text'):
+                        # Use provided examples
+                        example_values = component['example']['body_text'][0]
+                        if example_values and len(example_values) > 0:
+                            meta_component['example'] = {
+                                'body_text': [example_values]
+                            }
+                        else:
+                            # Generate default examples based on variable count
+                            default_examples = []
+                            for i in range(len(variables)):
+                                default_examples.append(f"Example {i+1}")
+                            meta_component['example'] = {
+                                'body_text': [default_examples]
+                            }
+                    else:
+                        # No examples provided - generate defaults
+                        default_examples = [f"Example {i+1}" for i in range(len(variables))]
+                        meta_component['example'] = {
+                            'body_text': [default_examples]
+                        }
+                # else: No variables - don't add example field at all
             
             elif component['type'] == 'FOOTER':
                 meta_component['text'] = component.get('text', '')
@@ -3691,13 +3731,28 @@ def submit_template_to_meta(request):
         else:
             error_message = response_data.get('error', {}).get('message', 'Submission failed')
             error_details = response_data.get('error', {})
+            error_user_msg = error_details.get('error_user_msg', '')
+            
             logger.error(f"Meta API Error: {json.dumps(error_details, indent=2)}")
+            
+            # Provide helpful error message
+            helpful_message = error_message
+            if 'body_text' in error_user_msg:
+                helpful_message = "Template has variables ({{1}}, {{2}}) but missing examples. Add examples for each variable."
+            elif 'example' in error_user_msg:
+                helpful_message = "Example values are required when using variables in template text."
+            elif 'category' in error_user_msg.lower():
+                helpful_message = "Template category is required. Use UTILITY or MARKETING."
+            elif 'language' in error_user_msg.lower():
+                helpful_message = "Language code is required. Use 'hi' for Marathi or 'en' for English."
             
             return JsonResponse({
                 'status': 'error',
-                'message': error_message,
+                'message': helpful_message,
+                'meta_error': error_message,
                 'meta_response': response_data,
-                'error_details': error_details
+                'error_details': error_details,
+                'fix_suggestion': get_fix_suggestion(error_details)
             }, status=response.status_code)
         
     except Exception as e:
@@ -3808,7 +3863,7 @@ Build the complete flow based on the original requirements and suggested structu
         created_attributes = create_missing_attributes(generated_flow)
         
         # Save flow
-        flow_obj = Flow.objects.create(
+        flow_obj = Flows.objects.create(
             name=generated_flow['name'],
             template_name=generated_flow['template_name'],
             flow_data=generated_flow['flow_data'],
@@ -3870,6 +3925,24 @@ def fetch_whatsapp_templates():
     except Exception as e:
         logger.error(f"Error fetching templates: {e}")
         return []
+
+
+def get_fix_suggestion(error_details):
+    """Provides actionable fix suggestions based on Meta API error."""
+    error_msg = error_details.get('error_user_msg', '').lower()
+    
+    if 'body_text' in error_msg and 'example' in error_msg:
+        return "Add example values: If text has {{1}} and {{2}}, add example: {'body_text': [['Example1', 'Example2']]}"
+    elif 'header_handle' in error_msg:
+        return "Upload image/video first and use the returned media ID in header_handle"
+    elif 'category' in error_msg:
+        return "Add 'category': 'UTILITY' or 'MARKETING' to template"
+    elif 'language' in error_msg:
+        return "Add 'language': 'hi' for Marathi or 'en' for English"
+    elif 'button' in error_msg:
+        return "Check button text (max 20 chars) and ensure type is 'QUICK_REPLY'"
+    else:
+        return "Check Meta's template requirements: https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates"
 
 
 def upload_media_to_meta(file_object):
