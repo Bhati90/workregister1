@@ -3444,6 +3444,7 @@ def generate_flow_with_ai(request):
 
 
 
+
 @csrf_exempt
 def analyze_and_generate_template(request):
     """
@@ -3495,7 +3496,7 @@ def analyze_requirements_with_ai(requirements, existing_templates):
     template or generate a new one.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-1.5-pro')
         
         prompt = f"""
 You are a WhatsApp Business API template expert. Analyze the user's requirements and decide:
@@ -3632,12 +3633,22 @@ def submit_template_to_meta(request):
         media_id = None
         if 'media_file' in request.FILES:
             media_file = request.FILES['media_file']
+            
+            # Validate file
+            max_size = 5 * 1024 * 1024  # 5MB for images
+            if media_file.size > max_size:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'File too large. Max size: 5MB. Your file: {media_file.size / 1024 / 1024:.1f}MB'
+                }, status=400)
+            
             media_id = upload_media_to_meta(media_file)
             
             if not media_id:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'Failed to upload media'
+                    'message': 'Failed to upload media. Please try again or submit template without media.',
+                    'suggestion': 'You can create template without image first, then add image later in Meta Business Manager'
                 }, status=500)
         
         # Build Meta API v23.0 compliant payload
@@ -3661,6 +3672,10 @@ def submit_template_to_meta(request):
                         meta_component['example'] = {
                             'header_handle': [media_id]
                         }
+                    else:
+                        # Skip header if no valid media ID
+                        logger.warning("Skipping HEADER component - no valid media ID")
+                        continue
             
             elif component['type'] == 'BODY':
                 body_text = component['text']
@@ -3863,7 +3878,7 @@ Build the complete flow based on the original requirements and suggested structu
         created_attributes = create_missing_attributes(generated_flow)
         
         # Save flow
-        flow_obj = Flow.objects.create(
+        flow_obj = Flows.objects.create(
             name=generated_flow['name'],
             template_name=generated_flow['template_name'],
             flow_data=generated_flow['flow_data'],
@@ -3944,34 +3959,6 @@ def get_fix_suggestion(error_details):
     else:
         return "Check Meta's template requirements: https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates"
 
-
-def upload_media_to_meta(file_object):
-    """
-    Uploads a file object to the Meta API and returns the media ID.
-    """
-    try:
-        url = f"{META_API_URL}/{PHONE_NUMBER_ID}/media"
-        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
-        
-        file_object.seek(0)
-        file_name = os.path.basename(file_object.name)
-        content_type, _ = mimetypes.guess_type(file_name)
-        if content_type is None:
-            content_type = 'application/octet-stream'
-        
-        files = {
-            'file': (file_name, file_object, content_type),
-        }
-        data = {
-            'messaging_product': 'whatsapp',
-        }
-        response = requests.post(url, headers=headers, files=files, data=data)
-        response.raise_for_status()
-        return response.json().get('id')
-        
-    except Exception as e:
-        logger.error(f"Failed to upload media: {e}", exc_info=True)
-        return None
 
 
 def generate_flow_with_gemini(user_info, templates, flow_forms, attributes):

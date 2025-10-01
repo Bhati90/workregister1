@@ -1,0 +1,148 @@
+/* AIFlowGenerator.css */
+
+/* Spinner animation for loading state */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top: 3px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Hover effects for example prompts */
+.example-prompt:hover {
+  background-color: #ececec !important;
+  border-color: #667eea !important;
+  transform: translateX(4px);
+}
+
+/* Hover effect for flow cards */
+.flow-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Button hover effects */
+button:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Scrollbar styling for flows list */
+.flows-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.flows-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.flows-list::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.flows-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .content {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .right-panel {
+    margin-top: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header h1 {
+    font-size: 2rem !important;
+  }
+  
+  .back-button {
+    position: static !important;
+    margin-bottom: 16px;
+  }
+  
+  .card {
+    padding: 16px !important;
+  }
+  
+  .flow-stats {
+    flex-direction: column !important;
+  }
+  
+  .action-buttons {
+    flex-direction: column !important;
+  }
+}
+
+/* Animation for generated flow card appearing */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Textarea focus effect */
+textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Success/Error box animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 200px;
+  }
+}
+
+.error-box,
+.success-box {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Loading pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.generating-button {
+  animation: pulse 2s ease-in-out infinite;
+}

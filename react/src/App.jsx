@@ -7,7 +7,7 @@ import 'reactflow/dist/style.css';
 import './App.css';
 import AttributesPage from './pages/AttributePage';
 import FlowEditorPage from './pages/FlowEditorPage';
-import AIFlowGenerator from './components/AiFlowGenerator';
+import AIFlowGenerator from './components/FlowGenerator';
 import TemplateFlowCreator from './pages/TemplateFlowCreator';
 import FlexibleFlowGenerator from './components/AiFlowGenerator';
 // import EnhancedAIFlowGenerator from './components/AiFlowGenerator';
@@ -24,7 +24,8 @@ function App() {
            */}
            <Route path="/flow/:flowId" element={<FlowEditorPage />} />
            <Route path="/flow/new" element={<FlowEditorPage />} />
-           <Route path="/ai-flow-generator" element={<FlexibleFlowGenerator/>} />
+           <Route path="/ai-tem-generator" element={<FlexibleFlowGenerator/>} />
+          <Route path="/ai-flow-generator" element={<AIFlowGenerator />} />
            
            <Route path="/template-flow-creator" element={<TemplateFlowCreator />} />
           {/* <Route path="/analytics" element={<AnalyticsPage />} /> <-- Add the route */}
