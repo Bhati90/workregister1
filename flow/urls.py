@@ -71,7 +71,8 @@ urlpatterns = [
     path('api/template-flow/status/<str:template_name>/', views.check_template_status, name='check_template_status'),
     path('api/template-flow/create-flow/', views.auto_create_flow_after_approval, name='auto_create_flow'),
     
-
+   path('api/flows/analyze-with-language/', views.analyze_flow_with_language_preference, name='analyze_with_language'),
+    
 
     path('api/flows/generate-smart/', views.generate_flow_with_smart_template_detection, name='generate_smart_flow'),
     path('api/flows/resume-with-templates/', views.create_templates_and_resume_flow, name='resume_flow_creation'),

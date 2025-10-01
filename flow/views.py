@@ -4459,6 +4459,168 @@ def generate_flow_with_smart_template_detection(request):
         }, status=500)
 
 
+@csrf_exempt
+def analyze_flow_with_language_preference(request):
+    """
+    Analyzes requirements and returns ALL missing templates at once.
+    User can choose which to create and which to skip.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        user_info = data.get('user_info', '')
+        preferred_language = data.get('preferred_language', 'hi')  # hi, en, en_US
+        
+        if not user_info:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'User info required'
+            }, status=400)
+        
+        # Fetch resources
+        templates = fetch_whatsapp_templates()
+        flow_forms = list(WhatsAppFlowForm.objects.all().values(
+            'id', 'name', 'template_body', 'template_button_text',
+            'template_category', 'screens_data'
+        ))
+        attributes = list(Attribute.objects.all().values('id', 'name', 'description'))
+        
+        # Analyze and get ALL missing templates at once
+        analysis = analyze_all_template_needs(
+            user_info=user_info,
+            templates=templates,
+            flow_forms=flow_forms,
+            attributes=attributes,
+            language=preferred_language
+        )
+        
+        if not analysis:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Analysis failed'
+            }, status=500)
+        
+        return JsonResponse({
+            'status': 'success',
+            'analysis': analysis.get('analysis', ''),
+            'missing_templates': analysis.get('missing_templates', []),
+            'flow_plan': analysis.get('flow_plan', {}),
+            'can_proceed_without_templates': True  # User always has choice
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in language-aware analysis: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+def analyze_all_template_needs(user_info, templates, flow_forms, attributes, language='hi'):
+    """
+    Returns ALL missing templates at once, not one by one.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        
+        # Language-specific instructions
+        language_guide = {
+            'hi': {
+                'script': 'देवनागरी (Marathi/Hindi)',
+                'greeting': 'नमस्कार',
+                'examples': ['राजू पाटील', 'नाशिक'],
+                'buttons': ['मजूर हवे', 'सेवा पहा', 'संपर्क करा']
+            },
+            'en': {
+                'script': 'English',
+                'greeting': 'Hello',
+                'examples': ['John Doe', 'Mumbai'],
+                'buttons': ['Need Workers', 'View Services', 'Contact Us']
+            }
+        }
+        
+        lang_config = language_guide.get(language, language_guide['hi'])
+        
+        prompt = f"""
+You are designing WhatsApp flows for a FARMER-LABOR PLATFORM.
+
+USER REQUIREMENTS:
+{user_info}
+
+PREFERRED LANGUAGE: {language} ({lang_config['script']})
+
+AVAILABLE TEMPLATES:
+{json.dumps(templates, indent=2)}
+
+TASK: Return ALL missing templates needed for this flow.
+
+LANGUAGE RULES for {language}:
+- Script: {lang_config['script']}
+- Greeting: {lang_config['greeting']}
+- Example names: {lang_config['examples']}
+- Button examples: {lang_config['buttons']}
+- Always include variables {{{{1}}}}, {{{{2}}}} for personalization
+- 4-6 lines in body text
+- Use emojis: ⭐, 🍇, ✅, 👇
+- Professional but friendly tone
+
+OUTPUT FORMAT (JSON):
+{{
+  "analysis": "Brief analysis of what's needed",
+  "missing_templates": [
+    {{
+      "purpose": "What this template does",
+      "reason": "Why we need it",
+      "suggested_name": "descriptive_name_lowercase",
+      "template_requirements": {{
+        "category": "UTILITY" or "MARKETING",
+        "language": "{language}",
+        "body_text": "Full template text with {{{{1}}}} variables",
+        "needs_buttons": true/false,
+        "button_options": ["Button 1", "Button 2"],
+        "needs_media": false,
+        "variables": [
+          {{"name": "farmer_name", "example": "{lang_config['examples'][0]}"}},
+          {{"name": "location", "example": "{lang_config['examples'][1]}"}}
+        ]
+      }}
+    }}
+  ],
+  "flow_plan": {{
+    "steps": [
+      {{
+        "step": 1,
+        "type": "template",
+        "status": "missing" or "exists",
+        "template_name": "name if exists",
+        "action": "What happens"
+      }}
+    ]
+  }}
+}}
+
+RETURN ALL MISSING TEMPLATES IN ONE RESPONSE.
+Generate ONLY valid JSON.
+"""
+        
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean response
+        if response_text.startswith('```'):
+            lines = response_text.split('\n')
+            response_text = '\n'.join(lines[1:-1])
+            if response_text.startswith('json'):
+                response_text = response_text[4:].strip()
+        
+        return json.loads(response_text)
+        
+    except Exception as e:
+        logger.error(f"Error in batch template analysis: {e}", exc_info=True)
+        return None
+
 def analyze_flow_requirements_with_template_gaps(user_info, templates, flow_forms, attributes):
     """
     Analyzes flow requirements and identifies which templates exist vs which need creation.
