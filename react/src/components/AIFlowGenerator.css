@@ -374,6 +374,38 @@ textarea:focus {
   color: #666;
 }
 
+.info-box {
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.success-box {
+  background: #e8f5e9;
+  border: 1px solid #4caf50;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.success-box p {
+  margin: 0;
+  color: #2e7d32;
+}
+
+.error-box {
+  background: #ffebee;
+  border: 1px solid #ef5350;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.error-box p {
+  margin: 0;
+  color: #c62828;
+}
+
 /* Flow Generated Step */
 
 .flow-info {

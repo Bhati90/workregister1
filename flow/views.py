@@ -3495,7 +3495,7 @@ def analyze_requirements_with_ai(requirements, existing_templates):
     template or generate a new one.
     """
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         prompt = f"""
 You are a WhatsApp Business API template expert. Analyze the user's requirements and decide:
@@ -3863,7 +3863,7 @@ Build the complete flow based on the original requirements and suggested structu
         created_attributes = create_missing_attributes(generated_flow)
         
         # Save flow
-        flow_obj = Flows.objects.create(
+        flow_obj = Flow.objects.create(
             name=generated_flow['name'],
             template_name=generated_flow['template_name'],
             flow_data=generated_flow['flow_data'],

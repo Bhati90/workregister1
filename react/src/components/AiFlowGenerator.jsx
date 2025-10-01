@@ -204,8 +204,18 @@ const EnhancedAIFlowGenerator = () => {
       name => templateStatuses[name] === 'APPROVED'
     );
     
+    const anyRejected = createdTemplates.some(
+      name => templateStatuses[name] === 'REJECTED'
+    );
+    
+    if (anyRejected) {
+      alert('Some templates were rejected. Please review and resubmit.');
+      return;
+    }
+    
     if (allApproved && createdTemplates.length === missingTemplates.length) {
-      // Resume flow creation
+      // All approved - automatically resume flow creation
+      alert('All templates approved! Creating flow now...');
       await resumeFlowCreation();
     }
   };
@@ -296,6 +306,8 @@ const EnhancedAIFlowGenerator = () => {
   const renderTemplateCreationStep = () => {
     const currentTemplate = missingTemplates[currentTemplateIndex];
     const progress = `${currentTemplateIndex + 1} of ${missingTemplates.length}`;
+    const allSubmitted = createdTemplates.length === missingTemplates.length;
+    const allApproved = createdTemplates.every(name => templateStatuses[name] === 'APPROVED');
     
     return (
       <div className="step-content">
@@ -310,6 +322,25 @@ const EnhancedAIFlowGenerator = () => {
             />
           </div>
         </div>
+
+        {allSubmitted && !allApproved && (
+          <div className="info-box" style={{background: '#fff3e0', padding: '16px', borderRadius: '8px', marginBottom: '20px'}}>
+            <p style={{margin: 0, color: '#e65100'}}>
+              <strong>⏳ Waiting for Meta Approval</strong><br/>
+              All templates have been submitted. Checking status every 10 seconds...<br/>
+              This typically takes 15 minutes to 2 hours.
+            </p>
+          </div>
+        )}
+
+        {allApproved && (
+          <div className="success-box" style={{background: '#e8f5e9', padding: '16px', borderRadius: '8px', marginBottom: '20px'}}>
+            <p style={{margin: 0, color: '#2e7d32'}}>
+              <strong>✓ All Templates Approved!</strong><br/>
+              Ready to create your flow.
+            </p>
+          </div>
+        )}
 
         <div className="analysis-info">
           <h3>Why this template is needed:</h3>
@@ -410,6 +441,23 @@ const EnhancedAIFlowGenerator = () => {
                 </span>
               </div>
             ))}
+            
+            {/* Manual flow creation button */}
+            {createdTemplates.every(name => templateStatuses[name] === 'APPROVED') && (
+              <button 
+                onClick={resumeFlowCreation}
+                className="primary-button"
+                style={{marginTop: '20px'}}
+              >
+                ✓ All Approved - Create Flow Now
+              </button>
+            )}
+            
+            {createdTemplates.some(name => templateStatuses[name] === 'REJECTED') && (
+              <div className="error-box" style={{marginTop: '20px'}}>
+                Some templates were rejected. Please review in Meta Business Manager and resubmit.
+              </div>
+            )}
           </div>
         )}
       </div>
