@@ -1,552 +1,510 @@
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import './AIFlowGenerator.css'; // Add this CSS file for animations
+import './AIFlowGenerator.css';
 
 const API_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp';
 
-const AIFlowGenerator = () => {
+const EnhancedAIFlowGenerator = () => {
   const navigate = useNavigate();
-  const [userInfo, setUserInfo] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Main states
+  const [step, setStep] = useState(1); // 1: Requirements, 2: Template Creation, 3: Flow Generated
+  const [requirements, setRequirements] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // Analysis results
+  const [analysis, setAnalysis] = useState(null);
+  const [missingTemplates, setMissingTemplates] = useState([]);
+  const [flowPlan, setFlowPlan] = useState(null);
+  
+  // Template creation
+  const [currentTemplateIndex, setCurrentTemplateIndex] = useState(0);
+  const [templateData, setTemplateData] = useState(null);
+  const [mediaFile, setMediaFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdTemplates, setCreatedTemplates] = useState([]);
+  const [templateStatuses, setTemplateStatuses] = useState({});
+  
+  // Final flow
   const [generatedFlow, setGeneratedFlow] = useState(null);
   const [error, setError] = useState('');
-  const [allFlows, setAllFlows] = useState([]);
 
-  useEffect(() => {
-    fetchAllFlows();
-  }, []);
-
-  const fetchAllFlows = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/flows/ai-list/`);
-      if (response.data.status === 'success') {
-        setAllFlows(response.data.flows);
-      }
-    } catch (error) {
-      console.error('Error fetching flows:', error);
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!userInfo.trim()) {
-      setError('Please provide user information');
+  // Step 1: Analyze Requirements
+  const handleAnalyze = async () => {
+    if (!requirements.trim()) {
+      setError('Please describe your requirements');
       return;
     }
 
-    setIsGenerating(true);
+    setIsAnalyzing(true);
     setError('');
-    setGeneratedFlow(null);
-
+    
     try {
-      const response = await axios.post(`${API_URL}/api/flows/generate-ai/`, {
-        user_info: userInfo
+      const response = await axios.post(`${API_URL}/api/flows/generate-smart/`, {
+        user_info: requirements
+      });
+
+      if (response.data.status === 'templates_needed') {
+        // Templates missing - go to creation step
+        setAnalysis(response.data.analysis);
+        setMissingTemplates(response.data.missing_templates);
+        setFlowPlan(response.data.flow_plan);
+        setStep(2);
+        
+        // Initialize first template
+        if (response.data.missing_templates.length > 0) {
+          prepareTemplateCreation(response.data.missing_templates[0]);
+        }
+      } else if (response.data.status === 'success') {
+        // All templates exist - flow generated immediately
+        setGeneratedFlow(response.data.flow);
+        setStep(3);
+      } else {
+        setError(response.data.message || 'Failed to analyze requirements');
+      }
+    } catch (error) {
+      setError(error.response?.data?.message || 'Analysis failed');
+      console.error('Analysis error:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Prepare template creation UI
+  const prepareTemplateCreation = (templateReq) => {
+    const { suggested_name, template_requirements } = templateReq;
+    
+    setTemplateData({
+      name: suggested_name,
+      language: 'en',
+      category: template_requirements.category,
+      components: buildComponents(template_requirements)
+    });
+  };
+
+  const buildComponents = (requirements) => {
+    const components = [];
+    
+    // Header (if media needed)
+    if (requirements.needs_media) {
+      components.push({
+        type: 'HEADER',
+        format: 'IMAGE'
+      });
+    }
+    
+    // Body
+    components.push({
+      type: 'BODY',
+      text: requirements.body_text,
+      example: {
+        body_text: [requirements.variables?.map(v => v.example) || []]
+      }
+    });
+    
+    // Buttons
+    if (requirements.needs_buttons) {
+      components.push({
+        type: 'BUTTONS',
+        buttons: requirements.button_options.map(text => ({
+          type: 'QUICK_REPLY',
+          text
+        }))
+      });
+    }
+    
+    return components;
+  };
+
+  // Submit current template to Meta
+  const handleSubmitTemplate = async () => {
+    const currentTemplate = missingTemplates[currentTemplateIndex];
+    
+    if (currentTemplate.template_requirements.needs_media && !mediaFile) {
+      alert('Please upload media file');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('template_data', JSON.stringify(templateData));
+      if (mediaFile) {
+        formData.append('media_file', mediaFile);
+      }
+
+      const response = await axios.post(`${API_URL}/api/template-flow/submit/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.status === 'success') {
+        const templateName = response.data.template_name;
+        
+        // Track created template
+        setCreatedTemplates(prev => [...prev, templateName]);
+        setTemplateStatuses(prev => ({
+          ...prev,
+          [templateName]: 'PENDING'
+        }));
+        
+        // Start polling for this template
+        startPollingTemplate(templateName);
+        
+        // Move to next template or wait for approval
+        if (currentTemplateIndex < missingTemplates.length - 1) {
+          setCurrentTemplateIndex(prev => prev + 1);
+          prepareTemplateCreation(missingTemplates[currentTemplateIndex + 1]);
+          setMediaFile(null);
+        } else {
+          // All templates submitted - wait for approvals
+          alert('All templates submitted! Waiting for Meta approval...');
+        }
+      } else {
+        alert('Submission failed: ' + response.data.message);
+      }
+    } catch (error) {
+      alert('Error submitting template: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Poll template status
+  const startPollingTemplate = (templateName) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/template-flow/status/${templateName}/`);
+        
+        if (response.data.status === 'success') {
+          const status = response.data.template_status;
+          
+          setTemplateStatuses(prev => ({
+            ...prev,
+            [templateName]: status
+          }));
+          
+          if (status === 'APPROVED' || status === 'REJECTED') {
+            clearInterval(interval);
+            
+            // Check if all templates are resolved
+            checkAllTemplatesReady();
+          }
+        }
+      } catch (error) {
+        console.error('Error checking template status:', error);
+      }
+    }, 10000); // Check every 10 seconds
+  };
+
+  // Check if all templates are approved
+  const checkAllTemplatesReady = async () => {
+    const allApproved = createdTemplates.every(
+      name => templateStatuses[name] === 'APPROVED'
+    );
+    
+    if (allApproved && createdTemplates.length === missingTemplates.length) {
+      // Resume flow creation
+      await resumeFlowCreation();
+    }
+  };
+
+  // Resume flow creation after templates approved
+  const resumeFlowCreation = async () => {
+    try {
+      const response = await axios.post(`${API_URL}/api/flows/resume-with-templates/`, {
+        original_requirements: requirements,
+        flow_plan: flowPlan,
+        created_templates: createdTemplates
       });
 
       if (response.data.status === 'success') {
         setGeneratedFlow(response.data.flow);
-        fetchAllFlows();
+        setStep(3);
+      } else if (response.data.status === 'waiting') {
+        // Some templates still pending
+        alert('Waiting for remaining templates to be approved');
       } else {
-        setError(response.data.message || 'Failed to generate flow');
+        setError('Failed to create flow: ' + response.data.message);
       }
     } catch (error) {
-      setError(error.response?.data?.message || 'An error occurred while generating the flow');
-      console.error('Generation error:', error);
-    } finally {
-      setIsGenerating(false);
+      setError('Error creating flow: ' + (error.response?.data?.message || error.message));
     }
   };
 
-  const handleViewFlow = (flowId) => {
-    navigate(`/flow/${flowId}`);
+  // Update template field
+  const updateTemplateField = (field, value) => {
+    setTemplateData(prev => ({ ...prev, [field]: value }));
   };
 
-  const examplePrompts = [
-    "Create a customer support flow for a restaurant. Users should be able to check menu, make reservations, and ask questions about dietary restrictions.",
-    "Build a lead generation flow for a real estate company. Collect name, email, budget range, and preferred location.",
-    "Design an appointment booking flow for a dental clinic. Ask for patient name, preferred date, time slot, and reason for visit.",
-    "Create an order tracking flow for an e-commerce store. Users can check order status, request returns, and contact support."
-  ];
+  const updateComponent = (index, field, value) => {
+    setTemplateData(prev => {
+      const newComponents = [...prev.components];
+      newComponents[index] = { ...newComponents[index], [field]: value };
+      return { ...prev, components: newComponents };
+    });
+  };
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>🤖 AI Flow Generator</h1>
-        <p style={styles.subtitle}>Describe your requirements and let AI create the perfect WhatsApp flow</p>
-        <button style={styles.backButton} onClick={() => navigate('/')}>
-          ← Back to Flows
-        </button>
+  // Render functions
+  const renderStepContent = () => {
+    switch (step) {
+      case 1:
+        return renderRequirementsStep();
+      case 2:
+        return renderTemplateCreationStep();
+      case 3:
+        return renderFlowGeneratedStep();
+      default:
+        return null;
+    }
+  };
+
+  const renderRequirementsStep = () => (
+    <div className="step-content">
+      <h2>Describe Your Flow Requirements</h2>
+      <p>Our AI will analyze if existing templates work, or pause to create new ones if needed.</p>
+      
+      <textarea
+        value={requirements}
+        onChange={(e) => setRequirements(e.target.value)}
+        placeholder="Example: I need a farmer onboarding flow. Welcome them, ask what crop they grow, request their farm location, ask how many laborers needed, and send them available worker profiles."
+        rows={8}
+      />
+
+      <div className="example-prompts">
+        <p><strong>Example for Farmer-Labor Platform:</strong></p>
+        <div className="prompt-item" onClick={() => setRequirements("Create farmer registration flow: welcome message, ask crop type, request farm location, ask land size, collect contact number, confirm registration.")}>
+          Farmer Registration Flow
+        </div>
+        <div className="prompt-item" onClick={() => setRequirements("Labor booking flow: show available workers with skills, let farmer select workers, ask work date and duration, collect location, send booking confirmation.")}>
+          Labor Booking Flow
+        </div>
+        <div className="prompt-item" onClick={() => setRequirements("Service inquiry flow: present farming services (seeds, equipment, consultation), collect requirements, ask budget, request callback time.")}>
+          Service Inquiry Flow
+        </div>
       </div>
 
-      <div style={styles.content}>
-        <div style={styles.leftPanel}>
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>Describe Your Flow Requirements</h2>
-            
-            <textarea
-              style={styles.textarea}
-              value={userInfo}
-              onChange={(e) => setUserInfo(e.target.value)}
-              placeholder="Example: I need a customer support flow for my restaurant. Customers should be able to view the menu, make reservations, ask about ingredients, and contact us for special requests."
-              rows={8}
+      <button onClick={handleAnalyze} disabled={isAnalyzing} className="primary-button">
+        {isAnalyzing ? 'Analyzing...' : 'Analyze & Generate'}
+      </button>
+
+      {error && <div className="error-box">{error}</div>}
+    </div>
+  );
+
+  const renderTemplateCreationStep = () => {
+    const currentTemplate = missingTemplates[currentTemplateIndex];
+    const progress = `${currentTemplateIndex + 1} of ${missingTemplates.length}`;
+    
+    return (
+      <div className="step-content">
+        <h2>Template Creation Required</h2>
+        
+        <div className="template-progress">
+          <p>Creating template {progress}</p>
+          <div className="progress-bar-container">
+            <div 
+              className="progress-bar-fill" 
+              style={{width: `${((currentTemplateIndex + 1) / missingTemplates.length) * 100}%`}}
             />
+          </div>
+        </div>
 
-            <div style={styles.examplesSection}>
-              <h3 style={styles.examplesTitle}>💡 Example Prompts (Click to use):</h3>
-              {examplePrompts.map((prompt, index) => (
-                <div
-                  key={index}
-                  style={styles.examplePrompt}
-                  onClick={() => setUserInfo(prompt)}
-                >
-                  {prompt}
-                </div>
-              ))}
-            </div>
+        <div className="analysis-info">
+          <h3>Why this template is needed:</h3>
+          <p>{currentTemplate.reason}</p>
+          
+          <h4>Flow Plan:</h4>
+          <ol className="flow-steps">
+            {flowPlan.steps.map((s, i) => (
+              <li key={i} className={s.status === 'missing' ? 'missing' : 'ready'}>
+                <strong>Step {s.step}:</strong> {s.action}
+                <span className={`status-badge ${s.status}`}>{s.status}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
 
-            <button
-              style={{
-                ...styles.generateButton,
-                ...(isGenerating ? styles.generatingButton : {})
-              }}
-              onClick={handleGenerate}
-              disabled={isGenerating}
+        <div className="template-editor">
+          <h3>Template: {currentTemplate.purpose}</h3>
+          
+          <div className="field-group">
+            <label>Template Name:</label>
+            <input
+              type="text"
+              value={templateData?.name || ''}
+              onChange={(e) => updateTemplateField('name', e.target.value)}
+            />
+          </div>
+
+          <div className="field-group">
+            <label>Category:</label>
+            <select
+              value={templateData?.category || 'UTILITY'}
+              onChange={(e) => updateTemplateField('category', e.target.value)}
             >
-              {isGenerating ? (
-                <>
-                  <span className="spinner"></span>
-                  Generating Flow...
-                </>
-              ) : (
-                '✨ Generate Flow'
-              )}
-            </button>
-
-            {error && (
-              <div style={styles.errorBox}>
-                <strong>⚠️ Error:</strong> {error}
-              </div>
-            )}
+              <option value="UTILITY">Utility</option>
+              <option value="MARKETING">Marketing</option>
+            </select>
           </div>
 
-          {generatedFlow && (
-            <div style={styles.card}>
-              <h2 style={styles.cardTitle}>✅ Generated Flow</h2>
+          {templateData?.components?.map((comp, index) => (
+            <div key={index} className="component-editor">
+              <h4>{comp.type}</h4>
               
-              <div style={styles.flowInfo}>
-                <div style={styles.infoRow}>
-                  <strong>Flow Name:</strong>
-                  <span>{generatedFlow.name}</span>
-                </div>
-                <div style={styles.infoRow}>
-                  <strong>Template:</strong>
-                  <span>{generatedFlow.template_name}</span>
-                </div>
-                <div style={styles.infoRow}>
-                  <strong>Flow ID:</strong>
-                  <span>#{generatedFlow.id}</span>
-                </div>
-              </div>
-
-              {generatedFlow.explanation && (
-                <div style={styles.explanation}>
-                  <h3 style={styles.explanationTitle}>📋 Design Explanation:</h3>
-                  <p style={styles.explanationText}>{generatedFlow.explanation}</p>
+              {comp.type === 'BODY' && (
+                <textarea
+                  value={comp.text}
+                  onChange={(e) => updateComponent(index, 'text', e.target.value)}
+                  rows={4}
+                />
+              )}
+              
+              {comp.type === 'HEADER' && comp.format === 'IMAGE' && (
+                <div className="field-group">
+                  <label>Upload Image:</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setMediaFile(e.target.files[0])}
+                  />
+                  {mediaFile && <small>Selected: {mediaFile.name}</small>}
                 </div>
               )}
-
-              {generatedFlow.created_attributes && generatedFlow.created_attributes.length > 0 && (
-                <div style={{...styles.explanation, borderLeft: '4px solid #2196F3', marginTop: '16px'}}>
-                  <h3 style={styles.explanationTitle}>✨ Auto-Created Attributes:</h3>
-                  <ul style={styles.attributesList}>
-                    {generatedFlow.created_attributes.map((attr, index) => (
-                      <li key={index} style={styles.attributeItem}>
-                        <strong>{attr}</strong>
-                      </li>
-                    ))}
-                  </ul>
-                  <p style={{fontSize: '0.85rem', color: '#666', marginTop: '8px', marginBottom: 0}}>
-                    These attributes were automatically created and are now available in your system.
-                  </p>
+              
+              {comp.type === 'BUTTONS' && (
+                <div className="buttons-preview">
+                  <p>Buttons:</p>
+                  {comp.buttons.map((btn, i) => (
+                    <div key={i} className="button-pill">{btn.text}</div>
+                  ))}
                 </div>
               )}
-
-              <div style={styles.flowStats}>
-                <div style={styles.statItem}>
-                  <span style={styles.statNumber}>
-                    {generatedFlow.flow_data?.nodes?.length || 0}
-                  </span>
-                  <span style={styles.statLabel}>Nodes</span>
-                </div>
-                <div style={styles.statItem}>
-                  <span style={styles.statNumber}>
-                    {generatedFlow.flow_data?.edges?.length || 0}
-                  </span>
-                  <span style={styles.statLabel}>Connections</span>
-                </div>
-              </div>
-
-              <div style={styles.actionButtons}>
-                <button
-                  style={styles.viewButton}
-                  onClick={() => handleViewFlow(generatedFlow.id)}
-                >
-                  👁️ View & Edit Flow
-                </button>
-                <button
-                  style={styles.secondaryButton}
-                  onClick={() => {
-                    setGeneratedFlow(null);
-                    setUserInfo('');
-                  }}
-                >
-                  🔄 Generate Another
-                </button>
-              </div>
             </div>
-          )}
+          ))}
         </div>
 
-        <div style={styles.rightPanel}>
-          <div style={styles.card}>
-            <div style={styles.historyHeader}>
-              <h2 style={styles.cardTitle}>📚 All Flows</h2>
-              <button
-                style={styles.refreshButton}
-                onClick={fetchAllFlows}
-              >
-                🔄 Refresh
-              </button>
-            </div>
+        <div className="button-group">
+          <button onClick={() => setStep(1)} className="secondary-button">
+            Back
+          </button>
+          <button 
+            onClick={handleSubmitTemplate} 
+            disabled={isSubmitting}
+            className="primary-button"
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit to Meta'}
+          </button>
+        </div>
 
-            {allFlows.length === 0 ? (
-              <p style={styles.emptyState}>No flows generated yet. Create your first AI-powered flow!</p>
-            ) : (
-              <div style={styles.flowsList}>
-                {allFlows.map((flow) => (
-                  <div
-                    key={flow.id}
-                    style={styles.flowCard}
-                    onClick={() => handleViewFlow(flow.id)}
-                  >
-                    <div style={styles.flowCardHeader}>
-                      <h3 style={styles.flowCardTitle}>{flow.name}</h3>
-                      <span style={{
-                        ...styles.statusBadge,
-                        ...(flow.is_active ? styles.activeBadge : styles.inactiveBadge)
-                      }}>
-                        {flow.is_active ? '✓ Active' : '✗ Inactive'}
-                      </span>
-                    </div>
-                    <div style={styles.flowCardDetails}>
-                      <p style={styles.flowCardTemplate}>
-                        📱 Template: {flow.template_name}
-                      </p>
-                      <div style={styles.flowCardStats}>
-                        <span>{flow.node_count} nodes</span>
-                        <span>•</span>
-                        <span>{flow.edge_count} connections</span>
-                      </div>
-                      <p style={styles.flowCardDate}>
-                        📅 Created: {new Date(flow.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+        {/* Show status of all templates */}
+        {createdTemplates.length > 0 && (
+          <div className="templates-status">
+            <h4>Template Status:</h4>
+            {createdTemplates.map(name => (
+              <div key={name} className="status-row">
+                <span>{name}</span>
+                <span className={`status-badge ${templateStatuses[name]?.toLowerCase()}`}>
+                  {templateStatuses[name] || 'SUBMITTING'}
+                </span>
               </div>
-            )}
+            ))}
           </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderFlowGeneratedStep = () => (
+    <div className="step-content">
+      <h2>Flow Generated Successfully!</h2>
+      
+      <div className="flow-info">
+        <div className="info-row">
+          <strong>Flow Name:</strong>
+          <span>{generatedFlow?.name}</span>
         </div>
+        <div className="info-row">
+          <strong>Template:</strong>
+          <span>{generatedFlow?.template_name}</span>
+        </div>
+        <div className="info-row">
+          <strong>Flow ID:</strong>
+          <span>#{generatedFlow?.id}</span>
+        </div>
+      </div>
+
+      {generatedFlow?.explanation && (
+        <div className="explanation">
+          <h3>Design Explanation:</h3>
+          <p>{generatedFlow.explanation}</p>
+        </div>
+      )}
+
+      {generatedFlow?.created_attributes?.length > 0 && (
+        <div className="attributes-box">
+          <h3>Auto-Created Attributes:</h3>
+          <ul>
+            {generatedFlow.created_attributes.map((attr, i) => (
+              <li key={i}>{attr}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flow-stats">
+        <div className="stat-item">
+          <span className="stat-number">{generatedFlow?.flow_data?.nodes?.length || 0}</span>
+          <span className="stat-label">Nodes</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-number">{generatedFlow?.flow_data?.edges?.length || 0}</span>
+          <span className="stat-label">Connections</span>
+        </div>
+      </div>
+
+      <div className="button-group">
+        <button 
+          onClick={() => navigate(`/edit-flow/${generatedFlow.id}`)}
+          className="primary-button"
+        >
+          View & Edit Flow
+        </button>
+        <button 
+          onClick={() => {
+            setStep(1);
+            setRequirements('');
+            setGeneratedFlow(null);
+            setCreatedTemplates([]);
+            setTemplateStatuses({});
+          }}
+          className="secondary-button"
+        >
+          Create Another Flow
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="enhanced-flow-generator">
+      <div className="header">
+        <h1>AI Flow Generator</h1>
+        <p>Intelligent template detection - Creates missing templates automatically</p>
+      </div>
+
+      <div className="progress-indicator">
+        <div className={`progress-step ${step >= 1 ? 'active' : ''}`}>1. Requirements</div>
+        <div className={`progress-step ${step >= 2 ? 'active' : ''}`}>2. Templates</div>
+        <div className={`progress-step ${step >= 3 ? 'active' : ''}`}>3. Flow Ready</div>
+      </div>
+
+      <div className="content-container">
+        {renderStepContent()}
       </div>
     </div>
   );
 };
 
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    padding: '20px'
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '30px',
-    position: 'relative'
-  },
-  title: {
-    fontSize: '2.5rem',
-    color: '#333',
-    marginBottom: '10px'
-  },
-  subtitle: {
-    fontSize: '1.1rem',
-    color: '#666'
-  },
-  backButton: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    padding: '10px 20px',
-    fontSize: '1rem',
-    color: '#2196F3',
-    backgroundColor: 'white',
-    border: '1px solid #2196F3',
-    borderRadius: '6px',
-    cursor: 'pointer'
-  },
-  content: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 400px',
-    gap: '20px',
-    maxWidth: '1400px',
-    margin: '0 auto'
-  },
-  leftPanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px'
-  },
-  rightPanel: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-  },
-  cardTitle: {
-    fontSize: '1.5rem',
-    color: '#333',
-    marginBottom: '16px'
-  },
-  textarea: {
-    width: '100%',
-    padding: '12px',
-    fontSize: '1rem',
-    border: '2px solid #e0e0e0',
-    borderRadius: '8px',
-    fontFamily: 'inherit',
-    resize: 'vertical',
-    marginBottom: '20px'
-  },
-  examplesSection: {
-    marginBottom: '20px'
-  },
-  examplesTitle: {
-    fontSize: '0.9rem',
-    color: '#666',
-    marginBottom: '10px',
-    fontWeight: '600'
-  },
-  examplePrompt: {
-    padding: '10px',
-    margin: '8px 0',
-    backgroundColor: '#f8f8f8',
-    borderRadius: '6px',
-    fontSize: '0.9rem',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    border: '1px solid #e0e0e0'
-  },
-  generateButton: {
-    width: '100%',
-    padding: '14px',
-    fontSize: '1.1rem',
-    fontWeight: 'bold',
-    color: 'white',
-    backgroundColor: '#25D366',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    transition: 'background-color 0.2s'
-  },
-  generatingButton: {
-    backgroundColor: '#1da851',
-    cursor: 'not-allowed'
-  },
-  errorBox: {
-    marginTop: '16px',
-    padding: '12px',
-    backgroundColor: '#ffebee',
-    border: '1px solid #ef5350',
-    borderRadius: '6px',
-    color: '#c62828'
-  },
-  flowInfo: {
-    marginBottom: '20px'
-  },
-  infoRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '10px 0',
-    borderBottom: '1px solid #f0f0f0'
-  },
-  explanation: {
-    marginTop: '20px',
-    padding: '16px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    borderLeft: '4px solid #25D366'
-  },
-  explanationTitle: {
-    fontSize: '1rem',
-    color: '#333',
-    marginBottom: '8px',
-    fontWeight: '600'
-  },
-  explanationText: {
-    fontSize: '0.95rem',
-    color: '#555',
-    lineHeight: '1.6',
-    margin: 0
-  },
-  attributesList: {
-    margin: '8px 0 0 20px',
-    padding: 0,
-    listStyle: 'disc'
-  },
-  attributeItem: {
-    fontSize: '0.95rem',
-    color: '#555',
-    marginBottom: '6px',
-    lineHeight: '1.6'
-  },
-  flowStats: {
-    display: 'flex',
-    gap: '20px',
-    marginTop: '20px'
-  },
-  statItem: {
-    flex: 1,
-    textAlign: 'center',
-    padding: '16px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px'
-  },
-  statNumber: {
-    display: 'block',
-    fontSize: '2rem',
-    fontWeight: 'bold',
-    color: '#25D366'
-  },
-  statLabel: {
-    display: 'block',
-    fontSize: '0.9rem',
-    color: '#666',
-    marginTop: '4px'
-  },
-  actionButtons: {
-    display: 'flex',
-    gap: '12px',
-    marginTop: '20px'
-  },
-  viewButton: {
-    flex: 1,
-    padding: '12px',
-    fontSize: '1rem',
-    fontWeight: 'bold',
-    color: 'white',
-    backgroundColor: '#2196F3',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer'
-  },
-  secondaryButton: {
-    flex: 1,
-    padding: '12px',
-    fontSize: '1rem',
-    fontWeight: 'bold',
-    color: '#333',
-    backgroundColor: '#e0e0e0',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer'
-  },
-  historyHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '16px'
-  },
-  refreshButton: {
-    padding: '8px 16px',
-    fontSize: '0.9rem',
-    color: '#2196F3',
-    backgroundColor: 'transparent',
-    border: '1px solid #2196F3',
-    borderRadius: '6px',
-    cursor: 'pointer'
-  },
-  emptyState: {
-    textAlign: 'center',
-    color: '#999',
-    padding: '40px 20px'
-  },
-  flowsList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    maxHeight: 'calc(100vh - 200px)',
-    overflowY: 'auto'
-  },
-  flowCard: {
-    padding: '16px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    border: '1px solid #e0e0e0'
-  },
-  flowCardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'start',
-    marginBottom: '12px'
-  },
-  flowCardTitle: {
-    fontSize: '1rem',
-    color: '#333',
-    margin: 0,
-    flex: 1
-  },
-  statusBadge: {
-    padding: '4px 8px',
-    fontSize: '0.75rem',
-    borderRadius: '4px',
-    fontWeight: 'bold'
-  },
-  activeBadge: {
-    backgroundColor: '#c8e6c9',
-    color: '#2e7d32'
-  },
-  inactiveBadge: {
-    backgroundColor: '#ffccbc',
-    color: '#d84315'
-  },
-  flowCardDetails: {
-    fontSize: '0.85rem',
-    color: '#666'
-  },
-  flowCardTemplate: {
-    marginBottom: '8px',
-    fontWeight: '500'
-  },
-  flowCardStats: {
-    display: 'flex',
-    gap: '8px',
-    marginBottom: '8px'
-  },
-  flowCardDate: {
-    fontSize: '0.8rem',
-    color: '#999'
-  }
-};
-
-export default AIFlowGenerator;
+export default EnhancedAIFlowGenerator;

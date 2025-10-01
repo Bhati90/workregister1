@@ -4280,3 +4280,313 @@ def get_ai_generated_flows(request):
             'status': 'error',
             'message': str(e)
         }, status=500)
+    
+
+
+@csrf_exempt
+def generate_flow_with_smart_template_detection(request):
+    """
+    Enhanced flow generation that identifies missing templates during flow design.
+    Pauses to request template creation when needed.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        user_info = data.get('user_info', '')
+        
+        if not user_info:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'User info is required'
+            }, status=400)
+        
+        # Step 1: Fetch all available resources
+        templates = fetch_whatsapp_templates()
+        flow_forms = list(WhatsAppFlowForm.objects.all().values(
+            'id', 'name', 'template_body', 'template_button_text',
+            'template_category', 'screens_data'
+        ))
+        attributes = list(Attribute.objects.all().values('id', 'name', 'description'))
+        
+        # Step 2: Analyze requirements and identify template gaps
+        analysis = analyze_flow_requirements_with_template_gaps(
+            user_info=user_info,
+            templates=templates,
+            flow_forms=flow_forms,
+            attributes=attributes
+        )
+        
+        if not analysis:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to analyze requirements'
+            }, status=500)
+        
+        # Step 3: Check if templates are missing
+        if analysis.get('missing_templates'):
+            # Pause and request template creation
+            return JsonResponse({
+                'status': 'templates_needed',
+                'message': 'Some templates need to be created first',
+                'analysis': analysis,
+                'missing_templates': analysis['missing_templates'],
+                'flow_plan': analysis['flow_plan']
+            })
+        
+        # Step 4: Generate complete flow (all templates available)
+        generated_flow = analysis.get('generated_flow')
+        
+        if not generated_flow or not validate_generated_flow(generated_flow, templates):
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to generate valid flow'
+            }, status=500)
+        
+        # Step 5: Create missing attributes
+        created_attributes = create_missing_attributes(generated_flow)
+        
+        # Step 6: Save flow
+        flow_obj = Flow.objects.create(
+            name=generated_flow['name'],
+            template_name=generated_flow['template_name'],
+            flow_data=generated_flow['flow_data'],
+            is_active=True
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Flow generated successfully',
+            'flow': {
+                'id': flow_obj.id,
+                'name': flow_obj.name,
+                'template_name': flow_obj.template_name,
+                'explanation': generated_flow.get('explanation', ''),
+                'flow_data': generated_flow['flow_data'],
+                'created_attributes': created_attributes
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in enhanced flow generation: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+def analyze_flow_requirements_with_template_gaps(user_info, templates, flow_forms, attributes):
+    """
+    Analyzes flow requirements and identifies which templates exist vs which need creation.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        
+        prompt = f"""
+You are designing WhatsApp chatbot flows for a farmer-labor connection platform. 
+Analyze the requirements and create an optimal flow plan.
+
+COMPANY CONTEXT: 
+We connect farmers with laborers and provide farming-related services.
+
+USER REQUIREMENTS:
+{user_info}
+
+AVAILABLE APPROVED TEMPLATES:
+{json.dumps(templates, indent=2)}
+
+AVAILABLE FLOW FORMS:
+{json.dumps(flow_forms, indent=2)}
+
+AVAILABLE ATTRIBUTES:
+{json.dumps(attributes, indent=2)}
+
+TASK:
+Analyze the requirements step by step:
+
+1. Identify the INITIAL engagement message needed
+   - Check if existing template works
+   - If not, flag it as "MISSING TEMPLATE"
+
+2. Break down the flow into conversation steps:
+   - Step 1: Initial engagement (template)
+   - Step 2: Gather info (ask nodes, forms, etc.)
+   - Step 3: Process/response
+   - etc.
+
+3. For EACH step, determine if it needs:
+   - Existing template (specify which)
+   - New template (describe requirements)
+   - Ask node (question, location, image)
+   - Form (if multi-field collection)
+   - Other node type
+
+4. List ALL missing templates with their requirements
+
+OUTPUT FORMAT (JSON):
+{{
+  "analysis": "Overall analysis of the requirements",
+  "missing_templates": [
+    {{
+      "purpose": "Initial farmer engagement",
+      "reason": "Need to welcome farmer and present options",
+      "suggested_name": "farmer_welcome_service",
+      "template_requirements": {{
+        "category": "UTILITY",
+        "body_text": "Welcome message content",
+        "needs_buttons": true,
+        "button_options": ["View Services", "Contact Support"],
+        "needs_media": false,
+        "variables": []
+      }}
+    }}
+  ],
+  "flow_plan": {{
+    "steps": [
+      {{
+        "step": 1,
+        "type": "template",
+        "status": "missing" or "exists",
+        "template_name": "template_name" (if exists),
+        "action": "User receives welcome message"
+      }},
+      {{
+        "step": 2,
+        "type": "askQuestionNode",
+        "status": "ready",
+        "action": "Ask about crop type",
+        "save_to_attribute": "crop_type"
+      }},
+      {{
+        "step": 3,
+        "type": "askLocationNode",
+        "status": "ready",
+        "action": "Request farm location"
+      }}
+    ]
+  }},
+  "can_proceed": false (if templates missing) or true (if all ready),
+  "generated_flow": {{}} (ONLY include if can_proceed is true)
+}}
+
+IMPORTANT:
+- Be conservative - if no exact template match, mark as missing
+- For farmer/labor platform, templates should be professional and clear
+- Use forms for complex data collection (multiple fields)
+- Use ask nodes for single questions
+- Generate complete flow ONLY if all templates exist
+
+Generate ONLY valid JSON.
+"""
+        
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean response
+        if response_text.startswith('```'):
+            lines = response_text.split('\n')
+            response_text = '\n'.join(lines[1:-1])
+            if response_text.startswith('json'):
+                response_text = response_text[4:].strip()
+        
+        analysis = json.loads(response_text)
+        
+        # If can proceed, generate the actual flow
+        if analysis.get('can_proceed') and not analysis.get('missing_templates'):
+            flow = generate_flow_with_gemini(user_info, templates, flow_forms, attributes)
+            analysis['generated_flow'] = flow
+        
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Error in template gap analysis: {e}", exc_info=True)
+        return None
+
+
+@csrf_exempt
+def create_templates_and_resume_flow(request):
+    """
+    After templates are created and approved, resume flow generation.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        original_requirements = data.get('original_requirements')
+        flow_plan = data.get('flow_plan')
+        created_template_names = data.get('created_templates', [])
+        
+        if not all([original_requirements, flow_plan]):
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Missing required data'
+            }, status=400)
+        
+        # Fetch updated templates (including newly approved ones)
+        templates = fetch_whatsapp_templates()
+        
+        # Verify all required templates now exist
+        missing = []
+        for step in flow_plan.get('steps', []):
+            if step.get('status') == 'missing' and step.get('type') == 'template':
+                template_name = step.get('template_name')
+                if not any(t['name'] == template_name for t in templates):
+                    missing.append(template_name)
+        
+        if missing:
+            return JsonResponse({
+                'status': 'waiting',
+                'message': f'Still waiting for templates: {", ".join(missing)}',
+                'missing_templates': missing
+            })
+        
+        # All templates ready - generate flow
+        flow_forms = list(WhatsAppFlowForm.objects.all().values(
+            'id', 'name', 'template_body', 'template_button_text',
+            'template_category', 'screens_data'
+        ))
+        attributes = list(Attribute.objects.all().values('id', 'name', 'description'))
+        
+        generated_flow = generate_flow_with_gemini(
+            user_info=original_requirements,
+            templates=templates,
+            flow_forms=flow_forms,
+            attributes=attributes
+        )
+        
+        if not generated_flow or not validate_generated_flow(generated_flow, templates):
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to generate flow'
+            }, status=500)
+        
+        created_attributes = create_missing_attributes(generated_flow)
+        
+        flow_obj = Flow.objects.create(
+            name=generated_flow['name'],
+            template_name=generated_flow['template_name'],
+            flow_data=generated_flow['flow_data'],
+            is_active=True
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Flow created successfully',
+            'flow': {
+                'id': flow_obj.id,
+                'name': flow_obj.name,
+                'template_name': flow_obj.template_name,
+                'explanation': generated_flow.get('explanation', ''),
+                'flow_data': generated_flow['flow_data'],
+                'created_attributes': created_attributes
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error resuming flow creation: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)

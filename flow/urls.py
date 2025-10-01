@@ -72,6 +72,10 @@ urlpatterns = [
     path('api/template-flow/create-flow/', views.auto_create_flow_after_approval, name='auto_create_flow'),
     
 
+
+    path('api/flows/generate-smart/', views.generate_flow_with_smart_template_detection, name='generate_smart_flow'),
+    path('api/flows/resume-with-templates/', views.create_templates_and_resume_flow, name='resume_flow_creation'),
+    
     
 
     path('api/flows/list/', views.get_flows_list_api, name='api_flows_list'),

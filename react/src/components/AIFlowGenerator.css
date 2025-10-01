@@ -1,100 +1,483 @@
-/* AIFlowGenerator.css */
+/* EnhancedFlowGenerator.css */
 
-/* Spinner animation for loading state */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.enhanced-flow-generator {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
 }
 
-.spinner {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-top: 3px solid white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.header {
+  text-align: center;
+  color: white;
+  margin-bottom: 30px;
 }
 
-/* Hover effects for example prompts */
-.example-prompt:hover {
-  background-color: #ececec !important;
-  border-color: #667eea !important;
+.header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+.header p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.progress-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.progress-step {
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 20px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.progress-step.active {
+  background: white;
+  color: #667eea;
+  transform: scale(1.05);
+}
+
+.content-container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.step-content h2 {
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.step-content > p {
+  color: #666;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+textarea {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 20px;
+  min-height: 150px;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.example-prompts {
+  margin: 20px 0;
+}
+
+.example-prompts > p {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.prompt-item {
+  padding: 12px;
+  margin: 8px 0;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.prompt-item:hover {
+  background: #ececec;
+  border-color: #667eea;
   transform: translateX(4px);
 }
 
-/* Hover effect for flow cards */
-.flow-card:hover {
+.primary-button {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: white;
+  background: #25D366;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 20px;
+}
+
+.primary-button:hover {
+  background: #1da851;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
 }
 
-/* Button hover effects */
-button:hover {
-  opacity: 0.9;
-  transform: scale(1.02);
+.primary-button:disabled {
+  background: #95e4b7;
+  cursor: not-allowed;
+  transform: none;
 }
 
-button:active {
-  transform: scale(0.98);
+.secondary-button {
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #333;
+  background: #e0e0e0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* Scrollbar styling for flows list */
-.flows-list::-webkit-scrollbar {
-  width: 8px;
+.secondary-button:hover {
+  background: #d0d0d0;
 }
 
-.flows-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
+.button-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 30px;
+}
+
+.button-group button {
+  flex: 1;
+}
+
+.error-box {
+  margin-top: 16px;
+  padding: 12px;
+  background: #ffebee;
+  border: 1px solid #ef5350;
+  border-radius: 6px;
+  color: #c62828;
+}
+
+/* Template Creation Step */
+
+.template-progress {
+  background: #e3f2fd;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.template-progress p {
+  font-weight: 600;
+  color: #1565c0;
+  margin-bottom: 10px;
+}
+
+.progress-bar-container {
+  height: 8px;
+  background: #bbdefb;
   border-radius: 4px;
+  overflow: hidden;
 }
 
-.flows-list::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+.progress-bar-fill {
+  height: 100%;
+  background: #2196F3;
+  transition: width 0.3s ease;
 }
 
-.flows-list::-webkit-scrollbar-thumb:hover {
-  background: #555;
+.analysis-info {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 24px;
 }
 
-/* Responsive design */
-@media (max-width: 1024px) {
-  .content {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .right-panel {
-    margin-top: 20px;
-  }
+.analysis-info h3 {
+  color: #333;
+  margin-bottom: 12px;
 }
 
-@media (max-width: 768px) {
-  .header h1 {
-    font-size: 2rem !important;
-  }
-  
-  .back-button {
-    position: static !important;
-    margin-bottom: 16px;
-  }
-  
-  .card {
-    padding: 16px !important;
-  }
-  
-  .flow-stats {
-    flex-direction: column !important;
-  }
-  
-  .action-buttons {
-    flex-direction: column !important;
-  }
+.analysis-info h4 {
+  color: #555;
+  margin-top: 16px;
+  margin-bottom: 8px;
 }
 
-/* Animation for generated flow card appearing */
-@keyframes slideIn {
+.flow-steps {
+  list-style: none;
+  padding: 0;
+}
+
+.flow-steps li {
+  padding: 10px;
+  margin: 8px 0;
+  background: white;
+  border-radius: 6px;
+  border-left: 4px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flow-steps li.missing {
+  border-left-color: #ff9800;
+  background: #fff3e0;
+}
+
+.flow-steps li.ready {
+  border-left-color: #4caf50;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.status-badge.missing {
+  background: #ffe0b2;
+  color: #e65100;
+}
+
+.status-badge.ready {
+  background: #c8e6c9;
+  color: #2e7d32;
+}
+
+.status-badge.exists {
+  background: #b3e5fc;
+  color: #01579b;
+}
+
+.template-editor {
+  margin: 24px 0;
+}
+
+.field-group {
+  margin-bottom: 20px;
+}
+
+.field-group label {
+  display: block;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.field-group input,
+.field-group select {
+  width: 100%;
+  padding: 10px;
+  font-size: 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.field-group input:focus,
+.field-group select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.field-group small {
+  display: block;
+  color: #999;
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+.component-editor {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.component-editor h4 {
+  color: #667eea;
+  margin-bottom: 12px;
+}
+
+.buttons-preview {
+  margin-top: 12px;
+}
+
+.buttons-preview p {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.button-pill {
+  display: inline-block;
+  padding: 8px 16px;
+  margin: 4px;
+  background: #e3f2fd;
+  color: #1976d2;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.templates-status {
+  margin-top: 30px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.templates-status h4 {
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  margin: 8px 0;
+  background: white;
+  border-radius: 6px;
+}
+
+.status-badge.pending {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.status-badge.approved {
+  background: #c8e6c9;
+  color: #2e7d32;
+}
+
+.status-badge.rejected {
+  background: #ffcdd2;
+  color: #c62828;
+}
+
+.status-badge.submitting {
+  background: #e0e0e0;
+  color: #666;
+}
+
+/* Flow Generated Step */
+
+.flow-info {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.explanation {
+  background: #e8f5e9;
+  border-left: 4px solid #4caf50;
+  padding: 16px;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+.explanation h3 {
+  color: #2e7d32;
+  margin-bottom: 8px;
+}
+
+.explanation p {
+  color: #555;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.attributes-box {
+  background: #fff3e0;
+  border-left: 4px solid #ff9800;
+  padding: 16px;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+.attributes-box h3 {
+  color: #e65100;
+  margin-bottom: 12px;
+}
+
+.attributes-box ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.attributes-box li {
+  padding: 6px 0;
+  color: #555;
+  font-weight: 500;
+}
+
+.attributes-box li:before {
+  content: "✓ ";
+  color: #ff9800;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.flow-stats {
+  display: flex;
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.stat-number {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #667eea;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Animations */
+
+@keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(20px);
@@ -105,44 +488,31 @@ button:active {
   }
 }
 
-.card {
-  animation: slideIn 0.3s ease-out;
-}
-
-/* Textarea focus effect */
-textarea:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-/* Success/Error box animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    max-height: 0;
-  }
-  to {
-    opacity: 1;
-    max-height: 200px;
-  }
-}
-
-.error-box,
-.success-box {
+.step-content {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* Loading pulse animation */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
+/* Responsive */
 
-.generating-button {
-  animation: pulse 2s ease-in-out infinite;
+@media (max-width: 768px) {
+  .content-container {
+    padding: 20px;
+  }
+
+  .header h1 {
+    font-size: 2rem;
+  }
+
+  .progress-indicator {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .flow-stats {
+    flex-direction: column;
+  }
 }
