@@ -3441,41 +3441,6 @@ def generate_flow_with_ai(request):
         }, status=500)
 
 
-def fetch_whatsapp_templates():
-    """Fetch approved WhatsApp templates from Meta API."""
-    try:
-        url = f"https://graph.facebook.com/v19.0/{WABA_ID}/message_templates"
-        params = {"fields": "name,components,status,language"}
-        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
-        
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        
-        all_templates = response.json().get('data', [])
-        approved_templates = [t for t in all_templates if t.get('status') == 'APPROVED']
-        
-        processed_templates = []
-        for t in approved_templates:
-            buttons = []
-            for comp in t.get('components', []):
-                if comp.get('type') == 'BUTTONS':
-                    for btn in comp.get('buttons', []):
-                        if btn.get('type') == 'QUICK_REPLY':
-                            buttons.append({'text': btn.get('text')})
-            
-            processed_templates.append({
-                'name': t.get('name'),
-                'components': t.get('components', []),
-                'buttons': buttons,
-                'language': t.get('language', 'en')
-            })
-        
-        return processed_templates
-    except Exception as e:
-        logger.error(f"Error fetching templates: {e}")
-        return []
-
-
 
 
 @csrf_exempt
@@ -3564,50 +3529,57 @@ OUTPUT FORMAT (JSON):
   "existing_template": "template_name" (if use_existing),
   "new_template": {{
     "name": "descriptive_lowercase_with_underscores",
-    "language": "en",
+    "language": "hi" (for Marathi/Hindi) or "en",
     "category": "UTILITY" or "MARKETING",
     "components": [
       {{
         "type": "HEADER",
-        "format": "TEXT" or "IMAGE" or "VIDEO" or "DOCUMENT",
-        "text": "Header text if TEXT format",
-        "example": {{
-          "header_handle": ["https://example.com/image.jpg"]
-        }} (if IMAGE/VIDEO/DOCUMENT - will need actual upload)
+        "format": "TEXT" or "IMAGE",
+        "text": "⭐ हेडर मजकूर" (if TEXT format)
       }},
       {{
         "type": "BODY",
-        "text": "Body text with {{{{1}}}} for variables",
+        "text": "⭐ नमस्कार {{{{1}}}},\n\nआम्ही {{{{2}}}} मधील द्राक्ष उत्पादक शेतकऱ्यांसाठी कुशल मजूर थेट उपलब्ध करून देण्यासाठी एक नवीन लेबर प्लॅटफॉर्म सुरू केले आहे.\n\n🍇 आमच्या प्रशिक्षित टीम्स सप्टेंबर छाटणी हंगामासाठी सज्ज आहेत – बांधणी, डिपिंग, पातळणी, घड निवड आणि आणखी बरेच काही.\n\n✅ कुशल आणि विश्वासार्ह मजूर\n✅ संपूर्ण सेवा आमच्याकडून व्यवस्थापित\n✅ तुमच्यासाठी कोणताही त्रास नाही\n\nइच्छुक असल्यास खाली क्लिक करा 👇👇👇",
         "example": {{
-          "body_text": [["Example value for variable 1", "Example for variable 2"]]
+          "body_text": [["शेतकरी नाव", "तालुका नाव"]]
         }}
-      }},
-      {{
-        "type": "FOOTER",
-        "text": "Footer text"
       }},
       {{
         "type": "BUTTONS",
         "buttons": [
           {{
             "type": "QUICK_REPLY",
-            "text": "Button text"
+            "text": "मजूर हवे आहेत"
+          }},
+          {{
+            "type": "QUICK_REPLY",
+            "text": "सेवा पहा"
           }}
         ]
       }}
     ]
   }} (if create_new),
   "variables_needed": [
-    {{"name": "customer_name", "description": "Customer's name", "example": "John"}},
-    {{"name": "order_number", "description": "Order ID", "example": "ORD123"}}
+    {{"name": "farmer_name", "description": "शेतकऱ्याचे नाव", "example": "राजू पाटील"}},
+    {{"name": "location", "description": "तालुका/गाव", "example": "नाशिक"}}
   ],
   "needs_media": true/false,
-  "media_type": "image" or "video" or "document" (if needs_media),
+  "media_type": "image" (if needs_media),
   "suggested_flow": {{
-    "description": "How the flow should work after template is approved",
-    "steps": ["Step 1", "Step 2", "Step 3"]
+    "description": "Flow काय करेल",
+    "steps": ["स्टेप 1", "स्टेप 2", "स्टेप 3"]
   }}
 }}
+
+TEMPLATE WRITING GUIDELINES:
+1. Use Marathi देवनागरी script (not English)
+2. Start with ⭐ or similar emoji
+3. Write 4-6 lines in body (detailed, not short)
+4. Mention specific services: बांधणी, डिपिंग, पातळणी, घड निवड
+5. Use bullet points with ✅ for benefits
+6. End with call-to-action: "इच्छुक असल्यास खाली क्लिक करा 👇"
+7. Professional farmer language
+8. Button text in Marathi: "मजूर हवे आहेत", "सेवा पहा", "संपर्क करा"
 
 Generate ONLY valid JSON, no markdown.
 """
@@ -3634,7 +3606,7 @@ Generate ONLY valid JSON, no markdown.
 def submit_template_to_meta(request):
     """
     Submits the approved template design to Meta for review.
-    Handles media upload if needed.
+    Handles media upload if needed. Uses correct Meta API v23.0 format.
     """
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
@@ -3644,6 +3616,7 @@ def submit_template_to_meta(request):
         template_data = json.loads(request.POST.get('template_data'))
         
         # Handle media upload if needed
+        media_id = None
         if 'media_file' in request.FILES:
             media_file = request.FILES['media_file']
             media_id = upload_media_to_meta(media_file)
@@ -3653,26 +3626,57 @@ def submit_template_to_meta(request):
                     'status': 'error',
                     'message': 'Failed to upload media'
                 }, status=500)
-            
-            # Update template with media ID
-            for component in template_data['components']:
-                if component.get('type') == 'HEADER' and component.get('format') in ['IMAGE', 'VIDEO', 'DOCUMENT']:
-                    component['example'] = {
-                        'header_handle': [media_id]
-                    }
         
-        # Submit to Meta
-        url = f"{META_API_URL}/{WABA_ID}/message_templates"
+        # Build Meta API v23.0 compliant payload
+        meta_payload = {
+            "name": template_data['name'],
+            "category": template_data['category'],
+            "language": template_data['language'],
+            "components": []
+        }
+        
+        # Process components for Meta API format
+        for component in template_data['components']:
+            meta_component = {"type": component['type']}
+            
+            if component['type'] == 'HEADER':
+                meta_component['format'] = component['format']
+                if component['format'] == 'TEXT':
+                    meta_component['text'] = component.get('text', '')
+                elif component['format'] in ['IMAGE', 'VIDEO', 'DOCUMENT']:
+                    if media_id:
+                        meta_component['example'] = {
+                            'header_handle': [media_id]
+                        }
+            
+            elif component['type'] == 'BODY':
+                meta_component['text'] = component['text']
+                # Add examples if variables exist
+                if 'example' in component and component['example'].get('body_text'):
+                    meta_component['example'] = component['example']
+            
+            elif component['type'] == 'FOOTER':
+                meta_component['text'] = component.get('text', '')
+            
+            elif component['type'] == 'BUTTONS':
+                meta_component['buttons'] = component.get('buttons', [])
+            
+            meta_payload['components'].append(meta_component)
+        
+        # Submit to Meta API v23.0
+        url = f"https://graph.facebook.com/v23.0/{WABA_ID}/message_templates"
         headers = {
             "Authorization": f"Bearer {META_ACCESS_TOKEN}",
             "Content-Type": "application/json"
         }
         
-        logger.info(f"Submitting template to Meta: {json.dumps(template_data, indent=2)}")
-        response = requests.post(url, json=template_data, headers=headers)
+        logger.info(f"Submitting template to Meta v23.0: {json.dumps(meta_payload, indent=2)}")
+        response = requests.post(url, json=meta_payload, headers=headers)
         response_data = response.json()
         
-        if response.status_code == 200:
+        logger.info(f"Meta API Response: {json.dumps(response_data, indent=2)}")
+        
+        if response.status_code == 200 and 'id' in response_data:
             # Template submitted successfully
             template_id = response_data.get('id')
             template_name = template_data.get('name')
@@ -3685,10 +3689,15 @@ def submit_template_to_meta(request):
                 'meta_response': response_data
             })
         else:
+            error_message = response_data.get('error', {}).get('message', 'Submission failed')
+            error_details = response_data.get('error', {})
+            logger.error(f"Meta API Error: {json.dumps(error_details, indent=2)}")
+            
             return JsonResponse({
                 'status': 'error',
-                'message': response_data.get('error', {}).get('message', 'Submission failed'),
-                'meta_response': response_data
+                'message': error_message,
+                'meta_response': response_data,
+                'error_details': error_details
             }, status=response.status_code)
         
     except Exception as e:
@@ -3890,6 +3899,7 @@ def upload_media_to_meta(file_object):
     except Exception as e:
         logger.error(f"Failed to upload media: {e}", exc_info=True)
         return None
+
 
 def generate_flow_with_gemini(user_info, templates, flow_forms, attributes):
     """
