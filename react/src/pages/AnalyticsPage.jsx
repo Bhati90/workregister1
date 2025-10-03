@@ -37,7 +37,7 @@ const AnalyticsPage = () => {
         setAutoAnalyzing(true);
         setError(null);
         try {
-            const response = await axios.post(`${API_URL}/api/auto-analyze-farmers/`);
+            const response = await axios.post(`${API_URL}/auto-analyze-farmers/`);
             setAiAnalysis(response.data.analysis);
             setFlowPrompts(response.data.flow_prompts);
         } catch (err) {
@@ -52,7 +52,7 @@ const AnalyticsPage = () => {
         setSelectedSegment(segment);
         setIsLoading(true);
         try {
-            const response = await axios.post(`${API_URL}/api/segment-details/`, {
+            const response = await axios.post(`${API_URL}/segment-details/`, {
                 segment_id: segment.segment_id
             });
             setSegmentDetails(response.data);
@@ -362,63 +362,192 @@ const AnalyticsPage = () => {
     const renderSegmentDetails = () => {
         if (!segmentDetails) return null;
 
+        const detailed = segmentDetails.detailed_analysis;
+
         return (
             <div className="segment-details-modal">
                 <div className="modal-content">
                     <button className="close-modal" onClick={() => setSegmentDetails(null)}>✕</button>
                     
                     <h2>{segmentDetails.segment.segment_name}</h2>
+                    <p className="segment-description">{segmentDetails.segment.farmer_count} farmers | {segmentDetails.segment.conversion_potential} conversion potential</p>
                     
-                    <div className="segment-full-info">
-                        <div className="info-section">
-                            <h3>📈 Strategy</h3>
-                            <div className="flow-strategy">
-                                <p><strong>Flow Type:</strong> {segmentDetails.segment.whatsapp_flow_strategy?.flow_type}</p>
-                                <p><strong>Trigger:</strong> {segmentDetails.segment.whatsapp_flow_strategy?.trigger}</p>
-                                
-                                <h4>Flow Steps:</h4>
-                                {segmentDetails.segment.whatsapp_flow_strategy?.steps?.map((step, idx) => (
-                                    <div key={idx} className="flow-step">
-                                        <h5>Step {step.step_number}: {step.template_type}</h5>
-                                        <p><em>{step.message_intent}</em></p>
-                                        <div className="message-samples">
-                                            <p><strong>Hindi:</strong> {step.sample_text_hindi}</p>
-                                            <p><strong>English:</strong> {step.sample_text_english}</p>
+                    {detailed && (
+                        <div className="segment-full-info">
+                            {/* Stage Distribution */}
+                            <div className="info-section">
+                                <h3>📊 Stage Distribution Analysis</h3>
+                                <div className="stage-breakdown">
+                                    {detailed.stage_distribution?.breakdown?.map((stage, idx) => (
+                                        <div key={idx} className={`stage-card urgency-${stage.urgency?.toLowerCase()}`}>
+                                            <div className="stage-header">
+                                                <h4>{stage.stage}</h4>
+                                                <span className="stage-percentage">{stage.percentage}%</span>
+                                            </div>
+                                            <p className="farmer-count">{stage.farmer_count} farmers</p>
+                                            <p className="urgency-badge">{stage.urgency} urgency</p>
+                                            <p className="action-needed">{stage.action_needed}</p>
                                         </div>
-                                        <p><strong>Buttons:</strong> {step.buttons?.join(' | ')}</p>
+                                    ))}
+                                </div>
+                                <div className="key-insights">
+                                    <h4>Key Insights:</h4>
+                                    <ul>
+                                        {detailed.stage_distribution?.key_insights?.map((insight, i) => (
+                                            <li key={i}>{insight}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Template Requirements */}
+                            <div className="info-section">
+                                <h3>📱 WhatsApp Template Requirements</h3>
+                                <p className="section-hint">Check if these templates exist before creating flows</p>
+                                
+                                {detailed.template_requirements?.map((template, idx) => (
+                                    <div key={idx} className={`template-card priority-${template.priority?.toLowerCase()}`}>
+                                        <div className="template-header">
+                                            <div>
+                                                <h4>{template.template_name}</h4>
+                                                <span className={`exists-badge ${template.likely_exists ? 'exists' : 'needs-creation'}`}>
+                                                    {template.likely_exists ? '✓ Likely Exists' : '⚠ Needs Creation'}
+                                                </span>
+                                            </div>
+                                            <span className={`priority-badge ${template.priority?.toLowerCase()}`}>
+                                                {template.priority}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="template-meta">
+                                            <span>Type: {template.template_type}</span>
+                                            <span>Language: {template.language}</span>
+                                            <span>Context: {template.usage_context}</span>
+                                        </div>
+                                        
+                                        <div className="template-body">
+                                            <h5>Body Text:</h5>
+                                            <pre>{template.body_text}</pre>
+                                        </div>
+                                        
+                                        <div className="template-variables">
+                                            <h5>Variables:</h5>
+                                            {template.variables?.map((v, i) => (
+                                                <div key={i} className="variable-item">
+                                                    <code>{v.position}</code> = {v.name} 
+                                                    <span className="example">(e.g., "{v.example}")</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        
+                                        {template.buttons && template.buttons.length > 0 && (
+                                            <div className="template-buttons">
+                                                <h5>Buttons:</h5>
+                                                {template.buttons.map((btn, i) => (
+                                                    <button key={i} className="template-button-preview">
+                                                        {btn.text}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                        
-                        <div className="info-section">
-                            <h3>👥 Farmers in this Segment ({segmentDetails.total_farmers})</h3>
-                            <div className="farmers-table">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Phone</th>
-                                            <th>Location</th>
-                                            <th>Crops</th>
-                                            <th>Messages</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {segmentDetails.farmers?.map((farmer, idx) => (
-                                            <tr key={idx}>
-                                                <td>{farmer.name}</td>
-                                                <td>{farmer.phone_number}</td>
-                                                <td>{farmer.location}</td>
-                                                <td>{farmer.crops_grown}</td>
-                                                <td>{farmer.total_messages}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+
+                            {/* Flow Creation Prompts */}
+                            <div className="info-section highlight-section">
+                                <h3>🤖 AI Flow Creation Prompts</h3>
+                                <p className="section-hint">Copy these prompts to your AI flow maker</p>
+                                
+                                {detailed.flow_creation_prompts?.map((flowPrompt, idx) => (
+                                    <div key={idx} className="flow-prompt-card">
+                                        <h4>{flowPrompt.prompt_title}</h4>
+                                        
+                                        <div className="prompt-meta-info">
+                                            <div className="meta-item">
+                                                <strong>Required Templates:</strong>
+                                                <div className="template-tags">
+                                                    {flowPrompt.required_templates?.map((t, i) => (
+                                                        <span key={i} className="template-tag">{t}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="meta-item">
+                                                <strong>Expected Outcome:</strong> {flowPrompt.expected_outcome}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="prompt-box">
+                                            <div className="prompt-header-bar">
+                                                <span>Complete Prompt (Copy This)</span>
+                                                <button 
+                                                    className="copy-prompt-btn"
+                                                    onClick={() => copyPromptToClipboard(flowPrompt.complete_prompt)}
+                                                >
+                                                    📋 Copy to Clipboard
+                                                </button>
+                                            </div>
+                                            <pre className="prompt-text">{flowPrompt.complete_prompt}</pre>
+                                        </div>
+                                        
+                                        <div className="implementation-notes">
+                                            <h5>Implementation Notes:</h5>
+                                            <ul>
+                                                {flowPrompt.implementation_notes?.map((note, i) => (
+                                                    <li key={i}>{note}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
+
+                            {/* Implementation Checklist */}
+                            <div className="info-section">
+                                <h3>✅ Implementation Checklist</h3>
+                                <div className="checklist">
+                                    {detailed.implementation_checklist?.map((step, idx) => (
+                                        <div key={idx} className="checklist-item">
+                                            <div className="step-number">{step.step}</div>
+                                            <div className="step-content">
+                                                <h5>{step.action}</h5>
+                                                <p>{step.details}</p>
+                                                <div className="step-meta">
+                                                    <span className="timeline">Timeline: {step.timeline}</span>
+                                                    <span className="responsible">Responsible: {step.responsible}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Revenue Breakdown */}
+                            {detailed.revenue_breakdown && (
+                                <div className="info-section revenue-section">
+                                    <h3>💰 Revenue Breakdown</h3>
+                                    <div className="revenue-stats">
+                                        <div className="revenue-stat">
+                                            <span className="label">Per Farmer Value</span>
+                                            <span className="value">{detailed.revenue_breakdown.per_farmer_value}</span>
+                                        </div>
+                                        <div className="revenue-stat highlight">
+                                            <span className="label">Total Potential</span>
+                                            <span className="value">{detailed.revenue_breakdown.total_potential}</span>
+                                        </div>
+                                    </div>
+                                    <p className="assumptions">{detailed.revenue_breakdown.conversion_assumptions}</p>
+                                </div>
+                            )}
                         </div>
-                    </div>
+                    )}
+
+                    {!detailed && (
+                        <div className="loading-details">
+                            <div className="spinner"></div>
+                            <p>Loading detailed analysis...</p>
+                        </div>
+                    )}
                 </div>
             </div>
         );

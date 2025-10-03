@@ -429,7 +429,10 @@ def auto_analyze_farmers_view(request):
 @csrf_exempt
 def get_segment_details_view(request):
     """
-    Get detailed information about a specific farmer segment.
+    Get detailed information about a specific farmer segment with:
+    - Stage distribution breakdown
+    - Template recommendations (check if exists)
+    - Flow creation prompts for AI
     """
     if request.method == 'POST':
         try:
@@ -453,27 +456,166 @@ def get_segment_details_view(request):
             if not target_segment:
                 return JsonResponse({'error': 'Segment not found'}, status=404)
             
-            # Get farmer details for this segment
-            farmer_ids = target_segment.get('farmer_ids', [])
-            farmers_in_segment = [
-                f for f in farmer_data['farmers'] 
-                if f['farmer_id'] in farmer_ids
-            ]
+            # Get detailed analysis for this segment using AI
+            segment_details = generate_detailed_segment_analysis(
+                segment=target_segment,
+                farmer_data=farmer_data
+            )
             
             return JsonResponse({
                 'status': 'success',
                 'segment': target_segment,
-                'farmers': farmers_in_segment,
-                'total_farmers': len(farmers_in_segment)
+                'detailed_analysis': segment_details
             })
             
         except Exception as e:
+            import traceback
+            print(f"Error in get_segment_details_view: {e}")
+            print(traceback.format_exc())
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
             }, status=500)
     
     return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+
+def generate_detailed_segment_analysis(segment, farmer_data):
+    """
+    Generates deep analysis for a specific segment including:
+    - Stage distribution percentages
+    - Template needs (check if exists)
+    - Flow creation prompts
+    """
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    except:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    
+    # Get relevant farmers for this segment based on characteristics
+    segment_name = segment['segment_name']
+    
+    prompt = f"""
+You are analyzing a specific farmer segment for a WhatsApp automation platform.
+
+SEGMENT INFORMATION:
+{json.dumps(segment, indent=2, default=str)}
+
+AVAILABLE FARMER DATA SUMMARY:
+- Total farmers in system: {len(farmer_data['farmers'])}
+- Total crops tracked: {len(farmer_data['crop_details'])}
+- Growth stages available: {list(set([c.get('current_growth_stage') for c in farmer_data['crop_details'] if c.get('current_growth_stage')]))}
+
+YOUR TASK:
+Provide a detailed analysis for THIS SPECIFIC SEGMENT including:
+
+1. STAGE DISTRIBUTION
+   - What percentage of farmers are at each crop growth stage?
+   - Which stages need immediate attention?
+
+2. TEMPLATE REQUIREMENTS
+   - List SPECIFIC WhatsApp templates needed
+   - For each template, specify:
+     * Template name (e.g., "labor_booking_reminder_hi")
+     * Template type (UTILITY or MARKETING)
+     * Language (hi/en)
+     * Exact body text with variables
+     * Button requirements
+   - Mark which templates likely already exist vs need creation
+
+3. FLOW CREATION PROMPTS
+   - Provide COMPLETE, COPY-PASTE ready prompts for the AI flow maker
+   - Each prompt should:
+     * Describe the target audience precisely
+     * Specify the business goal
+     * List required templates by name
+     * Define success metrics
+   - Format as if giving instructions to another AI
+
+4. IMPLEMENTATION CHECKLIST
+   - Step-by-step actions to implement this segment
+   - Timeline recommendations
+   - Dependencies
+
+OUTPUT FORMAT (JSON):
+{{
+  "stage_distribution": {{
+    "breakdown": [
+      {{
+        "stage": "Fruiting",
+        "percentage": 65,
+        "farmer_count": 295,
+        "urgency": "HIGH",
+        "action_needed": "Contact for labor booking"
+      }}
+    ],
+    "key_insights": ["insight1", "insight2"]
+  }},
+  "template_requirements": [
+    {{
+      "template_name": "pre_harvest_labor_booking_hi",
+      "likely_exists": false,
+      "template_type": "UTILITY",
+      "language": "hi",
+      "priority": "HIGH",
+      "body_text": "नमस्कार {{{{1}}}}, आपकी {{{{2}}}} फसल की कटाई {{{{3}}}} दिनों में है। क्या आपको मजदूरों की आवश्यकता है?\\n\\n✅ अनुभवी मजदूर\\n✅ उचित दरें\\n✅ समय पर उपलब्धता\\n\\nअभी बुक करें! 👇",
+      "variables": [
+        {{"position": "{{{{1}}}}", "name": "farmer_name", "example": "रमेश पाटील"}},
+        {{"position": "{{{{2}}}}", "name": "crop_name", "example": "अंगूर"}},
+        {{"position": "{{{{3}}}}", "name": "days_until_harvest", "example": "7"}}
+      ],
+      "buttons": [
+        {{"type": "QUICK_REPLY", "text": "मजदूर चाहिए"}},
+        {{"type": "QUICK_REPLY", "text": "बाद में संपर्क करें"}}
+      ],
+      "usage_context": "Send to farmers 7-14 days before harvest"
+    }}
+  ],
+  "flow_creation_prompts": [
+    {{
+      "prompt_id": "labor_booking_flow_1",
+      "prompt_title": "Pre-Harvest Labor Booking Flow",
+      "complete_prompt": "Create a WhatsApp flow for farmers harvesting in 7-14 days...\\n[FULL DETAILED PROMPT HERE]",
+      "required_templates": ["pre_harvest_labor_booking_hi", "labor_confirmation_hi"],
+      "expected_outcome": "30% conversion to labor booking",
+      "implementation_notes": ["Check templates first", "Test with 10 farmers", "Scale gradually"]
+    }}
+  ],
+  "implementation_checklist": [
+    {{
+      "step": 1,
+      "action": "Verify/Create Required Templates",
+      "details": "Check if pre_harvest_labor_booking_hi exists, if not create it",
+      "timeline": "Day 1",
+      "responsible": "Admin"
+    }},
+    {{
+      "step": 2,
+      "action": "Create Flow Using AI Prompt",
+      "details": "Copy flow_creation_prompts[0].complete_prompt and paste to flow maker",
+      "timeline": "Day 1",
+      "responsible": "AI Flow Maker"
+    }}
+  ],
+  "revenue_breakdown": {{
+    "per_farmer_value": "₹5,000",
+    "total_potential": "₹2,275,000",
+    "conversion_assumptions": "35% book labor, avg ₹5k per booking"
+  }}
+}}
+
+Be EXTREMELY specific and actionable. Generate ONLY valid JSON.
+"""
+    
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Error generating detailed segment analysis: {e}")
+        return None
 
 
 @csrf_exempt
