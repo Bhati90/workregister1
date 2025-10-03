@@ -72,6 +72,7 @@ urlpatterns = [
     path('api/template-flow/create-flow/', views.auto_create_flow_after_approval, name='auto_create_flow'),
     
    path('api/flows/analyze-with-language/', views.analyze_flow_with_language_preference, name='analyze_with_language'),
+    path('api/flows/create-with-refinement/', views.create_flow_with_refined_requirements, name='create_with_refinement'),
     
 
     path('api/flows/generate-smart/', views.generate_flow_with_smart_template_detection, name='generate_smart_flow'),
