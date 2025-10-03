@@ -48,6 +48,58 @@ class ChatContact(models.Model):
 
 #     def __str__(self):
 #         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
+
+class Farmer(models.Model):
+    """Stores the primary information about a farmer."""
+    farmer_name = models.CharField(max_length=255)
+    phone_number = models.CharField(max_length=20, unique=True)
+    farm_size_acres = models.DecimalField(max_digits=6, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.farmer_name
+
+class CropDetails(models.Model):
+    """Stores details for a single crop cycle, linked to a farmer."""
+    farmer = models.OneToOneField(Farmer, on_delete=models.CASCADE, related_name='crop_details')
+    crop_name = models.CharField(max_length=100)
+    
+    # Crop Calendar
+    seeding_date = models.DateField()
+    germination_date = models.DateField()
+    vegetative_stage_start = models.DateField()
+    flowering_stage_start = models.DateField()
+    fruiting_stage_start = models.DateField()
+    harvesting_date = models.DateField()
+
+    # Recommendations
+    next_crop_recommendation = models.CharField(max_length=255, blank=True)
+    soil_improvement_tip = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.crop_name} for {self.farmer.farmer_name}"
+
+class Intervention(models.Model):
+    """Stores each intervention activity for a specific crop cycle."""
+    INTERVENTION_CHOICES = [
+        ('Fertilizer', 'Fertilizer'),
+        ('Pesticide', 'Pesticide'),
+        ('Pruning/Weeding', 'Pruning/Weeding'),
+        ('Other', 'Other'),
+    ]
+
+    crop_details = models.ForeignKey(CropDetails, on_delete=models.CASCADE, related_name='interventions')
+    intervention_type = models.CharField(max_length=50, choices=INTERVENTION_CHOICES)
+    date = models.DateField()
+    product_used = models.CharField(max_length=255)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['date'] # Ensures interventions are ordered by date
+
+    def __str__(self):
+        return f"{self.intervention_type} on {self.date} for {self.crop_details.crop_name}"
+
 class Flow(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
     template_names = models.CharField(max_length=250, unique=False, help_text="The template that triggers this flow. Other templates can be used inside.")

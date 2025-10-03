@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'cloudinary_storage',
     'registration',
     'flow',
+    'analytics',
     'pwa',  
     'whitenoise',  # For serving static files in production
 ]
@@ -437,6 +438,7 @@ LOGGING = {
 #     'rest_framework',
 #     'corsheaders',
 #     'flow',
+#     'analytics',
 #     'whitenoise.storage',  # For serving static files in production
 #     'registration',
 #     'pwa',  
