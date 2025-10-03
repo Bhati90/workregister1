@@ -35,117 +35,224 @@ def get_db_schema():
                 schema_str += row[0] + "\n\n"
     return schema_str
 
-
 def get_comprehensive_farmer_data():
     """
-    Retrieves comprehensive farmer data for analysis including crops, 
-    interventions, messages, and engagement patterns.
+    Retrieves comprehensive farmer data matching EXACT database schema:
+    - registration_farmer (id, farmer_name, phone_number, farm_size_acres, created_at)
+    - registration_cropdetails (id, farmer_id, crop_name, seeding_date, germination_date, 
+                                vegetative_stage_start, flowering_stage_start, 
+                                fruiting_stage_start, harvesting_date, next_crop_recommendation, 
+                                soil_improvement_tip)
+    - registration_intervention (id, crop_details_id, intervention_type, date, product_used, notes)
     """
     with connection.cursor() as cursor:
-        # Get farmer demographics and crop details
-        cursor.execute("""
-            SELECT 
-                f.id as farmer_id,
-                f.name,
-                f.phone_number,
-                f.location,
-                f.farm_size,
-                f.created_at,
-                f.last_active,
-                COUNT(DISTINCT cd.id) as total_crops,
-                STRING_AGG(DISTINCT cd.crop_name, ', ') as crops_grown,
-                COUNT(DISTINCT i.id) as total_interventions,
-                COUNT(DISTINCT m.id) as total_messages,
-                MAX(m.created_at) as last_message_date
-            FROM registration_farmer f
-            LEFT JOIN registration_cropdetails cd ON f.id = cd.farmer_id
-            LEFT JOIN registration_intervention i ON f.id = i.farmer_id
-            LEFT JOIN registration_message m ON f.phone_number = m.phone_number
-            GROUP BY f.id, f.name, f.phone_number, f.location, f.farm_size, f.created_at, f.last_active
-        """)
+        try:
+            # Get farmer demographics with crop details
+            # Note: registration_cropdetails has farmer_id (FK to registration_farmer.id)
+            cursor.execute("""
+                SELECT 
+                    f.id as farmer_id,
+                    f.farmer_name as name,
+                    f.phone_number,
+                    f.farm_size_acres as farm_size,
+                    f.created_at,
+                    cd.crop_name,
+                    cd.seeding_date,
+                    cd.germination_date,
+                    cd.vegetative_stage_start,
+                    cd.flowering_stage_start,
+                    cd.fruiting_stage_start,
+                    cd.harvesting_date,
+                    cd.next_crop_recommendation,
+                    cd.soil_improvement_tip,
+                    COUNT(DISTINCT i.id) as total_interventions
+                FROM registration_farmer f
+                LEFT JOIN registration_cropdetails cd ON f.id = cd.farmer_id
+                LEFT JOIN registration_intervention i ON cd.id = i.crop_details_id
+                GROUP BY 
+                    f.id, f.farmer_name, f.phone_number, f.farm_size_acres, f.created_at,
+                    cd.crop_name, cd.seeding_date, cd.germination_date, cd.vegetative_stage_start,
+                    cd.flowering_stage_start, cd.fruiting_stage_start, cd.harvesting_date,
+                    cd.next_crop_recommendation, cd.soil_improvement_tip
+            """)
+            
+            columns = [col[0] for col in cursor.description]
+            farmer_data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            print(f"Fetched {len(farmer_data)} farmer records")
+            
+        except Exception as e:
+            print(f"Error fetching farmer data: {e}")
+            return {'farmers': [], 'crop_details': [], 'interventions': []}
         
-        columns = [col[0] for col in cursor.description]
-        farmer_data = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        
-        # Get crop-specific details
-        cursor.execute("""
-            SELECT 
-                farmer_id,
-                crop_name,
-                crop_variety,
-                planting_date,
-                expected_harvest_date,
-                area_planted,
-                growth_stage
-            FROM registration_cropdetails
-        """)
-        columns = [col[0] for col in cursor.description]
-        crop_details = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        # Get crop-specific details with growth stage calculation
+        try:
+            cursor.execute("""
+                SELECT 
+                    cd.id as crop_id,
+                    cd.farmer_id,
+                    cd.crop_name,
+                    cd.seeding_date,
+                    cd.germination_date,
+                    cd.vegetative_stage_start,
+                    cd.flowering_stage_start,
+                    cd.fruiting_stage_start,
+                    cd.harvesting_date,
+                    cd.next_crop_recommendation,
+                    cd.soil_improvement_tip,
+                    CASE 
+                        WHEN CURRENT_DATE < cd.germination_date THEN 'Seeding'
+                        WHEN CURRENT_DATE < cd.vegetative_stage_start THEN 'Germination'
+                        WHEN CURRENT_DATE < cd.flowering_stage_start THEN 'Vegetative'
+                        WHEN CURRENT_DATE < cd.fruiting_stage_start THEN 'Flowering'
+                        WHEN CURRENT_DATE < cd.harvesting_date THEN 'Fruiting'
+                        ELSE 'Ready for Harvest'
+                    END as current_growth_stage,
+                    cd.harvesting_date - CURRENT_DATE as days_until_harvest
+                FROM registration_cropdetails cd
+            """)
+            columns = [col[0] for col in cursor.description]
+            crop_details = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            print(f"Fetched {len(crop_details)} crop details")
+            
+        except Exception as e:
+            print(f"Error fetching crop details: {e}")
+            crop_details = []
         
         # Get intervention history
-        cursor.execute("""
-            SELECT 
-                farmer_id,
-                intervention_type,
-                intervention_date,
-                status,
-                outcome
-            FROM registration_intervention
-            ORDER BY intervention_date DESC
-        """)
-        columns = [col[0] for col in cursor.description]
-        interventions = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        # registration_intervention has: crop_details_id (FK to registration_cropdetails.id)
+        try:
+            cursor.execute("""
+                SELECT 
+                    i.id as intervention_id,
+                    cd.farmer_id,
+                    i.crop_details_id,
+                    i.intervention_type,
+                    i.date as intervention_date,
+                    i.product_used,
+                    i.notes,
+                    cd.crop_name
+                FROM registration_intervention i
+                JOIN registration_cropdetails cd ON i.crop_details_id = cd.id
+                ORDER BY i.date DESC
+            """)
+            columns = [col[0] for col in cursor.description]
+            interventions = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            print(f"Fetched {len(interventions)} interventions")
+            
+        except Exception as e:
+            print(f"Error fetching interventions: {e}")
+            interventions = []
         
         return {
             'farmers': farmer_data,
             'crop_details': crop_details,
             'interventions': interventions
         }
-
-
 def analyze_farmer_segments_with_ai(farmer_data):
     """
     Uses AI to automatically analyze farmer data and create actionable segments
     with specific flow recommendations.
+    OPTIMIZED: Sends summary statistics instead of all raw data to avoid quota issues.
     """
-    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    # Try with flash model first, fallback to flash-exp if needed
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')  # More stable, higher quota
+    except:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    
+    # Create a summary instead of sending all raw data (to save tokens)
+    from datetime import datetime, timedelta
+    from collections import Counter
+    
+    total_farmers = len(farmer_data['farmers'])
+    
+    # Calculate summary statistics
+    crops_counter = Counter([f['crop_name'] for f in farmer_data['farmers'] if f.get('crop_name')])
+    farm_sizes = [float(f['farm_size']) for f in farmer_data['farmers'] if f.get('farm_size')]
+    avg_farm_size = sum(farm_sizes) / len(farm_sizes) if farm_sizes else 0
+    
+    # Growth stage distribution
+    growth_stages = Counter([c['current_growth_stage'] for c in farmer_data['crop_details']])
+    
+    # Days until harvest distribution
+    harvest_soon = [c for c in farmer_data['crop_details'] if c.get('days_until_harvest') and c['days_until_harvest'] <= 30]
+    harvest_within_week = [c for c in farmer_data['crop_details'] if c.get('days_until_harvest') and c['days_until_harvest'] <= 7]
+    
+    # Intervention activity
+    recent_interventions = [i for i in farmer_data['interventions'] 
+                           if i.get('intervention_date') and 
+                           (datetime.now().date() - i['intervention_date']).days <= 30]
+    
+    intervention_types = Counter([i['intervention_type'] for i in farmer_data['interventions']])
+    
+    # Farmers with next crop recommendation
+    farmers_with_next_crop = [f for f in farmer_data['farmers'] if f.get('next_crop_recommendation')]
+    
+    summary_data = {
+        'total_farmers': total_farmers,
+        'crop_distribution': dict(crops_counter.most_common(10)),
+        'average_farm_size': round(avg_farm_size, 2),
+        'farm_size_ranges': {
+            'small_0_2_acres': len([f for f in farm_sizes if f <= 2]),
+            'medium_2_5_acres': len([f for f in farm_sizes if 2 < f <= 5]),
+            'large_5plus_acres': len([f for f in farm_sizes if f > 5])
+        },
+        'growth_stage_distribution': dict(growth_stages),
+        'harvest_insights': {
+            'harvesting_within_30_days': len(harvest_soon),
+            'harvesting_within_7_days': len(harvest_within_week),
+            'harvest_soon_crops': [{'crop': c['crop_name'], 'days': c['days_until_harvest']} 
+                                  for c in harvest_within_week[:10]]
+        },
+        'intervention_activity': {
+            'recent_interventions_30_days': len(recent_interventions),
+            'intervention_types': dict(intervention_types),
+            'avg_interventions_per_farmer': round(len(farmer_data['interventions']) / total_farmers, 2)
+        },
+        'next_crop_opportunities': {
+            'farmers_with_recommendations': len(farmers_with_next_crop),
+            'sample_recommendations': list(set([f['next_crop_recommendation'] 
+                                               for f in farmers_with_next_crop[:20] 
+                                               if f.get('next_crop_recommendation')]))
+        },
+        'sample_farmers': farmer_data['farmers'][:5]  # Just send 5 examples instead of 500
+    }
     
     prompt = f"""
-You are an expert agricultural business analyst for a FARMER-LABOR PLATFORM. Analyze the farmer data below and create actionable customer segments with specific WhatsApp flow recommendations.
+You are an expert agricultural business analyst for a FARMER-LABOR PLATFORM. Analyze the SUMMARY statistics below and create actionable customer segments with specific WhatsApp flow recommendations.
 
-FARMER DATA:
-{json.dumps(farmer_data, indent=2, default=str)}
+DATABASE STRUCTURE:
+- Farmer: farmer_name, phone_number, farm_size_acres, created_at
+- CropDetails: One crop per farmer with growth stages (seeding → germination → vegetative → flowering → fruiting → harvesting)
+- Intervention: Activities like Fertilizer, Pesticide, Pruning/Weeding linked to crops
+
+FARMER DATA SUMMARY (based on {total_farmers} farmers):
+{json.dumps(summary_data, indent=2, default=str)}
 
 YOUR TASK:
-1. Identify different farmer segments based on:
-   - Engagement level (active, inactive, dormant)
-   - Crop types and diversity
-   - Farm size and scale
-   - Intervention history
-   - Communication patterns
-   - Conversion potential (likelihood to become paying customer)
+1. Identify different farmer segments based on the statistics above:
+   - Crop growth stage distribution
+   - Farm size ranges (small/medium/large)
+   - Intervention frequency and activity
+   - Approaching harvest dates (7-30 days)
+   - Next crop recommendation availability
 
-2. For EACH segment, provide:
-   - Segment name and description
-   - Size (number of farmers)
-   - Key characteristics
-   - Business opportunity (revenue potential)
-   - Recommended WhatsApp flow strategy
-   - Specific message templates needed
-   - Best time to contact
-   - Success metrics
+2. IMPORTANT SEGMENTS TO CREATE:
+   - "Pre-Harvest Farmers" - {len(harvest_soon)} farmers approaching harvest, need labor services
+   - "Active Growers" - farmers with recent interventions, engaged and ready for upsell
+   - "Harvest Ready This Week" - {len(harvest_within_week)} farmers harvesting soon, URGENT labor needs
+   - "Next Crop Ready" - {len(farmers_with_next_crop)} farmers with recommendations, ready for new cycle
+   - "Small Farm Owners" - potential for cooperative services
+   - "Large Farm Owners" - premium service opportunity
 
-3. Prioritize segments by:
-   - Conversion potential (high/medium/low)
-   - Revenue impact
-   - Ease of implementation
+3. For EACH segment, provide detailed WhatsApp flow strategy with Hindi & English message samples.
 
 OUTPUT FORMAT (JSON):
 {{
   "analysis_summary": {{
-    "total_farmers": number,
-    "analysis_date": "current date",
-    "key_insights": ["insight1", "insight2", "insight3"]
+    "total_farmers": {total_farmers},
+    "analysis_date": "{datetime.now().strftime('%Y-%m-%d')}",
+    "key_insights": ["insight based on the data", "insight 2", "insight 3"]
   }},
   "segments": [
     {{
@@ -155,11 +262,8 @@ OUTPUT FORMAT (JSON):
       "farmer_count": number,
       "conversion_potential": "HIGH/MEDIUM/LOW",
       "estimated_revenue": "₹X,XXX per farmer/month",
-      "characteristics": [
-        "characteristic1",
-        "characteristic2"
-      ],
-      "farmer_ids": [list of farmer IDs in this segment],
+      "characteristics": ["based on data"],
+      "farmer_ids": [],
       "recommended_actions": [
         {{
           "action_type": "flow/template/campaign",
@@ -176,9 +280,9 @@ OUTPUT FORMAT (JSON):
           {{
             "step_number": 1,
             "template_type": "greeting/offer/survey/reminder",
-            "message_intent": "What this message achieves",
-            "sample_text_hindi": "Sample message in Hindi",
-            "sample_text_english": "Sample message in English",
+            "message_intent": "What this achieves",
+            "sample_text_hindi": "नमस्कार {{{{farmer_name}}}}, आपकी {{{{crop_name}}}} फसल...",
+            "sample_text_english": "Hello {{{{farmer_name}}}}, your {{{{crop_name}}}} crop...",
             "buttons": ["Button 1", "Button 2"],
             "expected_response": "What farmer should do"
           }}
@@ -188,7 +292,7 @@ OUTPUT FORMAT (JSON):
       "contact_strategy": {{
         "best_time": "morning/afternoon/evening",
         "frequency": "daily/weekly/monthly",
-        "channel_preference": "whatsapp/sms/call"
+        "channel_preference": "whatsapp"
       }}
     }}
   ],
@@ -203,7 +307,7 @@ OUTPUT FORMAT (JSON):
   ],
   "automation_recommendations": [
     {{
-      "automation_type": "Type of automation",
+      "automation_type": "Type",
       "description": "What it does",
       "target_segments": ["segment1", "segment2"],
       "implementation_priority": "HIGH/MEDIUM/LOW"
@@ -211,7 +315,7 @@ OUTPUT FORMAT (JSON):
   ]
 }}
 
-Make it actionable, specific, and focused on CONVERSION and REVENUE.
+Focus on ACTIONABLE insights. Use the statistics to size segments accurately.
 Generate ONLY valid JSON.
 """
     

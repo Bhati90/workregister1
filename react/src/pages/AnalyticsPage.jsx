@@ -37,7 +37,7 @@ const AnalyticsPage = () => {
         setAutoAnalyzing(true);
         setError(null);
         try {
-            const response = await axios.post(`${API_URL}/auto-analyze-farmers/`);
+            const response = await axios.post(`${API_URL}/api/auto-analyze-farmers/`);
             setAiAnalysis(response.data.analysis);
             setFlowPrompts(response.data.flow_prompts);
         } catch (err) {
@@ -52,7 +52,7 @@ const AnalyticsPage = () => {
         setSelectedSegment(segment);
         setIsLoading(true);
         try {
-            const response = await axios.post(`${API_URL}/segment-details/`, {
+            const response = await axios.post(`${API_URL}/api/segment-details/`, {
                 segment_id: segment.segment_id
             });
             setSegmentDetails(response.data);
