@@ -89,7 +89,7 @@ const FlowListPage = () => {
             + Create Flow
           </Link>
           <Link to="/ai-flow-generator">AI Flow Generator</Link>
-          <Link to="/template-flow-creator">AI Flow Generator temp</Link>
+          <Link to="/ai-tem-generator">AI Flow Generator temp</Link>
         </header>
 
         <div className="card quota-card">

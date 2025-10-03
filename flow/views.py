@@ -4445,7 +4445,6 @@ def generate_flow_with_smart_template_detection(request):
             'message': str(e)
         }, status=500)
 
-
 @csrf_exempt
 def analyze_flow_with_language_preference(request):
     """
@@ -4505,6 +4504,177 @@ def analyze_flow_with_language_preference(request):
         }, status=500)
 
 
+@csrf_exempt
+def create_flow_with_refined_requirements(request):
+    """
+    Creates flow with potentially refined requirements after template review.
+    Allows user to edit original input before final flow generation.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        original_requirements = data.get('original_requirements', '')
+        refined_requirements = data.get('refined_requirements', original_requirements)
+        created_templates = data.get('created_templates', [])
+        flow_plan = data.get('flow_plan', {})
+        
+        # Use refined requirements if user edited them
+        final_requirements = refined_requirements if refined_requirements != original_requirements else original_requirements
+        
+        # Fetch updated templates
+        templates = fetch_whatsapp_templates()
+        flow_forms = list(WhatsAppFlowForm.objects.all().values(
+            'id', 'name', 'template_body', 'template_button_text',
+            'template_category', 'screens_data'
+        ))
+        attributes = list(Attribute.objects.all().values('id', 'name', 'description'))
+        
+        # Generate flow with potentially refined requirements
+        generated_flow = generate_flow_with_gemini(
+            user_info=final_requirements,
+            templates=templates,
+            flow_forms=flow_forms,
+            attributes=attributes
+        )
+        
+        if not generated_flow or not validate_generated_flow(generated_flow, templates):
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to generate flow'
+            }, status=500)
+        
+        created_attributes = create_missing_attributes(generated_flow)
+        
+        flow_obj = Flow.objects.create(
+            name=generated_flow['name'],
+            template_name=generated_flow['template_name'],
+            flow_data=generated_flow['flow_data'],
+            is_active=True
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Flow created successfully',
+            'flow': {
+                'id': flow_obj.id,
+                'name': flow_obj.name,
+                'template_name': flow_obj.template_name,
+                'explanation': generated_flow.get('explanation', ''),
+                'flow_data': generated_flow['flow_data'],
+                'created_attributes': created_attributes,
+                'was_refined': refined_requirements != original_requirements
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating flow with refined requirements: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+    """
+    Returns ALL missing templates at once, not one by one.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        
+        # Language-specific instructions
+        language_guide = {
+            'hi': {
+                'script': 'देवनागरी (Marathi/Hindi)',
+                'greeting': 'नमस्कार',
+                'examples': ['राजू पाटील', 'नाशिक'],
+                'buttons': ['मजूर हवे', 'सेवा पहा', 'संपर्क करा']
+            },
+            'en': {
+                'script': 'English',
+                'greeting': 'Hello',
+                'examples': ['John Doe', 'Mumbai'],
+                'buttons': ['Need Workers', 'View Services', 'Contact Us']
+            }
+        }
+        
+        lang_config = language_guide.get(language, language_guide['hi'])
+        
+        prompt = f"""
+You are designing WhatsApp flows for a FARMER-LABOR PLATFORM.
+
+USER REQUIREMENTS:
+{user_info}
+
+PREFERRED LANGUAGE: {language} ({lang_config['script']})
+
+AVAILABLE TEMPLATES:
+{json.dumps(templates, indent=2)}
+
+TASK: Return ALL missing templates needed for this flow.
+
+LANGUAGE RULES for {language}:
+- Script: {lang_config['script']}
+- Greeting: {lang_config['greeting']}
+- Example names: {lang_config['examples']}
+- Button examples: {lang_config['buttons']}
+- Always include variables {{{{1}}}}, {{{{2}}}} for personalization
+- 4-6 lines in body text
+- Use emojis: ⭐, 🍇, ✅, 👇
+- Professional but friendly tone
+
+OUTPUT FORMAT (JSON):
+{{
+  "analysis": "Brief analysis of what's needed",
+  "missing_templates": [
+    {{
+      "purpose": "What this template does",
+      "reason": "Why we need it",
+      "suggested_name": "descriptive_name_lowercase",
+      "template_requirements": {{
+        "category": "UTILITY" or "MARKETING",
+        "language": "{language}",
+        "body_text": "Full template text with {{{{1}}}} variables",
+        "needs_buttons": true/false,
+        "button_options": ["Button 1", "Button 2"],
+        "needs_media": false,
+        "variables": [
+          {{"name": "farmer_name", "example": "{lang_config['examples'][0]}"}},
+          {{"name": "location", "example": "{lang_config['examples'][1]}"}}
+        ]
+      }}
+    }}
+  ],
+  "flow_plan": {{
+    "steps": [
+      {{
+        "step": 1,
+        "type": "template",
+        "status": "missing" or "exists",
+        "template_name": "name if exists",
+        "action": "What happens"
+      }}
+    ]
+  }}
+}}
+
+RETURN ALL MISSING TEMPLATES IN ONE RESPONSE.
+Generate ONLY valid JSON.
+"""
+        
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean response
+        if response_text.startswith('```'):
+            lines = response_text.split('\n')
+            response_text = '\n'.join(lines[1:-1])
+            if response_text.startswith('json'):
+                response_text = response_text[4:].strip()
+        
+        return json.loads(response_text)
+        
+    except Exception as e:
+        logger.error(f"Error in batch template analysis: {e}", exc_info=True)
+        return None
 def analyze_all_template_needs(user_info, templates, flow_forms, attributes, language='hi'):
     """
     Returns ALL missing templates at once, not one by one.

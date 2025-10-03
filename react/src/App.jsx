@@ -27,7 +27,7 @@ function App() {
            <Route path="/ai-tem-generator" element={<FlexibleFlowGenerator/>} />
           <Route path="/ai-flow-generator" element={<AIFlowGenerator />} />
            
-           <Route path="/template-flow-creator" element={<TemplateFlowCreator />} />
+           {/* <Route path="/template-flow-creator" element={<TemplateFlowCreator />} /> */}
           {/* <Route path="/analytics" element={<AnalyticsPage />} /> <-- Add the route */}
         </Routes>
       </div>

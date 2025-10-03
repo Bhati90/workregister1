@@ -161,7 +161,7 @@ const FlexibleFlowGenerator = () => {
 
       if (response.data.status === 'success') {
         alert('Flow तयार झाला! / Flow created!');
-        navigate(`/edit-flow/${response.data.flow.id}`);
+        navigate(`/flow/${response.data.flow.id}`);
       }
     } catch (error) {
       setError('Flow तयार करण्यात त्रुटी / Flow creation failed');

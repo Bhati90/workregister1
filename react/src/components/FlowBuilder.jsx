@@ -6,6 +6,7 @@ import ReactFlow, {
   Controls,
   Background,
   Panel,
+  MarkerType, 
 } from 'reactflow';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -43,7 +44,15 @@ const nodeTypes = {
 };
 
 const API_URL = 'https://workregister1-8g56.onrender.com/register/whatsapp';
-
+const edgeOptions = {
+  animated: true,
+  style: { stroke: '#b1b1b7', strokeWidth: 2 },
+  type: 'smoothstep',
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+    color: '#b1b1b7',
+  },
+};
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
@@ -349,6 +358,10 @@ const FlowBuilder = ({ initialData, isEditing }) => {
                         onDrop={onDrop}
                         onDragOver={onDragOver}
                         nodeTypes={nodeTypes}
+                         defaultEdgeOptions={edgeOptions} 
+                        onEdgesDelete={(edgesToDelete) => {  // Add this handler
+    edgesToDelete.forEach(edge => onEdgeDelete(edge.id));
+  }}
                         fitView
                     >
                         <Panel position="top-left">
