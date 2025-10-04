@@ -744,3 +744,282 @@ textarea:focus {
     flex-direction: column;
   }
 }
+
+
+/* Add these styles to your AIFlowGenerator.css */
+
+/* Image Upload Section */
+.image-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+}
+
+.image-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.image-toggle input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.image-toggle label {
+    font-weight: 500;
+    cursor: pointer;
+    margin: 0;
+}
+
+.image-upload-box {
+    margin-top: 15px;
+}
+
+.upload-label {
+    display: block;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-placeholder {
+    border: 2px dashed #667eea;
+    border-radius: 10px;
+    padding: 30px;
+    text-align: center;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.upload-placeholder:hover {
+    border-color: #5568d3;
+    background: #f8f9fa;
+}
+
+.upload-placeholder p {
+    margin: 10px 0 0 0;
+    color: #667eea;
+    font-weight: 500;
+}
+
+.image-preview {
+    text-align: center;
+    padding: 15px;
+    background: white;
+    border-radius: 10px;
+}
+
+.image-preview img {
+    max-width: 200px;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.image-preview p {
+    margin: 10px 0 0 0;
+    color: #6c757d;
+    font-size: 0.9em;
+}
+
+/* Editable Buttons Section */
+.buttons-edit-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.buttons-edit-section label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 12px;
+    color: #2c3e50;
+}
+
+.button-edit-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.button-input {
+    flex: 1;
+    padding: 10px 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 0.95em;
+    transition: border-color 0.3s ease;
+}
+
+.button-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.remove-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.remove-btn:hover {
+    background: #c82333;
+    transform: scale(1.1);
+}
+
+.add-button-btn {
+    width: 100%;
+    padding: 10px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+}
+
+.add-button-btn:hover {
+    background: #218838;
+    transform: translateY(-2px);
+}
+
+/* Enhanced Template Card */
+.template-card {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.template-card.selected {
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.template-header {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f8f9fa;
+}
+
+.template-header input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.template-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    flex: 1;
+}
+
+.field-group {
+    margin-bottom: 20px;
+}
+
+.field-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #495057;
+}
+
+.field-group input[type="text"],
+.field-group textarea,
+.field-group select {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 0.95em;
+    font-family: inherit;
+    transition: border-color 0.3s ease;
+}
+
+.field-group input:focus,
+.field-group textarea:focus,
+.field-group select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.field-group textarea {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.6;
+}
+
+.field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+/* Button Preview (old style) */
+.buttons-preview {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.buttons-preview label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+.button-pill {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    border-radius: 20px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .field-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .button-edit-row {
+        flex-direction: column;
+    }
+    
+    .remove-btn {
+        width: 100%;
+        border-radius: 6px;
+    }
+    
+    .upload-placeholder {
+        padding: 20px;
+    }
+}

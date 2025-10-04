@@ -9,24 +9,26 @@ const FlexibleFlowGenerator = () => {
   const navigate = useNavigate();
   
   // Main states
-  const [step, setStep] = useState(1); // 1: Requirements, 2: Review All Templates, 3: Submit Options
+  const [step, setStep] = useState(1);
   const [requirements, setRequirements] = useState('');
-  const [preferredLanguage, setPreferredLanguage] = useState('hi'); // hi, en, mr
+  const [preferredLanguage, setPreferredLanguage] = useState('hi');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   // Analysis results
   const [analysis, setAnalysis] = useState(null);
-  const [allTemplates, setAllTemplates] = useState([]); // All templates to create
+  const [allTemplates, setAllTemplates] = useState([]);
   const [flowPlan, setFlowPlan] = useState(null);
   
   // User choices
-  const [selectedTemplates, setSelectedTemplates] = useState([]); // Which templates user wants to create
+  const [selectedTemplates, setSelectedTemplates] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedTemplates, setSubmittedTemplates] = useState([]);
   
+  // NEW: Image handling
+  const [templateImages, setTemplateImages] = useState({}); // {templateIndex: File}
+  
   const [error, setError] = useState('');
 
-  // Step 1: Analyze Requirements
   const handleAnalyze = async () => {
     if (!requirements.trim()) {
       setError('कृपया आवश्यकता वर्णन करा / Please describe requirements');
@@ -48,12 +50,9 @@ const FlexibleFlowGenerator = () => {
         setFlowPlan(response.data.flow_plan);
         
         if (response.data.missing_templates && response.data.missing_templates.length > 0) {
-          // Show all templates for review
           setStep(2);
-          // Pre-select all templates
           setSelectedTemplates(response.data.missing_templates.map((_, i) => i));
         } else {
-          // No templates needed, go directly to flow creation
           alert('सर्व templates उपलब्ध आहेत! / All templates available!');
           await createFlowDirectly();
         }
@@ -65,7 +64,6 @@ const FlexibleFlowGenerator = () => {
     }
   };
 
-  // Toggle template selection
   const toggleTemplate = (index) => {
     setSelectedTemplates(prev => {
       if (prev.includes(index)) {
@@ -76,7 +74,63 @@ const FlexibleFlowGenerator = () => {
     });
   };
 
-  // Update template field
+  // NEW: Update button text
+  const updateButton = (templateIndex, buttonIndex, newText) => {
+    setAllTemplates(prev => {
+      const updated = [...prev];
+      if (!updated[templateIndex].template_requirements.button_options) {
+        updated[templateIndex].template_requirements.button_options = [];
+      }
+      updated[templateIndex].template_requirements.button_options[buttonIndex] = newText;
+      return updated;
+    });
+  };
+
+  // NEW: Add button
+  const addButton = (templateIndex) => {
+    setAllTemplates(prev => {
+      const updated = [...prev];
+      if (!updated[templateIndex].template_requirements.button_options) {
+        updated[templateIndex].template_requirements.button_options = [];
+      }
+      if (updated[templateIndex].template_requirements.button_options.length < 3) {
+        updated[templateIndex].template_requirements.button_options.push('नवीन बटण / New Button');
+      }
+      return updated;
+    });
+  };
+
+  // NEW: Remove button
+  const removeButton = (templateIndex, buttonIndex) => {
+    setAllTemplates(prev => {
+      const updated = [...prev];
+      updated[templateIndex].template_requirements.button_options.splice(buttonIndex, 1);
+      return updated;
+    });
+  };
+
+  // NEW: Toggle image requirement
+  const toggleImageHeader = (templateIndex) => {
+    setAllTemplates(prev => {
+      const updated = [...prev];
+      updated[templateIndex].template_requirements.needs_media = 
+        !updated[templateIndex].template_requirements.needs_media;
+      return updated;
+    });
+  };
+
+  // NEW: Handle image upload
+  const handleImageUpload = (templateIndex, file) => {
+    if (file && file.type.startsWith('image/')) {
+      setTemplateImages(prev => ({
+        ...prev,
+        [templateIndex]: file
+      }));
+    } else {
+      alert('कृपया image file निवडा / Please select an image file');
+    }
+  };
+
   const updateTemplate = (index, field, value) => {
     setAllTemplates(prev => {
       const updated = [...prev];
@@ -85,7 +139,6 @@ const FlexibleFlowGenerator = () => {
       } else if (field === 'category') {
         updated[index].template_requirements.category = value;
       } else if (field.includes('.')) {
-        // Nested field like template_requirements.body_text
         const [parent, child] = field.split('.');
         updated[index][parent][child] = value;
       } else {
@@ -95,7 +148,6 @@ const FlexibleFlowGenerator = () => {
     });
   };
 
-  // Submit selected templates to Meta
   const handleSubmitToMeta = async () => {
     if (selectedTemplates.length === 0) {
       alert('कृपया किमान एक template निवडा / Please select at least one template');
@@ -109,16 +161,31 @@ const FlexibleFlowGenerator = () => {
       const template = allTemplates[index];
       
       try {
+        // Build form data for image upload
+        const formData = new FormData();
+        
         const templateData = {
           name: template.suggested_name,
           language: template.template_requirements.language || preferredLanguage,
           category: template.template_requirements.category,
-          components: buildComponents(template.template_requirements)
+          components: buildComponents(template.template_requirements, index)
         };
 
-        const response = await axios.post(`${API_URL}/api/template-flow/submit/`, 
-          { template_data: JSON.stringify(templateData) },
-          { headers: { 'Content-Type': 'application/json' } }
+        formData.append('template_data', JSON.stringify(templateData));
+        
+        // Add image if provided
+        if (templateImages[index]) {
+          formData.append('media_file', templateImages[index]);
+        }
+
+        const response = await axios.post(
+          `${API_URL}/api/template-flow/submit/`, 
+          formData,
+          { 
+            headers: { 
+              'Content-Type': 'multipart/form-data'
+            } 
+          }
         );
 
         if (response.data.status === 'success') {
@@ -138,21 +205,18 @@ const FlexibleFlowGenerator = () => {
     
     if (submitted.length > 0) {
       setStep(3);
-      // Start polling
       submitted.forEach(t => startPolling(t.name));
     } else {
       alert('सर्व templates submit करण्यात अयशस्वी / All submissions failed');
     }
   };
 
-  // Skip template creation and go to flow
   const skipTemplatesAndCreateFlow = async () => {
     if (window.confirm('Templates न बनवता flow तयार करायचा? / Create flow without new templates?')) {
       await createFlowDirectly();
     }
   };
 
-  // Create flow without waiting for templates
   const createFlowDirectly = async () => {
     try {
       const response = await axios.post(`${API_URL}/api/flows/generate-ai/`, {
@@ -168,8 +232,17 @@ const FlexibleFlowGenerator = () => {
     }
   };
 
-  const buildComponents = (requirements) => {
+  const buildComponents = (requirements, templateIndex) => {
     const components = [];
+    
+    // Header with image if needed
+    if (requirements.needs_media && templateImages[templateIndex]) {
+      components.push({
+        type: 'HEADER',
+        format: 'IMAGE',
+        // Media ID will be added by backend after upload
+      });
+    }
     
     // Body
     components.push({
@@ -181,7 +254,7 @@ const FlexibleFlowGenerator = () => {
     });
     
     // Buttons
-    if (requirements.needs_buttons && requirements.button_options) {
+    if (requirements.needs_buttons && requirements.button_options && requirements.button_options.length > 0) {
       components.push({
         type: 'BUTTONS',
         buttons: requirements.button_options.map(text => ({
@@ -219,7 +292,6 @@ const FlexibleFlowGenerator = () => {
   const allApproved = submittedTemplates.length > 0 && 
     submittedTemplates.every(t => t.status === 'APPROVED');
 
-  // Render functions
   const renderStep1 = () => (
     <div className="step-content">
       <h2>आपली आवश्यकता सांगा / Describe Your Requirements</h2>
@@ -334,6 +406,50 @@ const FlexibleFlowGenerator = () => {
                 </div>
               </div>
 
+              {/* NEW: Image Header Option */}
+              <div className="field-group image-section">
+                <div className="image-toggle">
+                  <input
+                    type="checkbox"
+                    id={`image-${index}`}
+                    checked={template.template_requirements.needs_media || false}
+                    onChange={() => toggleImageHeader(index)}
+                  />
+                  <label htmlFor={`image-${index}`}>
+                    Image Header जोडा / Add Image Header
+                  </label>
+                </div>
+
+                {template.template_requirements.needs_media && (
+                  <div className="image-upload-box">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(index, e.target.files[0])}
+                      id={`file-${index}`}
+                      style={{display: 'none'}}
+                    />
+                    <label htmlFor={`file-${index}`} className="upload-label">
+                      {templateImages[index] ? (
+                        <div className="image-preview">
+                          <img 
+                            src={URL.createObjectURL(templateImages[index])} 
+                            alt="Preview"
+                            style={{maxWidth: '200px', borderRadius: '8px'}}
+                          />
+                          <p>{templateImages[index].name}</p>
+                        </div>
+                      ) : (
+                        <div className="upload-placeholder">
+                          <span style={{fontSize: '2em'}}>📷</span>
+                          <p>Image निवडण्यासाठी क्लिक करा / Click to select image</p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                )}
+              </div>
+
               <div className="field-group">
                 <label>मजकूर / Content:</label>
                 <textarea
@@ -343,14 +459,38 @@ const FlexibleFlowGenerator = () => {
                 />
               </div>
 
-              {template.template_requirements.button_options && (
-                <div className="buttons-preview">
-                  <label>Buttons:</label>
-                  {template.template_requirements.button_options.map((btn, i) => (
-                    <span key={i} className="button-pill">{btn}</span>
-                  ))}
-                </div>
-              )}
+              {/* NEW: Editable Buttons */}
+              <div className="buttons-edit-section">
+                <label>Buttons (max 3):</label>
+                {template.template_requirements.button_options?.map((btn, btnIndex) => (
+                  <div key={btnIndex} className="button-edit-row">
+                    <input
+                      type="text"
+                      value={btn}
+                      onChange={(e) => updateButton(index, btnIndex, e.target.value)}
+                      placeholder="Button text"
+                      className="button-input"
+                    />
+                    <button
+                      onClick={() => removeButton(index, btnIndex)}
+                      className="remove-btn"
+                      title="Remove button"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                
+                {(!template.template_requirements.button_options || 
+                  template.template_requirements.button_options.length < 3) && (
+                  <button
+                    onClick={() => addButton(index)}
+                    className="add-button-btn"
+                  >
+                    + Button जोडा / Add Button
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}

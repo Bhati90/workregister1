@@ -3490,6 +3490,165 @@ def analyze_and_generate_template(request):
         }, status=500)
 
 
+@csrf_exempt
+def submit_template_to_meta(request):
+    """
+    Submits the approved template design to Meta for review.
+    Handles media upload if needed. Uses correct Meta API v23.0 format.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        # Check if it's multipart (with image) or JSON only
+        if request.content_type.startswith('multipart/form-data'):
+            # Has image upload
+            template_data_str = request.POST.get('template_data')
+            media_file = request.FILES.get('media_file')
+        else:
+            # JSON only (no image)
+            body_data = json.loads(request.body)
+            template_data_str = body_data.get('template_data')
+            media_file = None
+
+        if not template_data_str:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'template_data is missing'
+            }, status=400)
+        
+        template_data = json.loads(template_data_str)
+        
+        # Upload media to Meta if provided
+        media_id = None
+        if media_file:
+            media_id = upload_media_to_meta(media_file)
+            if not media_id:
+                logger.warning("Media upload failed, proceeding without header image")
+        
+        # Build Meta API v23.0 compliant payload
+        meta_payload = {
+            "name": template_data['name'],
+            "category": template_data['category'],
+            "language": template_data['language'],
+            "components": []
+        }
+        
+        # Process components for Meta API format
+        for component in template_data['components']:
+            meta_component = {"type": component['type']}
+            
+            if component['type'] == 'HEADER':
+                meta_component['format'] = component.get('format', 'IMAGE')
+                
+                if component['format'] == 'TEXT':
+                    meta_component['text'] = component.get('text', '')
+                elif component['format'] in ['IMAGE', 'VIDEO', 'DOCUMENT']:
+                    if media_id:
+                        meta_component['example'] = {
+                            'header_handle': [media_id]
+                        }
+                    else:
+                        logger.warning("Skipping HEADER - no media ID")
+                        continue
+            
+            elif component['type'] == 'BODY':
+                body_text = component['text']
+                meta_component['text'] = body_text
+                
+                import re
+                variables = re.findall(r'\{\{(\d+)\}\}', body_text)
+                
+                if variables and 'example' in component:
+                    example_values = component['example'].get('body_text', [[]])[0]
+                    if example_values:
+                        meta_component['example'] = {'body_text': [example_values]}
+            
+            elif component['type'] == 'FOOTER':
+                meta_component['text'] = component.get('text', '')
+            
+            elif component['type'] == 'BUTTONS':
+                meta_component['buttons'] = component.get('buttons', [])
+            
+            meta_payload['components'].append(meta_component)
+        
+        # Submit to Meta API
+        url = f"https://graph.facebook.com/v23.0/{WABA_ID}/message_templates"
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        logger.info(f"Submitting to Meta: {json.dumps(meta_payload, indent=2)}")
+        response = requests.post(url, json=meta_payload, headers=headers)
+        response_data = response.json()
+        
+        logger.info(f"Meta Response: {json.dumps(response_data, indent=2)}")
+        
+        if response.status_code == 200 and 'id' in response_data:
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Template submitted for approval',
+                'template_id': response_data.get('id'),
+                'template_name': template_data.get('name'),
+                'meta_response': response_data
+            })
+        else:
+            error_details = response_data.get('error', {})
+            error_message = error_details.get('message', 'Submission failed')
+            logger.error(f"Meta Error: {json.dumps(error_details, indent=2)}")
+            
+            return JsonResponse({
+                'status': 'error',
+                'message': error_message,
+                'meta_response': response_data,
+            }, status=response.status_code)
+            
+    except Exception as e:
+        logger.error(f"Error submitting template: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+def upload_media_to_meta(media_file):
+    """
+    Uploads an image/media file to Meta and returns the media ID.
+    """
+    try:
+        url = f"https://graph.facebook.com/v23.0/{WABA_ID}/media"
+        
+        files = {
+            'file': (media_file.name, media_file, media_file.content_type),
+        }
+        
+        data = {
+            'messaging_product': 'whatsapp',
+            'type': media_file.content_type.split('/')[0]  # 'image', 'video', etc.
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+        }
+        
+        logger.info(f"Uploading media: {media_file.name}, type: {media_file.content_type}")
+        
+        response = requests.post(url, files=files, data=data, headers=headers)
+        response_data = response.json()
+        
+        logger.info(f"Media upload response: {json.dumps(response_data, indent=2)}")
+        
+        if response.status_code == 200 and 'id' in response_data:
+            return response_data['id']
+        else:
+            logger.error(f"Media upload failed: {response_data}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error uploading media: {e}", exc_info=True)
+        return None
+
 def analyze_requirements_with_ai(requirements, existing_templates):
     """
     Uses Gemini to analyze requirements and decide whether to use existing
@@ -3614,133 +3773,6 @@ Generate ONLY valid JSON, no markdown.
     except Exception as e:
         logger.error(f"Error in AI analysis: {e}", exc_info=True)
         return None
-
-
-@csrf_exempt
-def submit_template_to_meta(request):
-    """
-    Submits the approved template design to Meta for review.
-    Handles media upload if needed. Uses correct Meta API v23.0 format.
-    """
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
-    
-    try:
-        # Get template data from request
-        body_data = json.loads(request.body)
-        
-        # The actual template data is a stringified JSON inside the 'template_data' key
-        template_data_str = body_data.get('template_data')
-
-        if not template_data_str:
-            return JsonResponse({'status': 'error', 'message': "'template_data' key is missing in the request body"}, status=400)
-        
-        # Now, we parse the nested JSON string to get the final template object
-        template_data = json.loads(template_data_str)
-        # --- FIX END ---
-        
-        # The rest of your logic remains the same...
-
-        # Handle media upload if needed (Note: media files would need to be sent via multipart/form-data)
-        # This part of the logic might need adjustment if you intend to send files along with JSON.
-        # For now, assuming media is handled separately or not at all with this endpoint.
-        media_id = None
-        # if 'media_file' in request.FILES: ... (This won't work with application/json)
-
-        # Build Meta API v23.0 compliant payload
-        meta_payload = {
-            "name": template_data['name'],
-            "category": template_data['category'],
-            "language": template_data['language'],
-            "components": []
-        }
-        
-        # Process components for Meta API format
-        for component in template_data['components']:
-            meta_component = {"type": component['type']}
-            
-            if component['type'] == 'HEADER':
-                meta_component['format'] = component['format']
-                if component['format'] == 'TEXT':
-                    meta_component['text'] = component.get('text', '')
-                elif component['format'] in ['IMAGE', 'VIDEO', 'DOCUMENT']:
-                    if media_id:
-                        meta_component['example'] = {
-                            'header_handle': [media_id]
-                        }
-                    else:
-                        logger.warning("Skipping HEADER component - no valid media ID")
-                        continue
-            
-            elif component['type'] == 'BODY':
-                body_text = component['text']
-                meta_component['text'] = body_text
-                
-                import re
-                variables = re.findall(r'\{\{(\d+)\}\}', body_text)
-                
-                if variables:
-                    if 'example' in component and component['example'].get('body_text'):
-                        example_values = component['example']['body_text'][0]
-                        if example_values and len(example_values) > 0:
-                            meta_component['example'] = {
-                                'body_text': [example_values]
-                            }
-                        else:
-                            default_examples = [f"Example {i+1}" for i in range(len(variables))]
-                            meta_component['example'] = { 'body_text': [default_examples] }
-                    else:
-                        default_examples = [f"Example {i+1}" for i in range(len(variables))]
-                        meta_component['example'] = { 'body_text': [default_examples] }
-            
-            elif component['type'] == 'FOOTER':
-                meta_component['text'] = component.get('text', '')
-            
-            elif component['type'] == 'BUTTONS':
-                meta_component['buttons'] = component.get('buttons', [])
-            
-            meta_payload['components'].append(meta_component)
-        
-        # Submit to Meta API v23.0
-        url = f"https://graph.facebook.com/v23.0/{WABA_ID}/message_templates"
-        headers = {
-            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
-            "Content-Type": "application/json"
-        }
-        
-        logger.info(f"Submitting template to Meta v23.0: {json.dumps(meta_payload, indent=2)}")
-        response = requests.post(url, json=meta_payload, headers=headers)
-        response_data = response.json()
-        
-        logger.info(f"Meta API Response: {json.dumps(response_data, indent=2)}")
-        
-        if response.status_code == 200 and 'id' in response_data:
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Template submitted for approval',
-                'template_id': response_data.get('id'),
-                'template_name': template_data.get('name'),
-                'meta_response': response_data
-            })
-        else:
-            error_details = response_data.get('error', {})
-            error_message = error_details.get('message', 'Submission failed')
-            logger.error(f"Meta API Error: {json.dumps(error_details, indent=2)}")
-            
-            return JsonResponse({
-                'status': 'error',
-                'message': error_message,
-                'meta_response': response_data,
-            }, status=response.status_code)
-            
-    except json.JSONDecodeError:
-        return JsonResponse({'status': 'error', 'message': 'Invalid JSON in request body.'}, status=400)
-    except Exception as e:
-        logger.error(f"Error submitting template: {e}", exc_info=True)
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
 
 
 
