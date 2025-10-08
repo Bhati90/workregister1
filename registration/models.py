@@ -49,6 +49,8 @@ class ChatContact(models.Model):
 #     def __str__(self):
 #         return f"{self.contact.wa_id} is at {self.current_node_id} in {self.flow.template_name}"
 
+from django.db import models
+
 class Farmer(models.Model):
     """Stores the primary information about a farmer."""
     farmer_name = models.CharField(max_length=255)
@@ -82,23 +84,56 @@ class CropDetails(models.Model):
 class Intervention(models.Model):
     """Stores each intervention activity for a specific crop cycle."""
     INTERVENTION_CHOICES = [
-        ('Fertilizer', 'Fertilizer'),
-        ('Pesticide', 'Pesticide'),
+        ('Fertilizer', 'Fertilizer Application'),
+        ('Pesticide', 'Pesticide Spray'),
         ('Pruning/Weeding', 'Pruning/Weeding'),
+        ('Irrigation', 'Irrigation'),
+        ('Harvesting', 'Harvesting Activity'),
         ('Other', 'Other'),
     ]
 
     crop_details = models.ForeignKey(CropDetails, on_delete=models.CASCADE, related_name='interventions')
+    
+    # Basic intervention info
     intervention_type = models.CharField(max_length=50, choices=INTERVENTION_CHOICES)
     date = models.DateField()
-    product_used = models.CharField(max_length=255)
+    day_number_from_planting = models.IntegerField(blank=True,help_text="Days since seeding date")
+    
+    # Activity details
+    activity_name = models.CharField(blank=True,max_length=255, help_text="Specific activity name")
+    
+    # Input values
+    main_input_values = models.CharField(max_length=255, help_text="Primary input (e.g., Urea - 5kg)")
+    secondary_input_values = models.TextField(blank=True, help_text="Additional inputs (comma-separated)")
+    
+    # Instructions and details
+    how_to_do_it = models.TextField(help_text="Step-by-step instructions")
+    
+    
+    # Cost information
+    price_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost in INR")
+    product_catalog_brand = models.CharField(max_length=255, blank=True, help_text="Brand/catalog name")
+    
+    # Purpose
+    purpose_goal = models.TextField(help_text="Purpose or expected outcome")
+    
+    # Legacy field for backward compatibility
+    product_used = models.CharField(max_length=255, blank=True)
     notes = models.TextField(blank=True)
 
     class Meta:
-        ordering = ['date'] # Ensures interventions are ordered by date
+        ordering = ['date']
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate day_number_from_planting if not provided
+        if not self.day_number_from_planting and self.crop_details:
+            delta = self.date - self.crop_details.seeding_date
+            self.day_number_from_planting = delta.days
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.intervention_type} on {self.date} for {self.crop_details.crop_name}"
+        return f"{self.activity_name} on Day {self.day_number_from_planting} for {self.crop_details.crop_name}"
+    
 
 class Flow(models.Model):
     """Stores the JSON definition of a flow created in React Flow."""
