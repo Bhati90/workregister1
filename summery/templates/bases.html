@@ -1,0 +1,258 @@
+<!-- summary/templates/summary/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Analytics Dashboard{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    
+    <style>
+        :root {
+            --sidebar-width: 250px;
+            --primary-color: #4f46e5;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #06b6d4;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            padding: 20px 0;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar .brand {
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+            padding: 0 20px 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .sidebar .nav-link {
+            color: #cbd5e1;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+        
+        .sidebar .nav-link:hover {
+            background: rgba(255,255,255,0.05);
+            color: white;
+            border-left-color: var(--primary-color);
+        }
+        
+        .sidebar .nav-link.active {
+            background: rgba(79, 70, 229, 0.1);
+            color: white;
+            border-left-color: var(--primary-color);
+        }
+        
+        .sidebar .nav-link i {
+            margin-right: 12px;
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 30px;
+            min-height: 100vh;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 100%;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .stat-card .icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+        
+        .stat-card h3 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0;
+            color: #1e293b;
+        }
+        
+        .stat-card p {
+            color: #64748b;
+            margin: 8px 0 0;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .trend-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        
+        .trend-up {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .trend-down {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .trend-stable {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        
+        .alert-badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .badge-critical { background: #fef2f2; color: #991b1b; }
+        .badge-high { background: #fff7ed; color: #9a3412; }
+        .badge-medium { background: #fef9c3; color: #854d0e; }
+        .badge-low { background: #dbeafe; color: #1e40af; }
+        .badge-info { background: #f0fdf4; color: #166534; }
+        
+        .page-header {
+            margin-bottom: 30px;
+        }
+        
+        .page-header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+        
+        .page-header p {
+            color: #64748b;
+            margin: 8px 0 0;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+            }
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="brand">
+            <i class="bi bi-bar-chart-line"></i> Analytics
+        </div>
+        <nav class="nav flex-column">
+            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a class="nav-link {% if 'daily' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'daily_summary_list' %}">
+                <i class="bi bi-calendar-day"></i> Daily Summaries
+            </a>
+            <a class="nav-link {% if 'performance' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'performance_metrics' %}">
+                <i class="bi bi-graph-up"></i> Performance
+            </a>
+            <a class="nav-link {% if 'growth' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'growth_metrics' %}">
+                <i class="bi bi-arrow-up-circle"></i> Growth
+            </a>
+            <a class="nav-link {% if 'geographic' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'geographic_performance' %}">
+                <i class="bi bi-geo-alt"></i> Geographic
+            </a>
+            <a class="nav-link {% if 'alert' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'alert_list' %}">
+                <i class="bi bi-exclamation-triangle"></i> Alerts
+            </a>
+            <a class="nav-link {% if 'anomal' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'anomaly_list' %}">
+                <i class="bi bi-lightning"></i> Anomalies
+            </a>
+            <a class="nav-link {% if 'trend' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'trend_analysis' %}">
+                <i class="bi bi-graph-up-arrow"></i> Trends
+            </a>
+            <a class="nav-link {% if 'benchmark' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'benchmark_comparison' %}">
+                <i class="bi bi-bullseye"></i> Benchmarks
+            </a>
+            <a class="nav-link {% if 'inventory' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory_update_dashboard' %}">
+                <i class="bi bi-bullseye"></i> inventory update
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

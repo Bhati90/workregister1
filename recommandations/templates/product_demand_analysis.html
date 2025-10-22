@@ -1,0 +1,607 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if current_language == 'mr' %}उत्पादन मागणी विश्लेषण{% else %}Product Demand Analysis{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-chart-line"></i>
+            {% if current_language == 'mr' %}उत्पादन मागणी विश्लेषण{% else %}Product Demand Analysis{% endif %}
+        </h2>
+        <a href="{% url 'product_recommendations' %}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left"></i>
+            {% if current_language == 'mr' %}शिफारसींवर परत या{% else %}Back to Recommendations{% endif %}
+        </a>
+    </div>
+
+    <!-- Language Toggle -->
+    <div class="language-toggle">
+        <a href="{% url 'advisory_set_language' 'en' %}" class="lang-btn {% if current_language == 'en' %}active{% endif %}">
+            <i class="fas fa-language"></i> English
+        </a>
+        <a href="{% url 'advisory_set_language' 'mr' %}" class="lang-btn {% if current_language == 'mr' %}active{% endif %}">
+            <i class="fas fa-language"></i> मराठी
+        </a>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-2 col-6 mb-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ summary.total_products }}</div>
+                <div class="stats-label">
+                    {% if current_language == 'mr' %}एकूण उत्पादने{% else %}Total Products{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="stats-card" style="border-left: 4px solid #dc3545;">
+                <div class="stats-number" style="color: #dc3545;">{{ summary.out_of_stock }}</div>
+                <div class="stats-label">
+                    {% if current_language == 'mr' %}स्टॉक संपला{% else %}Out of Stock{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="stats-card" style="border-left: 4px solid #ff9800;">
+                <div class="stats-number" style="color: #ff9800;">{{ summary.insufficient }}</div>
+                <div class="stats-label">
+                    {% if current_language == 'mr' %}अपुरा स्टॉक{% else %}Insufficient{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="stats-card" style="border-left: 4px solid #ffc107;">
+                <div class="stats-number" style="color: #ffc107;">{{ summary.low_stock }}</div>
+                <div class="stats-label">
+                    {% if current_language == 'mr' %}कमी स्टॉक{% else %}Low Stock{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ summary.total_farmers }}</div>
+                <div class="stats-label">
+                    {% if current_language == 'mr' %}शेतकरी{% else %}Farmers{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+            <div class="stats-card" style="border-left: 4px solid #dc3545;">
+                <div class="stats-number" style="color: #dc3545;">{{ summary.urgent_tasks }}</div>
+                <div class="stats-label">
+                    {% if current_language == 'mr' %}तातडीची{% else %}Urgent{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-card mb-4">
+        <form method="GET">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}कालावधी{% else %}Time Period{% endif %}
+                    </label>
+                    <select class="form-select" name="days_ahead">
+                        <option value="3" {% if filters.days_ahead == '3' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}पुढील ३ दिवस{% else %}Next 3 Days{% endif %}
+                        </option>
+                        <option value="7" {% if filters.days_ahead == '7' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}पुढील ७ दिवस{% else %}Next 7 Days{% endif %}
+                        </option>
+                        <option value="14" {% if filters.days_ahead == '14' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}पुढील १४ दिवस{% else %}Next 14 Days{% endif %}
+                        </option>
+                        <option value="30" {% if filters.days_ahead == '30' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}पुढील ३० दिवस{% else %}Next 30 Days{% endif %}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}उत्पादन{% else %}Product{% endif %}
+                    </label>
+                    <select class="form-select" name="product">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        {% for product in all_products %}
+                        <option value="{{ product.id }}" {% if filters.product == product.id|stringformat:"s" %}selected{% endif %}>
+                            {{ product.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}स्टॉक स्थिती{% else %}Stock Status{% endif %}
+                    </label>
+                    <select class="form-select" name="stock_status">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        <option value="out" {% if filters.stock_status == 'out' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}स्टॉक संपला{% else %}Out of Stock{% endif %}
+                        </option>
+                        <option value="insufficient" {% if filters.stock_status == 'insufficient' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}अपुरा{% else %}Insufficient{% endif %}
+                        </option>
+                        <option value="low" {% if filters.stock_status == 'low' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}कमी{% else %}Low Stock{% endif %}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}शेतकरी{% else %}Farmer{% endif %}
+                    </label>
+                    <select class="form-select" name="farmer">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        {% for farmer in farmers %}
+                        <option value="{{ farmer.id }}" {% if filters.farmer == farmer.id|stringformat:"s" %}selected{% endif %}>
+                            {{ farmer.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}क्रमवारी{% else %}Sort By{% endif %}
+                    </label>
+                    <select class="form-select" name="sort">
+                        <option value="urgency" {% if filters.sort == 'urgency' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}तातडी{% else %}Urgency{% endif %}
+                        </option>
+                        <option value="shortage" {% if filters.sort == 'shortage' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}कमतरता{% else %}Shortage{% endif %}
+                        </option>
+                        <option value="farmers" {% if filters.sort == 'farmers' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}शेतकरी संख्या{% else %}Farmer Count{% endif %}
+                        </option>
+                        <option value="name" {% if filters.sort == 'name' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}नाव{% else %}Name{% endif %}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-1">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Products List -->
+    <div class="row">
+        {% if products %}
+            {% for product in products %}
+            <div class="col-12 mb-3">
+                <div class="card product-demand-card">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <!-- Product Info -->
+                            <div class="col-md-3">
+                                <h5 class="mb-1">{{ product.name }}</h5>
+                                <p class="text-muted mb-1">
+                                    <small>{{ product.company.name }}</small>
+                                </p>
+                                <span class="badge bg-secondary">{{ product.category.name }}</span>
+                            </div>
+
+                            <!-- Demand Info -->
+                            <div class="col-md-3">
+                                <div class="demand-stats">
+                                    <div class="mb-2">
+                                        <i class="fas fa-users text-primary"></i>
+                                        <strong>{{ product.demand_info.farmer_count }}</strong>
+                                        {% if current_language == 'mr' %}शेतकरी{% else %}Farmers{% endif %}
+                                    </div>
+                                    <div class="mb-2">
+                                        <i class="fas fa-tasks text-info"></i>
+                                        <strong>{{ product.demand_info.task_count }}</strong>
+                                        {% if current_language == 'mr' %}कार्ये{% else %}Tasks{% endif %}
+                                    </div>
+                                    <div>
+                                        {% for unit, qty in product.demand_info.total_quantity.items %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-weight"></i> {{ qty|floatformat:2 }} {{ unit }}
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Stock Info -->
+                            <div class="col-md-3">
+    <div class="stock-info">
+        <div class="mb-2">
+            <strong>
+                {% if current_language == 'mr' %}आवश्यक:{% else %}Required:{% endif %}
+            </strong>
+            <span class="text-primary">
+                {{ product.demand_info.primary_quantity|floatformat:2 }} {{ product.demand_info.primary_unit }}
+            </span>
+        </div>
+        
+        <div class="mb-2">
+            <strong>
+                {% if current_language == 'mr' %}उपलब्ध:{% else %}Available:{% endif %}
+            </strong>
+            <span class="{% if product.demand_info.stock_status == 'OUT_OF_STOCK' %}text-danger{% elif product.demand_info.stock_status == 'INSUFFICIENT' %}text-warning{% else %}text-success{% endif %}">
+                {{ product.demand_info.total_stock_primary|floatformat:2 }} {{ product.demand_info.primary_unit }}
+            </span>
+        </div>
+        
+        {% if product.demand_info.shortage > 0 %}
+        <div class="alert alert-danger py-1 px-2 mb-0">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>{% if current_language == 'mr' %}कमतरता:{% else %}Shortage:{% endif %}</strong>
+            {{ product.demand_info.shortage|floatformat:2 }} {{ product.demand_info.primary_unit }}
+        </div>
+        {% else %}
+        <!-- <div class="alert alert-success py-1 px-2 mb-0">
+            <i class="fas fa-check-circle"></i>
+            <strong>{% if current_language == 'mr' %}पुरेसा{% else %}Sufficient{% endif %}</strong>
+        </div> -->
+        
+        {% endif %}
+    </div>
+</div>
+
+<!-- Update the expandable details section -->
+<div class="collapse mt-3" id="details-{{ product.id }}">
+    <!-- **NEW: SKU Recommendations Section** -->
+    {% if product.demand_info.sku_recommendations %}
+    <div class="card mb-3 border-primary">
+        <div class="card-header bg-primary text-white">
+            <h6 class="mb-0">
+                <i class="fas fa-box"></i>
+                {% if current_language == 'mr' %}शिफारस केलेले SKU (पॅकिंग आकार){% else %}Recommended SKUs (Pack Sizes){% endif %}
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for sku_option in product.demand_info.sku_recommendations %}
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100 {% if not sku_option.in_stock %}border-danger{% elif forloop.first %}border-success{% endif %}">
+                        <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start mb-2">
+        <h6 class="mb-0">
+            <i class="fas fa-cube"></i>
+            {{ sku_option.sku.size }}
+            {% if forloop.first %}
+            <span class="badge bg-success ms-2">{% if current_language == 'mr' %}सर्वोत्तम{% else %}Best{% endif %}</span>
+            {% endif %}
+        </h6>
+        <span class="badge {% if sku_option.in_stock %}bg-success{% else %}bg-danger{% endif %}">
+            {% if sku_option.in_stock %}
+                {% if current_language == 'mr' %}स्टॉकमध्ये{% else %}In Stock{% endif %}
+            {% else %}
+                {% if current_language == 'mr' %}कमतरता{% else %}Shortage{% endif %}
+            {% endif %}
+        </span>
+    </div>
+    
+    <div class="sku-details">
+        <div class="row mb-2">
+            <div class="col-6">
+                <small class="text-muted">
+                    {% if current_language == 'mr' %}एकूण युनिट:{% else %}Total Units:{% endif %}
+                </small>
+                <div class="fw-bold text-primary" style="font-size: 1.2rem;">
+                    {{ sku_option.units_needed }} packs
+                </div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">
+                    {% if current_language == 'mr' %}स्टॉक:{% else %}Stock:{% endif %}
+                </small>
+                <div class="fw-bold {% if sku_option.in_stock %}text-success{% else %}text-danger{% endif %}" style="font-size: 1.2rem;">
+                    {{ sku_option.stock_available }} packs
+                </div>
+            </div>
+        </div>
+        
+        <!-- **NEW: Per-Farmer Breakdown**
+        {% if sku_option.farmer_details %}
+        <div class="alert alert-info py-2 px-2 mb-2">
+            <small>
+                <strong>
+                    <i class="fas fa-info-circle"></i>
+                    {% if current_language == 'mr' %}शेतकरी-निहाय:{% else %}Per Farmer:{% endif %}
+                </strong>
+            </small>
+            <div class="mt-1">
+                {% for farmer_detail in sku_option.farmer_details %}
+                <small class="d-block">
+                    • {{ farmer_detail.farmer.name }}: 
+                    <strong>{{ farmer_detail.units_needed }} pack{% if farmer_detail.units_needed > 1 %}s{% endif %}</strong>
+                    (needs {{ farmer_detail.quantity_needed|floatformat:2 }} {{ product.demand_info.primary_unit }})
+                </small>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %} -->
+        
+        <div class="row mb-2">
+            <div class="col-12">
+                <small class="text-muted">
+                    {% if current_language == 'mr' %}एकूण प्रदान:{% else %}Total Provided:{% endif %}
+                </small>
+                <div class="fw-bold">
+                    {{ sku_option.total_quantity_provided_base|floatformat:2 }} {{ sku_option.base_unit }}
+                </div>
+            </div>
+        </div>
+        
+        {% if sku_option.waste_percentage > 5 %}
+        <div class="alert alert-warning py-1 px-2 mb-2">
+            <small>
+                <i class="fas fa-info-circle"></i>
+                {% if current_language == 'mr' %}
+                    अतिरिक्त: {{ sku_option.waste_percentage|floatformat:1 }}%
+                {% else %}
+                    Surplus: {{ sku_option.waste_percentage|floatformat:1 }}%
+                {% endif %}
+            </small>
+        </div>
+        {% endif %}
+        
+        {% if not sku_option.in_stock %}
+        <div class="alert alert-danger py-1 px-2 mb-2">
+            <small>
+                <i class="fas fa-exclamation-triangle"></i>
+                {% if current_language == 'mr' %}
+                    {{ sku_option.stock_shortage }} युनिट कमी
+                {% else %}
+                    Short by {{ sku_option.stock_shortage }} packs
+                {% endif %}
+            </small>
+        </div>
+        {% endif %}
+        
+        {% if sku_option.sku.price %}
+        <div class="mt-2 pt-2 border-top">
+            <small class="text-muted">
+                {% if current_language == 'mr' %}एकूण किंमत:{% else %}Total Cost:{% endif %}
+            </small>
+            <div class="fw-bold text-success">
+                ₹{{ sku_option.sku.price|floatformat:2 }} × {{ sku_option.units_needed }} = 
+                ₹{% widthratio sku_option.sku.price 1 sku_option.units_needed %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+  
+    <!-- Farmer-wise Breakdown -->
+    <!-- <h6 class="mb-3">
+        <i class="fas fa-users"></i>
+        {% if current_language == 'mr' %}शेतकरी-निहाय आवश्यकता{% else %}Farmer-wise Requirements{% endif %}
+    </h6>
+    
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>{% if current_language == 'mr' %}शेतकरी{% else %}Farmer{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}शेताचा आकार{% else %}Farm Size{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}एकूण आवश्यकता{% else %}Total Required{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}कार्ये{% else %}Tasks{% endif %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for farmer_data in product.demand_info.farmer_breakdown %}
+                <tr>
+                    <td><strong>{{ farmer_data.farmer.name }}</strong></td>
+                    <td>
+                        <span class="badge bg-info">
+                            {{ farmer_data.farmer.farm_size }} {{ farmer_data.farmer.get_farm_size_unit_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <strong class="text-primary">
+                            {{ farmer_data.total_needed|floatformat:2 }} {{ farmer_data.unit }}
+                        </strong>
+                    </td>
+                    <td>{{ farmer_data.tasks|length }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <td colspan="2"><strong>{% if current_language == 'mr' %}एकूण{% else %}TOTAL{% endif %}</strong></td>
+                    <td colspan="2">
+                        <strong class="text-success">
+                            {{ product.demand_info.primary_quantity|floatformat:2 }} {{ product.demand_info.primary_unit }}
+                        </strong>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div> -->
+
+    <!-- Task-wise Details -->
+    <h6 class="mb-3">
+        <i class="fas fa-tasks"></i>
+        {% if current_language == 'mr' %}कार्य तपशील{% else %}Task Details{% endif %}
+    </h6>
+    
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>{% if current_language == 'mr' %}शेतकरी{% else %}Farmer{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}टप्पा{% else %}Stage{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}तारीख{% else %}Date{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}शेताचा आकार{% else %}Farm Size{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}प्रति एकर{% else %}Per Acre{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}एकूण आवश्यक{% else %}Total Needed{% endif %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task_info in product.demand_info.tasks %}
+                <tr>
+                    <td>{{ task_info.farmer.name }}</td>
+                    <td>{{ task_info.task.schedule_task.stage_name }}</td>
+                    <td>{{ task_info.task.planned_start_date|date:"d M, Y" }}</td>
+                    <td>{{ task_info.farm_size }} {{ task_info.farm_unit }}</td>
+                    <td>{{ task_info.dosage_per_area }} {{ task_info.unit }}</td>
+                    <td>
+                        <strong class="text-primary">
+                            {{ task_info.actual_quantity|floatformat:2 }} {{ task_info.unit }}
+                        </strong>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+
+                            <!-- Urgency Breakdown -->
+                            <div class="col-md-3">
+                                <div class="urgency-breakdown">
+                                    <div class="mb-1">
+                                        <span class="badge bg-danger">
+                                            {{ product.demand_info.urgency.urgent }}
+                                        </span>
+                                        {% if current_language == 'mr' %}तातडीचे{% else %}Urgent{% endif %}
+                                    </div>
+                                    <div class="mb-1">
+                                        <span class="badge bg-warning">
+                                            {{ product.demand_info.urgency.this_week }}
+                                        </span>
+                                        {% if current_language == 'mr' %}या आठवड्यात{% else %}This Week{% endif %}
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-secondary">
+                                            {{ product.demand_info.urgency.later }}
+                                        </span>
+                                        {% if current_language == 'mr' %}नंतर{% else %}Later{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Expandable Farmer Details -->
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#details-{{ product.id }}">
+                                <i class="fas fa-info-circle"></i>
+                                {% if current_language == 'mr' %}तपशील पहा{% else %}View Details{% endif %}
+                            </button>
+                        </div>
+
+                        <!-- <div class="collapse mt-3" id="details-{{ product.id }}">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>{% if current_language == 'mr' %}शेतकरी{% else %}Farmer{% endif %}</th>
+                                            <th>{% if current_language == 'mr' %}टप्पा{% else %}Stage{% endif %}</th>
+                                            <th>{% if current_language == 'mr' %}तारीख{% else %}Date{% endif %}</th>
+                                            <th>{% if current_language == 'mr' %}मात्रा{% else %}Quantity{% endif %}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for task_info in product.demand_info.tasks %}
+                                        <tr>
+                                            <td>{{ task_info.task.farmer_crop_cycle.farmer.name }}</td>
+                                            <td>{{ task_info.task.schedule_task.stage_name }}</td>
+                                            <td>{{ task_info.task.planned_start_date|date:"d M, Y" }}</td>
+                                            <td>{{ task_info.dosage }} {{ task_info.unit }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div> -->
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox" style="font-size: 64px; color: #ccc;"></i>
+                    <h4 class="mt-3">
+                        {% if current_language == 'mr' %}मागणी नाही{% else %}No Demand Found{% endif %}
+                    </h4>
+                    <p class="text-muted">
+                        {% if current_language == 'mr' %}
+                            निवडलेल्या फिल्टरसाठी कोणतीही मागणी नाही
+                        {% else %}
+                            No product demand for the selected filters
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.product-demand-card {
+    border-left: 4px solid #007bff;
+    transition: all 0.3s;
+}
+
+.product-demand-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.demand-stats i {
+    width: 20px;
+}
+
+.sku-details {
+    font-size: 0.9rem;
+}
+
+.sku-details .row {
+    margin-left: -5px;
+    margin-right: -5px;
+}
+
+.sku-details .col-6 {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.card.border-success {
+    border-width: 2px;
+}
+
+.card.border-danger {
+    border-width: 2px;
+}
+
+.stock-info {
+    font-size: 0.95rem;
+}
+
+.urgency-breakdown .badge {
+    min-width: 30px;
+    display: inline-block;
+}
+</style>
+{% endblock %}

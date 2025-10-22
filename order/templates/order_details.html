@@ -1,0 +1,672 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .order-header {
+        background: linear-gradient(135deg, var(--primary-color) 0%, #2d4a32 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+    }
+    
+    .order-number {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    
+    .detail-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+    
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+    
+    .info-item {
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .info-label {
+        font-size: 12px;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    
+    .info-value {
+        font-size: 16px;
+        color: #2d3748;
+        font-weight: 600;
+    }
+    
+    .status-badge {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-confirmed { background: #d1ecf1; color: #0c5460; }
+    .status-shipped { background: #d4edda; color: #155724; }
+    .status-delivered { background: #28a745; color: white; }
+    .status-completed { background: #28a745; color: white; }
+    .status-cancelled { background: #f8d7da; color: #721c24; }
+    
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .items-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 13px;
+    }
+    
+    .items-table td {
+        padding: 15px 12px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .stock-impact-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    
+    .stock-impact-table th {
+        background: #fff3cd;
+        padding: 10px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .stock-impact-table td {
+        padding: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .stock-warning {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    
+    .stock-ok {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 8px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e9ecef;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -22px;
+        top: 20px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        border: 2px solid white;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .modal-content {
+        border-radius: 12px;
+    }
+    
+    .notification-preview {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+        border-left: 4px solid var(--primary-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Order Header -->
+    <div class="order-header">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="order-number">{{ order.order_number }}</div>
+                <div class="mb-2">
+                    <span class="status-badge status-{{ order.status|lower }}">
+                        {{ order.get_status_display }}
+                    </span>
+                    <span class="status-badge status-{{ order.payment_status|lower|cut:'_' }}" style="margin-left: 10px;">
+                        {{ order.get_payment_status_display }}
+                    </span>
+                </div>
+                <div style="opacity: 0.9;">
+                    <i class="far fa-calendar"></i> {{ order.created_at|date:"d M, Y h:i A" }}
+                </div>
+            </div>
+            <div class="text-end">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Total Amount</div>
+                <div style="font-size: 36px; font-weight: 700;">₹{{ order.total_amount }}</div>
+                {% if order.get_pending_amount > 0 %}
+                <div style="font-size: 14px; opacity: 0.9;">Pending: ₹{{ order.get_pending_amount }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="detail-card">
+        <div class="action-buttons">
+            <a href="{% url 'order_edit' order.pk %}" class="btn btn-primary">
+                <i class="fas fa-edit"></i> Edit Order
+            </a>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#statusModal">
+                <i class="fas fa-exchange-alt"></i> Update Status
+            </button>
+            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                <i class="fas fa-rupee-sign"></i> Add Payment
+            </button>
+            <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#notificationModal">
+                <i class="fas fa-bell"></i> Send Notification
+            </button>
+            {% if order.can_update_inventory %}
+            <form method="POST" action="{% url 'order_complete' order.pk %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger" onclick="return confirm('This will deduct stock from inventory. Continue?')">
+                    <i class="fas fa-warehouse"></i> Complete & Update Inventory
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Farmer Details -->
+            <div class="detail-card">
+                <h3 class="section-title">
+                    <i class="fas fa-user"></i> Farmer Details
+                </h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Name</div>
+                        <div class="info-value">{{ order.farmer.name }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Phone</div>
+                        <div class="info-value">{{ order.farmer.phone }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Village</div>
+                        <div class="info-value">{{ order.farmer.village }}, {{ order.farmer.taluka }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">District</div>
+                        <div class="info-value">{{ order.farmer.district }}</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <strong>Delivery Address:</strong><br>
+                    {{ order.delivery_address }}
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="detail-card">
+                <h3 class="section-title">
+                    <i class="fas fa-boxes"></i> Order Items
+                </h3>
+                <div class="table-responsive">
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Size</th>
+                                <th>Quantity</th>
+                                <th>Unit Price</th>
+                                <th>Discount</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order.items.all %}
+                            <tr>
+                                <td><strong>{{ item.sku.product.name }}</strong></td>
+                                <td>{{ item.sku.size }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>₹{{ item.unit_price }}</td>
+                                <td>₹{{ item.discount }}</td>
+                                <td><strong>₹{{ item.total_price }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot style="background: #f8f9fa; font-weight: 600;">
+                            <tr>
+                                <td colspan="5" class="text-end">Subtotal:</td>
+                                <td>₹{{ order.subtotal }}</td>
+                            </tr>
+                            {% if order.discount > 0 %}
+                            <tr>
+                                <td colspan="5" class="text-end">Discount:</td>
+                                <td>- ₹{{ order.discount }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if order.tax > 0 %}
+                            <tr>
+                                <td colspan="5" class="text-end">Tax:</td>
+                                <td>₹{{ order.tax }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if order.delivery_charges > 0 %}
+                            <tr>
+                                <td colspan="5" class="text-end">Delivery Charges:</td>
+                                <td>₹{{ order.delivery_charges }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr style="font-size: 18px;">
+                                <td colspan="5" class="text-end">Total:</td>
+                                <td>₹{{ order.total_amount }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Stock Impact (if not updated) -->
+            {% if stock_impact %}
+            <div class="detail-card" style="border: 2px solid #ffc107;">
+                <h3 class="section-title">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> Projected Stock Impact
+                </h3>
+                <p class="text-muted">When this order is completed, the following stock changes will occur:</p>
+                <table class="stock-impact-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Size</th>
+                            <th>Current Stock</th>
+                            <th>Order Qty</th>
+                            <th>After Fulfillment</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for impact in stock_impact %}
+                        <tr>
+                            <td>{{ impact.product_name }}</td>
+                            <td>{{ impact.size }}</td>
+                            <td>{{ impact.current_stock }}</td>
+                            <td>{{ impact.order_quantity }}</td>
+                            <td>
+                                <strong class="{% if impact.projected_stock < 0 %}stock-warning{% else %}stock-ok{% endif %}">
+                                    {{ impact.projected_stock }}
+                                </strong>
+                            </td>
+                            <td>
+                                {% if impact.projected_stock < 0 %}
+                                <span class="badge bg-danger">Insufficient Stock</span>
+                                {% elif impact.projected_stock <= impact.sku.reorder_level %}
+                                <span class="badge bg-warning">Low Stock Warning</span>
+                                {% else %}
+                                <span class="badge bg-success">OK</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <!-- Status History -->
+            <div class="detail-card">
+                <h3 class="section-title">
+                    <i class="fas fa-history"></i> Status History
+                </h3>
+                <div class="timeline">
+                    {% for history in order.status_history.all %}
+                    <div class="timeline-item">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>
+                                    {% if history.old_status %}
+                                        {{ history.old_status }} → {{ history.new_status }}
+                                    {% else %}
+                                        Status: {{ history.new_status }}
+                                    {% endif %}
+                                </strong>
+                                {% if history.notification_sent %}
+                                <span class="badge bg-success ms-2">
+                                    <i class="fas fa-check"></i> Notified
+                                </span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">{{ history.created_at|date:"d M, Y h:i A" }}</small>
+                        </div>
+                        {% if history.notes %}
+                        <div class="text-muted mt-2">{{ history.notes }}</div>
+                        {% endif %}
+                        {% if history.changed_by %}
+                        <small class="text-muted">by {{ history.changed_by.username }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Quick Info -->
+            <div class="detail-card">
+                <h3 class="section-title">
+                    <i class="fas fa-info-circle"></i> Order Info
+                </h3>
+                <div class="info-item mb-2">
+                    <div class="info-label">Created By</div>
+                    <div class="info-value">{{ order.created_by.username|default:"System" }}</div>
+                </div>
+                <div class="info-item mb-2">
+                    <div class="info-label">Assigned To</div>
+                    <div class="info-value">{{ order.assigned_to.username|default:"Unassigned" }}</div>
+                </div>
+                <div class="info-item mb-2">
+                    <div class="info-label">Payment Method</div>
+                    <div class="info-value">{{ order.get_payment_method_display }}</div>
+                </div>
+                {% if order.expected_delivery_date %}
+                <div class="info-item mb-2">
+                    <div class="info-label">Expected Delivery</div>
+                    <div class="info-value">{{ order.expected_delivery_date|date:"d M, Y" }}</div>
+                </div>
+                {% endif %}
+                {% if order.tracking_number %}
+                <div class="info-item mb-2">
+                    <div class="info-label">Tracking Number</div>
+                    <div class="info-value">{{ order.tracking_number }}</div>
+                </div>
+                {% endif %}
+                <div class="info-item mb-2">
+                    <div class="info-label">Inventory Updated</div>
+                    <div class="info-value">
+                        {% if order.inventory_updated %}
+                        <span class="badge bg-success">Yes</span>
+                        {% else %}
+                        <span class="badge bg-warning">No</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment History -->
+            <div class="detail-card">
+                <h3 class="section-title">
+                    <i class="fas fa-rupee-sign"></i> Payments
+                </h3>
+                {% if order.payments.all %}
+                    {% for payment in order.payments.all %}
+                    <div class="info-item mb-2">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="info-value">₹{{ payment.amount }}</div>
+                                <small class="text-muted">{{ payment.get_payment_method_display }}</small>
+                            </div>
+                            <small class="text-muted">{{ payment.payment_date|date:"d M, Y" }}</small>
+                        </div>
+                        {% if payment.transaction_id %}
+                        <small class="text-muted">ID: {{ payment.transaction_id }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <strong>Total Paid:</strong>
+                        <strong>₹{{ order.paid_amount }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-danger">
+                        <strong>Pending:</strong>
+                        <strong>₹{{ order.get_pending_amount }}</strong>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No payments recorded yet</p>
+                {% endif %}
+            </div>
+
+            <!-- Notifications Sent -->
+            <div class="detail-card">
+                <h3 class="section-title">
+                    <i class="fas fa-bell"></i> Notifications
+                </h3>
+                {% if order.notifications.all %}
+                    {% for notification in order.notifications.all %}
+                    <div class="info-item mb-2">
+                        <div class="info-label">{{ notification.notification_type }}</div>
+                        <div class="text-muted small">{{ notification.sent_at|date:"d M, Y h:i A" }}</div>
+                        <span class="badge bg-{% if notification.is_sent %}success{% else %}warning{% endif %}">
+                            {{ notification.delivery_status }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">No notifications sent yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Update Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'order_update_status' order.pk %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Order Status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">New Status</label>
+                        <select name="status" class="form-select" required>
+                            {% for status_code, status_name in order.ORDER_STATUS %}
+                            <option value="{{ status_code }}" {% if status_code == order.status %}selected{% endif %}>
+                                {{ status_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="send_notification" class="form-check-input" id="sendNotif" checked>
+                        <label class="form-check-label" for="sendNotif">
+                            Send notification to farmer
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'order_add_payment' order.pk %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Amount</label>
+                        <input type="number" name="amount" class="form-control" step="0.01" 
+                               max="{{ order.get_pending_amount }}" required>
+                        <small class="text-muted">Pending: ₹{{ order.get_pending_amount }}</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Payment Method</label>
+                        <select name="payment_method" class="form-select" required>
+                            {% for method_code, method_name in order.PAYMENT_METHOD %}
+                            <option value="{{ method_code }}">{{ method_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Transaction ID</label>
+                        <input type="text" name="transaction_id" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Add Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Send Notification Modal -->
+<div class="modal fade" id="notificationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'order_send_notification' order.pk %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Send Notification</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Template</label>
+                        <select class="form-select" id="templateSelect" onchange="previewTemplate()">
+                            <option value="">Custom Message</option>
+                            {% for template in notification_templates %}
+                            <option value="{{ template.id }}">{{ template.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Language</label>
+                        <select name="language" class="form-select" id="languageSelect" onchange="previewTemplate()">
+                            <option value="en">English</option>
+                            <option value="mr">Marathi</option>
+                        </select>
+                    </div>
+                    <div id="preview" class="notification-preview" style="display: none;">
+                        <h6>Preview:</h6>
+                        <div id="previewContent"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Subject</label>
+                        <input type="text" name="subject" class="form-control" id="subjectInput" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message</label>
+                        <textarea name="message" class="form-control" rows="5" id="messageInput" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Send Notification</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function previewTemplate() {
+    const templateId = document.getElementById('templateSelect').value;
+    const language = document.getElementById('languageSelect').value;
+    
+    if (!templateId) {
+        document.getElementById('preview').style.display = 'none';
+        return;
+    }
+    
+    fetch(`/orders/{{ order.pk }}/preview-notification/?template_id=${templateId}&language=${language}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('preview').style.display = 'block';
+                document.getElementById('previewContent').innerHTML = 
+                    '<strong>Subject:</strong> ' + data.subject + '<br><br>' +
+                    '<strong>Message:</strong><br>' + data.message.replace(/\n/g, '<br>');
+                document.getElementById('subjectInput').value = data.subject;
+                document.getElementById('messageInput').value = data.message;
+            }
+        });
+}
+</script>
+{% endblock %}

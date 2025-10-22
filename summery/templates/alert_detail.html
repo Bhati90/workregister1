@@ -1,0 +1,208 @@
+
+{% extends 'bases.html' %}
+
+{% block title %}Alert Detail{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'alert_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to Alerts
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- Alert Details -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="alert-badge badge-{{ alert.severity|lower }}">{{ alert.get_severity_display }}</span>
+                        <span class="badge bg-info text-white ms-2">{{ alert.get_status_display }}</span>
+                    </div>
+                    <small class="text-muted">{{ alert.created_at|date:"M d, Y H:i" }}</small>
+                </div>
+            </div>
+            <div class="card-body">
+                <h3 class="mb-3">{{ alert.title }}</h3>
+                <p class="lead text-muted">{{ alert.description }}</p>
+
+                <hr class="my-4">
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Category</h6>
+                        <p class="mb-0">
+                            <span class="badge bg-light text-dark">{{ alert.get_category_display }}</span>
+                        </p>
+                    </div>
+                    {% if alert.entity_name %}
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Related Entity</h6>
+                        <p class="mb-0">{{ alert.entity_name }} <small class="text-muted">({{ alert.entity_type }})</small></p>
+                    </div>
+                    {% endif %}
+                    {% if alert.location %}
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Location</h6>
+                        <p class="mb-0"><i class="bi bi-geo-alt text-primary"></i> {{ alert.location }}</p>
+                    </div>
+                    {% endif %}
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Created</h6>
+                        <p class="mb-0">{{ alert.created_at|timesince }} ago</p>
+                    </div>
+                </div>
+
+                {% if alert.current_value %}
+                <hr class="my-4">
+                <h5 class="mb-3">Metric Values</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <small class="text-muted d-block mb-1">Current Value</small>
+                                <h4 class="mb-0">{{ alert.current_value }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    {% if alert.threshold_value %}
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <small class="text-muted d-block mb-1">Threshold</small>
+                                <h4 class="mb-0">{{ alert.threshold_value }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if alert.previous_value %}
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <small class="text-muted d-block mb-1">Previous Value</small>
+                                <h4 class="mb-0">{{ alert.previous_value }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if alert.resolution_notes %}
+                <hr class="my-4">
+                <h5 class="mb-3">Resolution Notes</h5>
+                <div class="alert alert-success">
+                    <p class="mb-0">{{ alert.resolution_notes }}</p>
+                    <small class="text-muted d-block mt-2">
+                        Resolved by {{ alert.resolved_by.username }} on {{ alert.resolved_at|date:"M d, Y H:i" }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Related Anomaly -->
+        {% if anomaly %}
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-lightning text-danger me-2"></i>Related Anomaly</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Type</h6>
+                        <p>{{ anomaly.get_anomaly_type_display }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Metric</h6>
+                        <p>{{ anomaly.metric_name }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted mb-2">Expected</h6>
+                        <p class="mb-0">{{ anomaly.expected_value }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted mb-2">Actual</h6>
+                        <p class="mb-0">{{ anomaly.actual_value }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted mb-2">Deviation</h6>
+                        <p class="mb-0 text-danger">{{ anomaly.deviation_percentage }}%</p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <a href="{% url 'anomaly_detail' anomaly.pk %}" class="btn btn-sm btn-outline-primary">
+                        View Full Anomaly Details <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Action Panel -->
+    <div class="col-lg-4">
+        <div class="card sticky-top" style="top: 20px;">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Actions</h5>
+            </div>
+            <div class="card-body">
+                {% if alert.status == 'ACTIVE' %}
+                <div class="d-grid gap-2">
+                    <a href="{% url 'alert_acknowledge' alert.pk %}" class="btn btn-warning">
+                        <i class="bi bi-check-circle"></i> Acknowledge
+                    </a>
+                    <a href="{% url 'alert_resolve' alert.pk %}" class="btn btn-success">
+                        <i class="bi bi-check-all"></i> Resolve
+                    </a>
+                    <a href="{% url 'alert_dismiss' alert.pk %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Dismiss
+                    </a>
+                </div>
+                {% elif alert.status == 'ACKNOWLEDGED' %}
+                <div class="d-grid gap-2">
+                    <a href="{% url 'alert_resolve' alert.pk %}" class="btn btn-success">
+                        <i class="bi bi-check-all"></i> Resolve
+                    </a>
+                    <div class="alert alert-info mb-0 mt-3">
+                        <small>
+                            <i class="bi bi-info-circle me-1"></i>
+                            Acknowledged by {{ alert.acknowledged_by.username }}<br>
+                            on {{ alert.acknowledged_at|date:"M d, Y H:i" }}
+                        </small>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-success mb-0">
+                    <i class="bi bi-check-circle me-2"></i>
+                    This alert has been {{ alert.get_status_display|lower }}.
+                </div>
+                {% endif %}
+
+                <hr class="my-3">
+
+                <h6 class="mb-3">Alert Timeline</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <small class="text-muted d-block">Created</small>
+                        <small>{{ alert.created_at|date:"M d, Y H:i" }}</small>
+                    </li>
+                    {% if alert.acknowledged_at %}
+                    <li class="mb-2">
+                        <small class="text-muted d-block">Acknowledged</small>
+                        <small>{{ alert.acknowledged_at|date:"M d, Y H:i" }}</small>
+                    </li>
+                    {% endif %}
+                    {% if alert.resolved_at %}
+                    <li class="mb-2">
+                        <small class="text-muted d-block">Resolved</small>
+                        <small>{{ alert.resolved_at|date:"M d, Y H:i" }}</small>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

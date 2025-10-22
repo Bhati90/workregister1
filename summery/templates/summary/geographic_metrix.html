@@ -1,0 +1,103 @@
+
+{% extends 'bases.html' %}
+
+{% block title %}Geographic Performance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Geographic Performance</h1>
+    <p>Performance metrics by location</p>
+</div>
+
+<!-- District Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">District</label>
+                <select name="district" class="form-select">
+                    <option value="">All Districts</option>
+                    {% for district in districts %}
+                    <option value="{{ district }}" {% if selected_district == district %}selected{% endif %}>{{ district }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Apply
+                </button>
+                <a href="{% url 'geographic_performance' %}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Performance Cards -->
+{% if performances %}
+<div class="table-container">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Location</th>
+                    <th class="text-end">Total Farmers</th>
+                    <th class="text-end">Orders</th>
+                    <th class="text-end">Revenue</th>
+                    <th class="text-end">Avg Order Value</th>
+                    <th class="text-center">Task Rate</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for perf in performances %}
+                <tr>
+                    <td>
+                        <div>
+                            <i class="bi bi-geo-alt text-primary me-2"></i>
+                            <strong>{{ perf.district }}</strong>
+                        </div>
+                        {% if perf.taluka %}
+                        <small class="text-muted ms-4">{{ perf.taluka }}{% if perf.village %}, {{ perf.village }}{% endif %}</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div>{{ perf.total_farmers }}</div>
+                        <small class="text-success">{{ perf.active_farmers_count }} active</small>
+                    </td>
+                    <td class="text-end">
+                        <div><strong>{{ perf.total_orders }}</strong></div>
+                        {% if perf.cancelled_orders > 0 %}
+                        <small class="text-danger">{{ perf.cancelled_orders }} cancelled</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <strong class="text-success">₹{{ perf.total_revenue|floatformat:0 }}</strong>
+                    </td>
+                    <td class="text-end">
+                        ₹{{ perf.average_order_value|floatformat:0 }}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge {% if perf.task_completion_rate >= 80 %}bg-success{% elif perf.task_completion_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}">
+                            {{ perf.task_completion_rate }}%
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'geographic_detail' perf.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-geo-alt fs-1 text-muted"></i>
+        <p class="text-muted mt-3">No geographic performance data available</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

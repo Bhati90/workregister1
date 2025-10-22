@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="detail-card">
+        <h2 class="section-title">
+            <i class="fas fa-check-circle"></i>
+            {% if current_language == 'mr' %}कार्य पूर्ण करा{% else %}Complete Task{% endif %}
+        </h2>
+
+        <div class="mb-4">
+            <h4>{{ object.schedule_task.stage_name }}</h4>
+            <p class="text-muted">
+                {% if current_language == 'mr' %}
+                    शेतकरी: {{ object.farmer_crop_cycle.farmer.name }} | पीक: {{ object.farmer_crop_cycle.crop_variety.name }}
+                {% else %}
+                    Farmer: {{ object.farmer_crop_cycle.farmer.name }} | Crop: {{ object.farmer_crop_cycle.crop_variety.name }}
+                {% endif %}
+            </p>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label">
+                    {% if current_language == 'mr' %}पूर्ण होण्याची तारीख{% else %}Completion Date{% endif %}
+                </label>
+                <input type="date" 
+                       name="actual_completion_date" 
+                       class="form-control" 
+                       value="{{ object.actual_completion_date|date:'Y-m-d'|default:'' }}"
+                       max="{{ today|date:'Y-m-d' }}">
+                <small class="text-muted">
+                    {% if current_language == 'mr' %}
+                        रिक्त ठेवल्यास, आजची तारीख वापरली जाईल
+                    {% else %}
+                        Leave blank to use today's date
+                    {% endif %}
+                </small>
+            </div>
+
+            <div class="alert alert-info">
+                <strong>{% if current_language == 'mr' %}नियोजित समाप्ती:{% else %}Planned End:{% endif %}</strong>
+                {{ object.planned_end_date|date:"d M, Y" }}
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check"></i>
+                    {% if current_language == 'mr' %}पूर्ण म्हणून चिन्हांकित करा{% else %}Mark as Complete{% endif %}
+                </button>
+                <a href="{% url 'farmer_detail' object.farmer_crop_cycle.farmer.id %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i>
+                    {% if current_language == 'mr' %}रद्द करा{% else %}Cancel{% endif %}
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

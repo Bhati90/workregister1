@@ -1,0 +1,70 @@
+{% load static %}
+<header class="header bg-white shadow-sm">
+    <div class="container-fluid py-3">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                {% if request.resolver_match.url_name == 'farmer_profile' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Farmer Profile - {{farmer.farmer_id}}</h1>
+                {% elif request.resolver_match.url_name == 'chat_interface' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">AI Agronomist</h1>
+                {% elif request.resolver_match.url_name == 'search_page' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Map Dashboard</h1>
+                {% elif request.resolver_match.url_name == 'ivr_page' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Calls Dashboard </h1>
+                {% elif request.resolver_match.url_name == 'DashboardView' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Hello,
+                    <span style="color: #000000ff;">{{ user.name }}</span>
+                </h1>
+                {% elif request.resolver_match.url_name == 'schedule' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Scheduler Dashboard</h1>
+                {% elif request.resolver_match.url_name == 'actionables_list' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Actions Dashboard</h1>
+                {% elif request.resolver_match.url_name == 'dial_pad' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Dial Pad</h1>
+                {% elif request.resolver_match.url_name == 'ap_dashboard' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Leads</h1>
+                {% elif request.resolver_match.url_name == 'all_actionables' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">All Leads</h1>
+                {% elif request.resolver_match.url_name == 'session_detail' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Session Details</h1>
+                {% elif request.resolver_match.url_name == 'edit_lead' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Edit Session</h1>
+                {% elif request.resolver_match.url_name == 'all_summary_logs' %}
+                <h1 class="fs-4 fw-semibold text-success mb-0">Lead History</h1>
+                {% endif %}
+            </div>
+
+            <div class="position-absolute top-0 end-0 p-3">
+                <div class="d-flex justify-content-end align-items-center">
+                    {% comment %} <div class="me-4">
+                        <i class="fas fa-bell fs-5 text-muted"></i>
+                    </div> {% endcomment %}
+                    <div class="d-flex align-items-center">
+                        {% comment %} {% if user.profile_pic %}
+                            <img src="{{ user.profile_pic.url }}" alt="User Profile" class="rounded-circle me-2" width="40" height="40">
+                        {% else %}
+                            <img src="{% static 'images/default_profile.png' %}" onerror="this.src='https://cdn.wikifarmer.com/images/thumbnail/2023/04/Banana-Crop-History-Nutritional-Value-and-Health-Benefits-500x500.jpg'" alt="User Profile" class="rounded-circle me-2" width="40" height="40">
+                        {% endif %} {% endcomment %}
+                    <div class="dropdown">
+                    <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    {% if request.resolver_match.url_name == 'DashboardView' %}
+                    <span class="">{{ user.name  }}</span>
+                    {% elif request.resolver_match.url_name == 'schedule' %}
+                    <span class="">{{ user.name  }}</span>
+                    {% else %}
+                    <span class="">{{ user  }}</span>
+                    {% endif %}
+                    </a>
+
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li><a class="dropdown-item" href="{% url 'inventory_list' %}">Logout</a></li>
+                    </ul>
+                    </div>
+
+                        {% comment %} <i class="fas fa-chevron-down ms-2 small text-muted"></i> {% endcomment %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>

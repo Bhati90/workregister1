@@ -33,6 +33,8 @@ const AnalyticsPage = () => {
     const [calendarFilter, setCalendarFilter] = useState('all');
     const [cacheStatus, setCacheStatus] = useState(null);
     const [showQuotaWarning, setShowQuotaWarning] = useState(false);
+    const [templatePrompts, setTemplatePrompts] = useState(null);
+    const [segmentPackages, setSegmentPackages] = useState(null);
 
     useEffect(() => {
         checkCacheStatus(); 
@@ -50,78 +52,137 @@ const AnalyticsPage = () => {
     };
 
     const handleAutoAnalysis = async (forceRefresh = false) => {
-        setAutoAnalyzing(true);
-        setError(null);
-        setShowQuotaWarning(false);
-        try {
-            const formData = new FormData();
-            formData.append('force_refresh', forceRefresh ? 'true' : 'false');
-            
-            const response = await axios.post(`${API_URL}/auto-analyze-farmers/`, formData);
-            
-            if (response.data.status === 'warning') {
-                setShowQuotaWarning(true);
-                setError(response.data.message);
-            }
-            
-            setAiAnalysis(response.data.analysis);
-            setFlowPrompts(response.data.flow_prompts);
-            setCacheStatus({
-                has_cache: true,
-                cached_at: response.data.cached_at,
-                from_cache: response.data.from_cache
-            });
-        } catch (err) {
-            console.error("Auto-analysis error:", err);
-            
-            if (err.response?.status === 429) {
-                setShowQuotaWarning(true);
-                setError(err.response.data.message || "API quota exceeded. Showing cached data if available.");
-                
-                if (err.response.data.analysis) {
-                    setAiAnalysis(err.response.data.analysis);
-                    setFlowPrompts(err.response.data.flow_prompts);
-                }
-            } else {
-                setError("Could not perform automatic farmer analysis: " + (err.response?.data?.message || err.message));
-            }
-        } finally {
-            setAutoAnalyzing(false);
-        }
-    };
+    setAutoAnalyzing(true);
+    setError(null);
+    try {
+        const formData = new FormData();
+        formData.append('force_refresh', forceRefresh ? 'true' : 'false');
+        
+        const response = await axios.post(`${API_URL}/auto-analyze-farmers/`, formData);
+        
+        setAiAnalysis(response.data.analysis);
+        setSegmentPackages(response.data.segment_packages);
+        setFlowPrompts(response.data.flow_prompts);// NEW
+        setCacheStatus({
+            has_cache: true,
+            cached_at: response.data.cached_at,
+            from_cache: response.data.from_cache
+        });
+    } catch (err) {
+        console.error("Auto-analysis error:", err);
+        setError("Analysis failed: " + (err.response?.data?.message || err.message));
+    } finally {
+        setAutoAnalyzing(false);
+    }
+};
 
-    const handleRefreshCache = async () => {
-        if (!window.confirm('This will use an API call. Are you sure? (Free tier: 50 calls/day)')) {
-            return;
+  const handleRefreshCache = async () => {
+    // Confirm with user before making API call
+    if (!window.confirm('⚠️ This will use an API call.\n\nFree tier: 50 calls/day\nAre you sure you want to refresh?')) {
+        return;
+    }
+    
+    setAutoAnalyzing(true);
+    setError(null);
+    setShowQuotaWarning(false);
+    
+    try {
+        console.log("🔄 Starting cache refresh...");
+        
+        const response = await axios.post(`${API_URL}/refresh-cache/`);
+        
+        console.log("✅ Refresh response received:", response.data);
+        console.log("📊 Analysis:", response.data.analysis);
+        console.log("📦 Segment Packages:", response.data.segment_packages);
+        console.log("🔄 Flow Prompts:", response.data.flow_prompts);
+        
+        // Validate response structure
+        if (!response.data.analysis) {
+            throw new Error("No analysis data in response");
         }
         
-        setAutoAnalyzing(true);
-        setError(null);
-        setShowQuotaWarning(false);
+        // Update ALL state with refreshed data
+        setAiAnalysis(response.data.analysis);
         
-        try {
-            const response = await axios.post(`${API_URL}/refresh-cache/`);
-            
-            setAiAnalysis(response.data.analysis);
+        // Set segment packages (new format with templates)
+        if (response.data.segment_packages) {
+            setSegmentPackages(response.data.segment_packages);
+            console.log(`✅ Set ${response.data.segment_packages.segment_packages?.length || 0} segment packages`);
+        } else {
+            console.warn("⚠️ No segment_packages in response");
+            setSegmentPackages({ segment_packages: [] });
+        }
+        
+        // Set flow prompts (backward compatibility)
+        if (response.data.flow_prompts) {
             setFlowPrompts(response.data.flow_prompts);
-            setCacheStatus({
-                has_cache: true,
-                cached_at: response.data.cached_at,
-                from_cache: false
-            });
-            
-            alert('Analysis refreshed successfully!');
-        } catch (err) {
-            if (err.response?.status === 429) {
-                setShowQuotaWarning(true);
-                setError(err.response.data.message || "API quota exceeded. Please try tomorrow.");
-            } else {
-                setError("Could not refresh analysis: " + (err.response?.data?.message || err.message));
-            }
-        } finally {
-            setAutoAnalyzing(false);
+            console.log(`✅ Set ${response.data.flow_prompts.flow_prompts?.length || 0} flow prompts`);
+        } else {
+            console.warn("⚠️ No flow_prompts in response");
+            setFlowPrompts({ flow_prompts: [] });
         }
-    };
+         setFlowPrompts(response.data.flow_prompts);
+         setSegmentPackages(response.data.segment_packages);
+        
+        
+        // Update cache status
+        setCacheStatus({
+            has_cache: true,
+            cached_at: response.data.cached_at || new Date().toISOString(),
+            from_cache: false
+        });
+        
+        // Count results
+        const segmentCount = response.data.analysis?.segments?.length || 0;
+        const opportunityCount = response.data.analysis?.immediate_opportunities?.length || 0;
+        const automationCount = response.data.analysis?.automation_recommendations?.length || 0;
+        const packageCount = response.data.segment_packages?.segment_packages?.length || 0;
+        const promptCount = response.data.flow_prompts?.flow_prompts?.length || 0;
+        
+        console.log("📈 Results summary:", {
+            segments: segmentCount,
+            opportunities: opportunityCount,
+            automations: automationCount,
+            packages: packageCount,
+            prompts: promptCount
+        });
+        
+        // Show success message with details
+        let message = '✅ Analysis refreshed successfully!\n\n';
+        message += `📊 Segments: ${segmentCount}\n`;
+        message += `💰 Opportunities: ${opportunityCount}\n`;
+        message += `🤖 Automations: ${automationCount}\n`;
+        message += `📱 Segment Packages: ${packageCount}\n`;
+        message += `🔄 Flow Prompts: ${promptCount}\n\n`;
+        
+        if (packageCount === 0 && promptCount === 0) {
+            message += '⚠️ Warning: No templates/prompts generated!\nCheck console for details.';
+        }
+        
+        alert(message);
+        
+    } catch (err) {
+        console.error("❌ Refresh error:", err);
+        console.error("Error details:", err.response?.data);
+        
+        // Handle quota exceeded (429 error)
+        if (err.response?.status === 429) {
+            setShowQuotaWarning(true);
+            setError(err.response.data.message || "API quota exceeded. Free tier: 50 requests/day. Please try again tomorrow.");
+        } 
+        // Handle other errors
+        else {
+            const errorMessage = err.response?.data?.message || err.message || "Unknown error occurred";
+            setError(`Could not refresh analysis: ${errorMessage}`);
+            
+            // Show user-friendly error
+            alert(`❌ Refresh Failed\n\n${errorMessage}\n\nCheck console (F12) for details.`);
+        }
+    } finally {
+        setAutoAnalyzing(false);
+        console.log("🏁 Refresh complete");
+    }
+};
     
     const renderTemplateManagement = () => {
         if (!aiAnalysis || !flowPrompts) {
@@ -751,102 +812,233 @@ const renderTemplateDetailModal = () => {
             </div>
         );
     };
+const renderDateDetailsModal = (events, dateStr) => {
+    if (!events) return null;
 
-    const renderDateDetailsModal = (events, dateStr) => {
-        if (!events) return null;
+    const eventDate = new Date(dateStr);
+    
+    const groupedEvents = events.reduce((acc, event) => {
+        const key = `${event.event_type}_${event.title}`;
+        if (!acc[key]) {
+            acc[key] = {
+                ...event,
+                farmers: []
+            };
+        }
+        acc[key].farmers.push({
+            name: event.farmer_name,
+            phone: event.farmer_phone,
+            id: event.farmer_id,
+            details: event.details,
+            recommended_template: event.recommended_template,
+            recommended_flow: event.recommended_flow,
+            needs_template_creation: event.needs_template_creation,
+            create_template_prompt: event.create_template_prompt,
+            farmer_details: event.farmer_details
+        });
+        return acc;
+    }, {});
 
-        const eventDate = new Date(dateStr);
-        
-        const groupedEvents = events.reduce((acc, event) => {
-            const key = `${event.event_type}_${event.title}`;
-            if (!acc[key]) {
-                acc[key] = {
-                    ...event,
-                    farmers: []
-                };
-            }
-            acc[key].farmers.push({
-                name: event.farmer_name,
-                phone: event.farmer_phone,
-                id: event.farmer_id,
-                details: event.details
-            });
-            return acc;
-        }, {});
+    const consolidatedEvents = Object.values(groupedEvents);
 
-        const consolidatedEvents = Object.values(groupedEvents);
-
-        return (
-            <div className="date-details-modal" onClick={() => setSelectedDate(null)}>
-                <div className="modal-content large" onClick={e => e.stopPropagation()}>
-                    <button className="close-modal" onClick={() => setSelectedDate(null)}>✕</button>
-                    <h2>Events on {eventDate.toLocaleDateString('en-US', { dateStyle: 'full' })}</h2>
-                    
-                    <div className="events-detailed">
-                        {consolidatedEvents.map((event, idx) => (
-                            <div key={idx} className={`event-detail-card priority-${event.priority.toLowerCase()}`}>
-                                <div className="event-header">
-                                    <h3>{event.title}</h3>
-                                    <span className={`priority-badge ${event.priority.toLowerCase()}`}>{event.priority}</span>
-                                </div>
-                                
-                                <div className="event-importance">
-                                    <strong>Why Important:</strong>
-                                    <p>{event.action_needed}</p>
-                                </div>
-
-                                <div className="farmers-list-compact">
-                                    <h4><Users size={16} /> {event.farmers.length} Farmer{event.farmers.length > 1 ? 's' : ''} Affected</h4>
-                                    
-                                    {event.farmers.map((farmer, fIdx) => (
-                                        <div key={fIdx} className="farmer-row">
-                                            <div className="farmer-info">
-                                                <span className="farmer-name">{farmer.name}</span>
-                                                <a href={`tel:${farmer.phone}`} className="farmer-phone">
-                                                    <Phone size={14} /> {farmer.phone}
-                                                </a>
-                                            </div>
-                                            <button 
-                                                className="whatsapp-btn-small"
-                                                onClick={() => window.open(`https://wa.me/${farmer.phone}`, '_blank')}
-                                            >
-                                                WhatsApp
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="bulk-actions">
-                                    <button 
-                                        className="export-farmers-btn"
-                                        onClick={() => exportFarmersToCSV(event.farmers.map(f => ({
-                                            farmer_name: f.name,
-                                            phone_number: f.phone,
-                                            event_type: event.event_type,
-                                            action_needed: event.action_needed
-                                        })))}
-                                    >
-                                        📥 Export All Numbers
-                                    </button>
-                                    <button 
-                                        className="copy-numbers-btn"
-                                        onClick={() => {
-                                            const numbers = event.farmers.map(f => f.phone).join(', ');
-                                            navigator.clipboard.writeText(numbers);
-                                            alert('All phone numbers copied!');
-                                        }}
-                                    >
-                                        📋 Copy All Numbers
-                                    </button>
-                                </div>
+    return (
+        <div className="date-details-modal" onClick={() => setSelectedDate(null)}>
+            <div className="modal-content large" onClick={e => e.stopPropagation()}>
+                <button className="close-modal" onClick={() => setSelectedDate(null)}>✕</button>
+                <h2>Events on {eventDate.toLocaleDateString('en-US', { dateStyle: 'full' })}</h2>
+                
+                <div className="events-detailed">
+                    {consolidatedEvents.map((event, idx) => (
+                        <div key={idx} className={`event-detail-card priority-${event.priority.toLowerCase()}`}>
+                            <div className="event-header">
+                                <h3>{event.title}</h3>
+                                <span className={`priority-badge ${event.priority.toLowerCase()}`}>{event.priority}</span>
                             </div>
-                        ))}
-                    </div>
+                            
+                            <div className="event-importance">
+                                <strong>Why Important:</strong>
+                                <p>{event.action_needed}</p>
+                            </div>
+
+                            {/* NEW: Template & Flow Recommendations */}
+                            <div className="template-flow-recommendations">
+                                <h4>📱 WhatsApp Communication Plan</h4>
+                                
+                                {/* Show matched template */}
+                                {event.recommended_template ? (
+                                    <div className="recommendation-box template-box">
+                                        <div className="recommendation-header">
+                                            <span className="recommendation-icon">✅</span>
+                                            <strong>Recommended Template</strong>
+                                            <span className={`confidence-badge ${event.recommended_template.confidence.toLowerCase()}`}>
+                                                {event.recommended_template.confidence} Match
+                                            </span>
+                                        </div>
+                                        <div className="recommendation-details">
+                                            <p><strong>Name:</strong> {event.recommended_template.template_name}</p>
+                                            <p><strong>Language:</strong> {event.recommended_template.template_language.toUpperCase()}</p>
+                                            <p><strong>Category:</strong> {event.recommended_template.template_category}</p>
+                                            <p className="match-reason">
+                                                <strong>Why:</strong> {event.recommended_template.match_reason}
+                                            </p>
+                                        </div>
+                                        <button 
+                                            className="use-template-btn"
+                                            onClick={() => {
+                                                const farmerNumbers = event.farmers.map(f => f.phone).join(', ');
+                                                alert(`✅ Use template: "${event.recommended_template.template_name}"\n\nFor farmers:\n${farmerNumbers}\n\nCopy numbers and send via WhatsApp Business API`);
+                                            }}
+                                        >
+                                            📤 Use This Template
+                                        </button>
+                                    </div>
+                                ) : event.needs_template_creation ? (
+                                    <div className="recommendation-box needs-creation-box">
+                                        <div className="recommendation-header">
+                                            <span className="recommendation-icon">⚠️</span>
+                                            <strong>No Suitable Template Found</strong>
+                                            <span className="needs-creation-badge">Create New</span>
+                                        </div>
+                                        
+                                        {event.create_template_prompt && !event.create_template_prompt.error ? (
+                                            <>
+                                                <div className="recommendation-details">
+                                                    <p className="suggestion-text">
+                                                        We've generated a custom template for this event type. 
+                                                        Copy the prompt below and create it in Meta Business Manager.
+                                                    </p>
+                                                    
+                                                    <div className="template-preview">
+                                                        <h5>📝 Suggested Template:</h5>
+                                                        <p><strong>Name:</strong> {event.create_template_prompt.template_name}</p>
+                                                        <p><strong>Category:</strong> {event.create_template_prompt.template_category}</p>
+                                                        <div className="body-preview">
+                                                            <strong>Body:</strong>
+                                                            <pre>{event.create_template_prompt.template_body}</pre>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <button 
+                                                    className="copy-prompt-btn"
+                                                    onClick={() => {
+                                                        const promptText = event.create_template_prompt.meta_template_creation_prompt;
+                                                        navigator.clipboard.writeText(promptText);
+                                                        alert('✅ Template creation prompt copied!\n\nPaste this in Meta Business Manager to create the template.');
+                                                    }}
+                                                >
+                                                    📋 Copy Template Creation Prompt
+                                                </button>
+                                                
+                                                <details className="full-prompt-details" style={{marginTop: '12px'}}>
+                                                    <summary>👁️ View Complete Prompt</summary>
+                                                    <pre className="full-prompt-text">
+                                                        {event.create_template_prompt.meta_template_creation_prompt}
+                                                    </pre>
+                                                </details>
+                                            </>
+                                        ) : (
+                                            <p className="error-text">Could not generate template prompt. Please create manually.</p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="recommendation-box no-match-box">
+                                        <p>No template recommendation available</p>
+                                    </div>
+                                )}
+
+                                {/* Show matched flow */}
+                                {event.recommended_flow && (
+                                    <div className="recommendation-box flow-box">
+                                        <div className="recommendation-header">
+                                            <span className="recommendation-icon">🔄</span>
+                                            <strong>Recommended Flow</strong>
+                                            <span className={`confidence-badge ${event.recommended_flow.confidence.toLowerCase()}`}>
+                                                {event.recommended_flow.confidence} Match
+                                            </span>
+                                        </div>
+                                        <div className="recommendation-details">
+                                            <p><strong>Flow Name:</strong> {event.recommended_flow.flow_name}</p>
+                                            <p><strong>Flow ID:</strong> {event.recommended_flow.flow_id}</p>
+                                            <p className="match-reason">
+                                                <strong>Why:</strong> {event.recommended_flow.match_reason}
+                                            </p>
+                                        </div>
+                                        <button 
+                                            className="use-flow-btn"
+                                            onClick={() => {
+                                                alert(`✅ Use flow: "${event.recommended_flow.flow_name}"\n\nFlow ID: ${event.recommended_flow.flow_id}\n\nTrigger this flow for the affected farmers.`);
+                                            }}
+                                        >
+                                            🔄 Use This Flow
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="farmers-list-compact">
+                                <h4><Users size={16} /> {event.farmers.length} Farmer{event.farmers.length > 1 ? 's' : ''} Affected</h4>
+                                
+                                {event.farmers.map((farmer, fIdx) => (
+                                    <div key={fIdx} className="farmer-row">
+                                        <div className="farmer-info">
+                                            <span className="farmer-name">{farmer.name}</span>
+                                            <a href={`tel:${farmer.phone}`} className="farmer-phone">
+                                                <Phone size={14} /> {farmer.phone}
+                                            </a>
+                                            {farmer.farmer_details && (
+                                                <div className="farmer-context">
+                                                    <span className="context-item">
+                                                        🌾 {farmer.farmer_details.crop || 'N/A'}
+                                                    </span>
+                                                    <span className="context-item">
+                                                        📏 {farmer.farmer_details.farm_size || 'N/A'} acres
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button 
+                                            className="whatsapp-btn-small"
+                                            onClick={() => window.open(`https://wa.me/${farmer.phone}`, '_blank')}
+                                        >
+                                            WhatsApp
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="bulk-actions">
+                                <button 
+                                    className="export-farmers-btn"
+                                    onClick={() => exportFarmersToCSV(event.farmers.map(f => ({
+                                        farmer_name: f.name,
+                                        phone_number: f.phone,
+                                        event_type: event.event_type,
+                                        action_needed: event.action_needed,
+                                        recommended_template: event.recommended_template?.template_name || 'None',
+                                        recommended_flow: event.recommended_flow?.flow_name || 'None'
+                                    })))}
+                                >
+                                    📥 Export All Numbers
+                                </button>
+                                <button 
+                                    className="copy-numbers-btn"
+                                    onClick={() => {
+                                        const numbers = event.farmers.map(f => f.phone).join(', ');
+                                        navigator.clipboard.writeText(numbers);
+                                        alert('All phone numbers copied!');
+                                    }}
+                                >
+                                    📋 Copy All Numbers
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
-        );
-    };
-
+        </div>
+    );
+};
     const renderSegmentFarmers = () => {
         if (!segmentFarmers) return null;
 
@@ -1203,7 +1395,7 @@ const renderTemplateDetailModal = () => {
                     </div>
                 </div>
 
-                <div className="flow-prompts-section">
+                {/* <div className="flow-prompts-section">
                     <h2>🚀 Ready-to-Use Flow Prompts</h2>
                     <p className="section-description">
                         Copy these prompts and use them to create WhatsApp flows. Click on segments above to see which farmers to send to.
@@ -1251,7 +1443,170 @@ const renderTemplateDetailModal = () => {
                             </div>
                         </div>
                     ))}
+                </div> */}
+               <div className="flow-prompts-section">
+    <h2>🚀 Ready-to-Use Prompts</h2>
+    <p className="section-description">
+        Complete prompts for creating templates and flows. Copy and use directly.
+    </p>
+    
+    {segmentPackages?.segment_packages?.map((pkg, idx) => (
+        <div key={idx} className={`prompt-card priority-${pkg.priority.toLowerCase()}`}>
+            <div className="prompt-header">
+                <h3>
+                    {pkg.segment_name}
+                    <span className={`badge priority-${pkg.priority.toLowerCase()}`}>
+                        {pkg.priority}
+                    </span>
+                </h3>
+                <p className="prompt-meta">
+                    Farmers: <strong>{pkg.farmer_count}</strong> | 
+                    Language: <strong>{pkg.language.toUpperCase()}</strong> | 
+                    Conversion: <strong>{pkg.estimated_conversion_rate}</strong>
+                </p>
+            </div>
+            
+            {/* STEP 1: Template Creation */}
+            {pkg.step_1_templates && pkg.step_1_templates.length > 0 && (
+                <div className="template-creation-section">
+                    <h4>📱 Step 1: Create Templates ({pkg.step_1_templates.length})</h4>
+                    <p className="step-description">Create these templates first before building the flow</p>
+                    
+                    {pkg.step_1_templates.map((template, tidx) => (
+                        <div key={tidx} className="template-prompt-box">
+                            <div className="template-prompt-header">
+                                <strong>{template.template_name}</strong>
+                                <div className="template-badges">
+                                    <span className="badge">{template.template_category}</span>
+                                    <span className="badge">{template.template_language.toUpperCase()}</span>
+                                </div>
+                            </div>
+                            
+                            {/* Template Body Preview */}
+                            <div className="template-body-preview">
+                                <h5>📝 Template Text:</h5>
+                                <pre className="template-text-preview">{template.template_body}</pre>
+                            </div>
+                            
+                            {/* Variables */}
+                            <div className="template-variables-compact">
+                                <h5>🔧 Variables ({template.variables.length}):</h5>
+                                <div className="variables-grid-compact">
+                                    {template.variables.map((v, vidx) => (
+                                        <div key={vidx} className="variable-chip">
+                                            <strong>{`{{${v.position}}}`}</strong> = {v.variable_name}
+                                            <span className="variable-example">"{v.example}"</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {/* Buttons */}
+                            {template.buttons && template.buttons.length > 0 && (
+                                <div className="template-buttons-preview">
+                                    <h5>🔘 Buttons:</h5>
+                                    <div className="buttons-row">
+                                        {template.buttons.map((btn, bidx) => (
+                                            <span key={bidx} className="button-chip">{btn.text}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Copy Button */}
+                            <button 
+                                className="copy-template-prompt-btn"
+                                onClick={() => {
+                                    copyPromptToClipboard(template.meta_template_creation_prompt);
+                                    alert('Template prompt copied! Paste in Meta Business Manager.');
+                                }}
+                            >
+                                📋 Copy Complete Template Creation Prompt
+                            </button>
+                            
+                            {/* Expandable Full Prompt */}
+                            <details className="full-prompt-details">
+                                <summary>👁️ View Full Template Prompt</summary>
+                                <pre className="full-prompt-text">{template.meta_template_creation_prompt}</pre>
+                            </details>
+                        </div>
+                    ))}
                 </div>
+            )}
+            
+            {/* STEP 2: Flow Creation */}
+            <div className="flow-prompt-section">
+                <h4>🔄 Step 2: Create Flow (After Templates Approved)</h4>
+                <p className="step-description">Use this prompt after all {pkg.step_1_templates?.length || 0} template(s) are approved by Meta</p>
+                
+                <div className="prompt-content">
+                    <div className="prompt-text">
+                        <pre>{pkg.step_2_flow_prompt}</pre>
+                        <button 
+                            className="copy-btn"
+                            onClick={() => {
+                                copyPromptToClipboard(pkg.step_2_flow_prompt);
+                                alert('Flow prompt copied! Use in AI Flow Maker.');
+                            }}
+                        >
+                            📋 Copy Flow Creation Prompt
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Implementation Details */}
+            <div className="prompt-details">
+                <div className="stats-row">
+                    <div className="stat-item">
+                        <strong>Templates Needed:</strong> {pkg.step_1_templates?.length || 0}
+                    </div>
+                    <div className="stat-item">
+                        <strong>Target Farmers:</strong> {pkg.farmer_count}
+                    </div>
+                    <div className="stat-item">
+                        <strong>Expected Conversion:</strong> {pkg.estimated_conversion_rate}
+                    </div>
+                </div>
+                
+                <div className="implementation-steps">
+                    <h4>📋 Implementation Checklist:</h4>
+                    <ol>
+                        <li>
+                            <strong>Create Templates ({pkg.step_1_templates?.length || 0}):</strong>
+                            <ul>
+                                {pkg.step_1_templates?.map((t, i) => (
+                                    <li key={i}>Copy prompt for "{t.template_name}" and submit to Meta</li>
+                                ))}
+                            </ul>
+                        </li>
+                        <li><strong>Wait for Approval:</strong> Usually 15 minutes - 2 hours</li>
+                        <li><strong>Create Flow:</strong> Copy Step 2 prompt above and create flow</li>
+                        <li><strong>Test:</strong> Send to 5-10 farmers to verify</li>
+                        <li><strong>Deploy:</strong> Roll out to all {pkg.farmer_count} farmers</li>
+                    </ol>
+                </div>
+                
+                {pkg.implementation_notes && pkg.implementation_notes.length > 0 && (
+                    <div className="additional-notes">
+                        <h5>💡 Additional Notes:</h5>
+                        <ul>
+                            {pkg.implementation_notes.map((note, i) => (
+                                <li key={i}>{note}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+        </div>
+    ))}
+    
+    {(!segmentPackages || !segmentPackages.segment_packages || segmentPackages.segment_packages.length === 0) && (
+        <div className="no-prompts">
+            <p>No prompts available. Run analysis first.</p>
+        </div>
+    )}
+</div>
 
                 <div className="opportunities-section">
                     <h2>💰 Immediate Revenue Opportunities</h2>
@@ -1405,6 +1760,11 @@ const renderTemplateDetailModal = () => {
                     >
                         💬 Natural Language Query
                     </button>
+                    <a href = "ai-tem-generator" 
+                    className='temai'
+                    >
+                        template generate
+                    </a>
                 </div>
             </header>
 
@@ -1481,7 +1841,239 @@ const renderTemplateDetailModal = () => {
 
             {segmentDetails && renderSegmentDetails()}
 
-            <style jsx>{`
+            <style jsx>
+                {`
+.template-flow-recommendations {
+    margin: 20px 0;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.template-flow-recommendations h4 {
+    margin: 0 0 16px 0;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.recommendation-box {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-left: 4px solid #ccc;
+}
+
+.template-box {
+    border-left-color: #00C49F;
+}
+
+.flow-box {
+    border-left-color: #0088FE;
+}
+
+.needs-creation-box {
+    border-left-color: #FFBB28;
+    background: #fffbf0;
+}
+
+.no-match-box {
+    border-left-color: #999;
+    background: #f5f5f5;
+    text-align: center;
+    color: #666;
+}
+
+.recommendation-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.recommendation-icon {
+    font-size: 1.5rem;
+}
+
+.confidence-badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.confidence-badge.high {
+    background: #d4edda;
+    color: #155724;
+}
+
+.confidence-badge.medium {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.needs-creation-badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #fff3cd;
+    color: #856404;
+}
+
+.recommendation-details {
+    margin: 12px 0;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.recommendation-details p {
+    margin: 6px 0;
+    font-size: 0.875rem;
+}
+
+.match-reason {
+    color: #666;
+    font-style: italic;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.use-template-btn, .use-flow-btn {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 8px;
+}
+
+.use-template-btn {
+    background: #00C49F;
+    color: white;
+}
+
+.use-template-btn:hover {
+    background: #00A080;
+}
+
+.use-flow-btn {
+    background: #0088FE;
+    color: white;
+}
+
+.use-flow-btn:hover {
+    background: #0066CC;
+}
+
+.suggestion-text {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    border-left: 3px solid #FFBB28;
+}
+
+.template-preview {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    margin-top: 12px;
+}
+
+.template-preview h5 {
+    margin: 0 0 8px 0;
+    color: #333;
+}
+
+.body-preview {
+    margin-top: 8px;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.body-preview pre {
+    margin: 8px 0 0 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 0.875rem;
+    background: white;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.copy-prompt-btn {
+    width: 100%;
+    background: #0088FE;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+}
+
+.copy-prompt-btn:hover {
+    background: #0066CC;
+}
+
+.full-prompt-details {
+    margin-top: 12px;
+    cursor: pointer;
+}
+
+.full-prompt-details summary {
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.full-prompt-text {
+    margin-top: 8px;
+    padding: 12px;
+    background: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.error-text {
+    color: #c62828;
+    font-size: 0.875rem;
+    text-align: center;
+    padding: 12px;
+}
+
+.farmer-context {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.context-item {
+    font-size: 0.75rem;
+    color: #666;
+    background: #f0f0f0;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
                 .analytics-page { padding: 20px; max-width: 1400px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
                 .analytics-header { margin-bottom: 30px; }
                 .analytics-header h1 { font-size: 2rem; margin-bottom: 20px; }
@@ -1752,6 +2344,23 @@ const renderTemplateDetailModal = () => {
                 .view-farmers-btn { width: 100%; background: #0088FE; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; }
                 .view-farmers-btn:hover { background: #0066CC; }
                 
+.temai {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s;
+  color: black; /* ✅ make text black */
+  text-decoration: none; /
+}
+
+.temai:hover {
+  border-bottom: 3px solid #000; /* optional hover effect */
+}
+
+
                 .template-detail-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; overflow-y: auto; }
                 .modal-content.extra-large { max-width: 1400px; width: 100%; background: white; border-radius: 16px; position: relative; max-height: 90vh; display: flex; flex-direction: column; }
                 .modal-scroll-wrapper { padding: 32px; overflow-y: auto; flex: 1; }
@@ -1825,6 +2434,75 @@ const renderTemplateDetailModal = () => {
                     .cache-status-banner { flex-direction: column; gap: 12px; align-items: stretch; }
                     .refresh-cache-btn { width: 100%; }
                     .quota-warning-banner { flex-direction: column; gap: 12px; }
+
+                    .variables-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.variable-chip {
+    background: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #007bff;
+    font-size: 0.8rem;
+}
+
+.variable-chip strong {
+    color: #007bff;
+    font-family: 'Courier New', monospace;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.variable-example {
+    color: #666;
+    font-size: 0.75rem;
+    display: block;
+    margin-top: 4px;
+}
+
+.stats-row {
+    display: flex;
+    gap: 20px;
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.stat-item {
+    flex: 1;
+}
+
+.stat-item strong {
+    color: #495057;
+}
+
+.implementation-steps ol {
+    margin-left: 20px;
+    line-height: 1.8;
+}
+
+.implementation-steps li {
+    margin: 10px 0;
+}
+
+.additional-notes {
+    margin-top: 15px;
+    padding: 15px;
+    background: #fff3cd;
+    border-radius: 6px;
+    border-left: 4px solid #ffc107;
+}
+
+.no-prompts {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
                 }
             `}</style>
         </div>

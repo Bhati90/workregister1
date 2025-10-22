@@ -1,0 +1,512 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load task_filters %}
+
+{% block title %}Task Status Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .task-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+
+    .task-card.pending {
+        border-left: 4px solid #ffc107;
+    }
+
+    .task-card.completed {
+        border-left: 4px solid #28a745;
+    }
+
+    .task-card.overdue {
+        border-left: 4px solid #dc3545;
+    }
+
+    .task-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .task-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .task-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+    }
+
+    .task-farmer {
+        font-size: 14px;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+
+    .status-pill {
+        padding: 6px 15px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+
+    .status-completed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .status-overdue {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .task-dates {
+        display: flex;
+        gap: 20px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+
+    .date-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: #4a5568;
+    }
+
+    .date-item i {
+        color: var(--primary-color);
+    }
+
+    .product-list {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .product-item {
+        background-color: #f8f9fa;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .product-name {
+        font-weight: 600;
+        color: #2d3748;
+    }
+
+    .product-dosage {
+        color: var(--primary-color);
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .quick-filters {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .quick-filter-btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        background-color: white;
+        color: #4a5568;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .quick-filter-btn:hover,
+    .quick-filter-btn.active {
+        border-color: var(--primary-color);
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .stats-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        text-align: center;
+    }
+
+    .stats-number {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 5px;
+    }
+
+    .stats-label {
+        font-size: 14px;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .filter-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .language-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .lang-btn {
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: 2px solid var(--primary-color);
+        background-color: white;
+        color: var(--primary-color);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .lang-btn.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    @media (max-width: 768px) {
+        .task-dates {
+            flex-direction: column;
+            gap: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Language Toggle -->
+    <div class="language-toggle">
+        <a href="{% url 'advisory_set_language' 'en' %}" class="lang-btn {% if current_language == 'en' %}active{% endif %}">
+            <i class="fas fa-language"></i> English
+        </a>
+        <a href="{% url 'advisory_set_language' 'mr' %}" class="lang-btn {% if current_language == 'mr' %}active{% endif %}">
+            <i class="fas fa-language"></i> मराठी
+        </a>
+    </div>
+
+    <!-- Quick Filters -->
+    <div class="quick-filters">
+        <a href="{% url 'task_status_list' %}?upcoming=1" 
+           class="quick-filter-btn {% if filters.upcoming %}active{% endif %}">
+            <i class="fas fa-calendar-week"></i>
+            {% if current_language == 'mr' %}आगामी (७ दिवस){% else %}Upcoming (7 days){% endif %}
+        </a>
+        <a href="{% url 'task_status_list' %}?show_overdue=1" 
+           class="quick-filter-btn {% if filters.show_overdue %}active{% endif %}">
+            <i class="fas fa-exclamation-triangle"></i>
+            {% if current_language == 'mr' %}मुदतबाह्य{% else %}Overdue{% endif %}
+        </a>
+        <a href="{% url 'task_status_list' %}?status=PENDING" 
+           class="quick-filter-btn {% if filters.status == 'PENDING' %}active{% endif %}">
+            <i class="fas fa-clock"></i>
+            {% if current_language == 'mr' %}प्रलंबित{% else %}Pending{% endif %}
+        </a>
+        <a href="{% url 'task_status_list' %}?status=COMPLETED" 
+           class="quick-filter-btn {% if filters.status == 'COMPLETED' %}active{% endif %}">
+            <i class="fas fa-check-circle"></i>
+            {% if current_language == 'mr' %}पूर्ण{% else %}Completed{% endif %}
+        </a>
+    </div>
+
+   <!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3 col-6">
+        <div class="stats-card">
+            <div class="stats-number">{{ page_obj.paginator.count }}</div>
+            <div class="stats-label">
+                {% if current_language == 'mr' %}एकूण कार्ये{% else %}Total Tasks{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stats-card">
+            <div class="stats-number" style="color: #ffc107;">
+                {{ task_statuses|length }}
+            </div>
+            <div class="stats-label">
+                {% if current_language == 'mr' %}या पृष्ठावर{% else %}On This Page{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stats-card">
+            <div class="stats-number" style="color: #28a745;">
+                {{ completed_count }}
+            </div>
+            <div class="stats-label">
+                {% if current_language == 'mr' %}पूर्ण{% else %}Completed{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stats-card">
+            <div class="stats-number" style="color: #dc3545;">
+                {{ overdue_count }}
+            </div>
+            <div class="stats-label">
+                {% if current_language == 'mr' %}मुदतबाह्य{% else %}Overdue{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Advanced Filters -->
+    <div class="filter-card">
+        <form method="GET">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}शेतकरी{% else %}Farmer{% endif %}
+                    </label>
+                    <select class="form-select" name="farmer">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        {% for farmer in farmers %}
+                        <option value="{{ farmer.id }}" {% if filters.farmer == farmer.id|stringformat:"s" %}selected{% endif %}>
+                            {{ farmer.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}पीक{% else %}Crop{% endif %}
+                    </label>
+                    <select class="form-select" name="crop">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        {% for crop in crops %}
+                        <option value="{{ crop.id }}" {% if filters.crop == crop.id|stringformat:"s" %}selected{% endif %}>
+                            {{ crop.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}स्थिती{% else %}Status{% endif %}
+                    </label>
+                    <select class="form-select" name="status">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}टप्पा{% else %}Stage{% endif %}
+                    </label>
+                    <select class="form-select" name="stage">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        {% for stage in stages %}
+                        <option value="{{ stage }}" {% if filters.stage == stage %}selected{% endif %}>
+                            {{ stage }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}पासून तारीख{% else %}Date From{% endif %}
+                    </label>
+                    <input type="date" class="form-control" name="date_from" value="{{ filters.date_from }}">
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="filter-btn">
+                        <i class="fas fa-filter"></i>
+                        {% if current_language == 'mr' %}फिल्टर लागू करा{% else %}Apply Filters{% endif %}
+                    </button>
+                    <a href="{% url 'task_status_list' %}" class="reset-btn ms-2">
+                        <i class="fas fa-redo"></i>
+                        {% if current_language == 'mr' %}रीसेट{% else %}Reset{% endif %}
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tasks List -->
+    <div class="row">
+        {% if task_statuses %}
+            {% for task in task_statuses %}
+            <div class="col-12">
+                <div class="task-card {{ task.status|lower }}">
+                    <div class="task-header">
+                        <div>
+                            <div class="task-title">
+                                {{ task.schedule_task.stage_name }}
+                            </div>
+                            <div class="task-farmer">
+                                <i class="fas fa-user"></i> {{ task.farmer_crop_cycle.farmer.name }} - 
+                                <i class="fas fa-leaf"></i> {{ task.farmer_crop_cycle.crop_variety.name }}
+                            </div>
+                        </div>
+                        <span class="status-pill status-{{ task.status|lower }}">
+                            {{ task.get_status_display }}
+                        </span>
+                    </div>
+
+                    <div class="task-dates">
+                        <div class="date-item">
+                            <i class="fas fa-calendar-plus"></i>
+                            <span>
+                                {% if current_language == 'mr' %}सुरवात:{% else %}Start:{% endif %}
+                                {{ task.planned_start_date|date:"d M, Y" }}
+                            </span>
+                        </div>
+                        <div class="date-item">
+                            <i class="fas fa-calendar-check"></i>
+                            <span>
+                                {% if current_language == 'mr' %}समाप्ती:{% else %}End:{% endif %}
+                                {{ task.planned_end_date|date:"d M, Y" }}
+                            </span>
+                        </div>
+                        {% if task.actual_completion_date %}
+                        <div class="date-item">
+                            <i class="fas fa-check-double"></i>
+                            <span>
+                                {% if current_language == 'mr' %}पूर्ण:{% else %}Completed:{% endif %}
+                                {{ task.actual_completion_date|date:"d M, Y" }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Products Recommended -->
+                    {% if task.schedule_task.products.all %}
+                    <div class="product-list">
+                        <strong>
+                            <i class="fas fa-box"></i>
+                            {% if current_language == 'mr' %}शिफारस केलेली उत्पादने:{% else %}Recommended Products:{% endif %}
+                        </strong>
+                        {% for task_product in task.schedule_task.taskproduct_set.all %}
+                        <div class="product-item">
+                            <span class="product-name">{{ task_product.product.name }}</span>
+                            <span class="product-dosage">
+                                {{ task_product.dosage_amount }} {{ task_product.dosage_unit }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Purpose and Benefits -->
+                    {% if task.schedule_task.purpose_and_benefits %}
+                    <div class="mt-3 p-3" style="background-color: #f8f9fa; border-radius: 8px;">
+                        <small class="text-muted">
+                            <strong>
+                                {% if current_language == 'mr' %}उद्देश:{% else %}Purpose:{% endif %}
+                            </strong>
+                            {{ task.schedule_task.purpose_and_benefits|truncatewords:30 }}
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                {% if current_language == 'mr' %}प्रथम{% else %}First{% endif %}
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                {% if current_language == 'mr' %}मागील{% else %}Previous{% endif %}
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                {% if current_language == 'mr' %}पुढील{% else %}Next{% endif %}
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
+        {% else %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-tasks" style="font-size: 64px; color: #e2e8f0;"></i>
+                    <h4 class="mt-3">
+                        {% if current_language == 'mr' %}
+                            कोणतीही कार्ये सापडली नाहीत
+                        {% else %}
+                            No Tasks Found
+                        {% endif %}
+                    </h4>
+                    <p class="text-muted">
+                        {% if current_language == 'mr' %}
+                            आपले फिल्टर समायोजित करण्याचा प्रयत्न करा
+                        {% else %}
+                            Try adjusting your filters
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,192 @@
+{% extends 'bases.html' %}
+
+{% block title %}Performance Metrics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Performance Metrics</h1>
+    <p>Track key performance indicators over time</p>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Metric Type</label>
+                <select name="type" class="form-select">
+                    {% for value, label in metric_types %}
+                    <option value="{{ value }}" {% if metric_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Time Period</label>
+                <select name="days" class="form-select">
+                    <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 Days</option>
+                    <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 Days</option>
+                    <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 Days</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Apply
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Statistics Summary -->
+{% if avg_value %}
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Average Value</h6>
+                <h3 class="mb-0">{{ avg_value|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Maximum Value</h6>
+                <h3 class="mb-0 text-success">{{ max_value|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Minimum Value</h6>
+                <h3 class="mb-0 text-danger">{{ min_value|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Metrics Chart -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Trend Chart</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="metricsChart" height="80"></canvas>
+    </div>
+</div>
+
+<!-- Metrics Table -->
+<div class="table-container">
+    {% if metrics %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Metric Type</th>
+                    <th class="text-end">Value</th>
+                    <th class="text-end">Target</th>
+                    <th class="text-center">Status</th>
+                    {% if metrics.0.entity_name %}
+                    <th>Entity</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for metric in metrics %}
+                <tr>
+                    <td>{{ metric.date|date:"M d, Y" }}</td>
+                    <td>{{ metric.get_metric_type_display }}</td>
+                    <td class="text-end"><strong>{{ metric.value|floatformat:2 }}</strong></td>
+                    <td class="text-end">
+                        {% if metric.target_value %}
+                        {{ metric.target_value|floatformat:2 }}
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if metric.target_value %}
+                            {% if metric.is_meeting_target %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> Met
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning">
+                                <i class="bi bi-exclamation-circle"></i> Below
+                            </span>
+                            {% endif %}
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    {% if metrics.0.entity_name %}
+                    <td>
+                        {% if metric.entity_name %}
+                        {{ metric.entity_name }}
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-graph-up fs-1 text-muted"></i>
+        <p class="text-muted mt-3">No metrics available for the selected criteria</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if metrics %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('metricsChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [{% for metric in metrics reversed %}'{{ metric.date|date:"M d" }}',{% endfor %}],
+            datasets: [{
+                label: 'Value',
+                data: [{% for metric in metrics reversed %}{{ metric.value }},{% endfor %}],
+                borderColor: '#4f46e5',
+                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                tension: 0.4,
+                fill: true
+            }{% if metrics.0.target_value %},
+            {
+                label: 'Target',
+                data: [{% for metric in metrics reversed %}{{ metric.target_value|default:"null" }},{% endfor %}],
+                borderColor: '#10b981',
+                borderDash: [5, 5],
+                fill: false
+            }{% endif %}]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

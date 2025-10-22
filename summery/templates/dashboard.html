@@ -1,0 +1,323 @@
+<!-- templates/summary/dashboard.html -->
+{% extends 'bases.html' %}
+
+{% block title %}Dashboard - Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard Overview</h1>
+    <p>Real-time analytics and key performance indicators</p>
+</div>
+
+<!-- Critical Alerts Banner -->
+{% if critical_alerts_count > 0 %}
+<div class="alert alert-danger border-0 shadow-sm mb-4" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+        <div>
+            <strong>{{ critical_alerts_count }}</strong> critical alert{{ critical_alerts_count|pluralize }} requiring immediate attention.
+            <a href="{% url 'alert_list' %}?severity=CRITICAL" class="alert-link ms-2">View alerts <i class="bi bi-arrow-right"></i></a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Today's Summary Cards -->
+{% if today_summary %}
+<div class="row g-4 mb-4">
+    <!-- Revenue Card -->
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+                <i class="bi bi-currency-rupee"></i>
+            </div>
+            <h3>₹{{ today_summary.total_revenue|floatformat:0 }}</h3>
+            <p>Total Revenue</p>
+            {% if yesterday_summary %}
+            <small class="text-muted">
+                {% widthratio today_summary.total_revenue yesterday_summary.total_revenue 100 %}% vs yesterday
+            </small>
+            {% endif %}
+            <span class="trend-badge trend-{{ revenue_trend }}">
+                <i class="bi bi-arrow-{% if revenue_trend == 'up' %}up{% elif revenue_trend == 'down' %}down{% else %}right{% endif %}"></i>
+                {{ revenue_trend|title }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Orders Card -->
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="icon" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white;">
+                <i class="bi bi-cart-check"></i>
+            </div>
+            <h3>{{ today_summary.total_orders }}</h3>
+            <p>Total Orders</p>
+            <small class="text-muted">{{ today_summary.orders_completed }} completed</small>
+            <span class="trend-badge trend-{{ order_trend }}">
+                <i class="bi bi-arrow-{% if order_trend == 'up' %}up{% elif order_trend == 'down' %}down{% else %}right{% endif %}"></i>
+                {{ today_summary.order_completion_rate }}% completion
+            </span>
+        </div>
+    </div>
+
+    <!-- Active Farmers Card -->
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">
+                <i class="bi bi-people"></i>
+            </div>
+            <h3>{{ today_summary.active_farmers }}</h3>
+            <p>Active Farmers</p>
+            <small class="text-muted">{{ today_summary.new_farmers }} new today</small>
+            <span class="trend-badge trend-stable">
+                <i class="bi bi-diagram-3"></i>
+                {{ today_summary.active_crop_cycles }} cycles
+            </span>
+        </div>
+    </div>
+
+    <!-- Tasks Card -->
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="icon" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+                <i class="bi bi-check2-square"></i>
+            </div>
+            <h3>{{ today_summary.tasks_completed }}</h3>
+            <p>Tasks Completed</p>
+            <small class="text-muted">{{ today_summary.tasks_overdue }} overdue</small>
+            <span class="trend-badge {% if today_summary.task_completion_rate >= 80 %}trend-up{% else %}trend-down{% endif %}">
+                {{ today_summary.task_completion_rate }}% rate
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Secondary Metrics -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Avg Order Value</h6>
+                        <h4 class="mb-0">₹{{ today_summary.average_order_value|floatformat:0 }}</h4>
+                    </div>
+                    <div class="text-primary fs-2">
+                        <i class="bi bi-tag"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Low Stock Items</h6>
+                        <h4 class="mb-0">{{ today_summary.low_stock_items }}</h4>
+                    </div>
+                    <div class="text-warning fs-2">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">WhatsApp Messages</h6>
+                        <h4 class="mb-0">{{ today_summary.total_messages_sent }}</h4>
+                    </div>
+                    <div class="text-success fs-2">
+                        <i class="bi bi-whatsapp"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Pending Payments</h6>
+                        <h4 class="mb-0">₹{{ today_summary.pending_payments|floatformat:0 }}</h4>
+                    </div>
+                    <div class="text-danger fs-2">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-warning border-0 shadow-sm mb-4" role="alert">
+    <i class="bi bi-info-circle me-2"></i>
+    No data available for today yet.
+</div>
+{% endif %}
+
+<!-- Active Alerts and Anomalies -->
+<div class="row g-4 mb-4">
+    <!-- Active Alerts -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Active Alerts</h5>
+                    <a href="{% url 'alert_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if active_alerts %}
+                <div class="list-group list-group-flush">
+                    {% for alert in active_alerts %}
+                    <a href="{% url 'alert_detail' alert.pk %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="mb-2">
+                                    <span class="alert-badge badge-{{ alert.severity|lower }}">{{ alert.severity }}</span>
+                                    <span class="badge bg-light text-dark ms-2">{{ alert.get_category_display }}</span>
+                                </div>
+                                <h6 class="mb-1">{{ alert.title }}</h6>
+                                <p class="mb-1 text-muted small">{{ alert.description|truncatewords:15 }}</p>
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> {{ alert.created_at|timesince }} ago
+                                </small>
+                            </div>
+                            <i class="bi bi-chevron-right text-muted"></i>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-check-circle text-success fs-1"></i>
+                    <p class="text-muted mt-2">No active alerts</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Anomalies -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-lightning text-danger me-2"></i>Recent Anomalies</h5>
+                    <a href="{% url 'anomaly_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_anomalies %}
+                <div class="list-group list-group-flush">
+                    {% for anomaly in recent_anomalies %}
+                    <a href="{% url 'anomaly_detail' anomaly.pk %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="mb-2">
+                                    <span class="badge bg-danger">{{ anomaly.get_anomaly_type_display }}</span>
+                                </div>
+                                <h6 class="mb-1">{{ anomaly.metric_name }}</h6>
+                                <div class="d-flex gap-3 small text-muted">
+                                    <span><i class="bi bi-graph-down"></i> Deviation: {{ anomaly.deviation_percentage }}%</span>
+                                    <span><i class="bi bi-bullseye"></i> Confidence: {{ anomaly.confidence_score }}%</span>
+                                </div>
+                            </div>
+                            <i class="bi bi-chevron-right text-muted"></i>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-check-circle text-success fs-1"></i>
+                    <p class="text-muted mt-2">No recent anomalies detected</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="card">
+    <div class="card-header bg-white border-bottom">
+        <h5 class="mb-0"><i class="bi bi-grid me-2"></i>Quick Access</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-lg-3 col-md-6">
+                <a href="{% url 'performance_metrics' %}" class="text-decoration-none">
+                    <div class="card text-center h-100 hover-shadow">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <i class="bi bi-graph-up fs-1" style="color: #3b82f6;"></i>
+                            </div>
+                            <h6 class="mb-0">Performance Metrics</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <a href="{% url 'growth_metrics' %}" class="text-decoration-none">
+                    <div class="card text-center h-100 hover-shadow">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <i class="bi bi-arrow-up-circle fs-1" style="color: #10b981;"></i>
+                            </div>
+                            <h6 class="mb-0">Growth Analysis</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <a href="{% url 'trend_analysis' %}" class="text-decoration-none">
+                    <div class="card text-center h-100 hover-shadow">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <i class="bi bi-graph-up-arrow fs-1" style="color: #8b5cf6;"></i>
+                            </div>
+                            <h6 class="mb-0">Trend Analysis</h6>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <!-- <a href="{% url 'benchmark_comparison' %}" class="text-decoration-none">
+                    <div class="card text-center h-100 hover-shadow">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <i class="bi bi-bullseye fs-1" style="color: #f59e0b;"></i>
+                            </div>
+                            <h6 class="mb-0">Benchmarks</h6>
+                        </div>
+                    </div>
+                </a>
+            </div> -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hover-shadow {
+        transition: all 0.3s ease;
+    }
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}

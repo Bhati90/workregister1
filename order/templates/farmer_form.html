@@ -1,0 +1,275 @@
+<!-- ============================================ -->
+<!-- FARMER FORM TEMPLATE (farmer_form.html) -->
+<!-- ============================================ -->
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .detail-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+    
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .form-label.required::after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="detail-card">
+        <h1 class="mb-0">
+            <i class="fas fa-{% if object %}edit{% else %}user-plus{% endif %}"></i>
+            {% if object %}
+                {% if current_language == 'mr' %}शेतकरी संपादित करा{% else %}Edit Farmer{% endif %}
+            {% else %}
+                {% if current_language == 'mr' %}नवीन शेतकरी जोडा{% else %}Add New Farmer{% endif %}
+            {% endif %}
+        </h1>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- Main Form -->
+            <div class="col-lg-8">
+                <!-- Basic Information -->
+                <div class="detail-card">
+                    <h3 class="section-title">
+                        <i class="fas fa-info-circle"></i>
+                        {% if current_language == 'mr' %}मूलभूत माहिती{% else %}Basic Information{% endif %}
+                    </h3>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}नाव (इंग्रजी){% else %}Name (English){% endif %}
+                            </label>
+                            <input type="text" name="name" class="form-control" 
+                                   value="{% if object %}{{ object.name }}{% endif %}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                {% if current_language == 'mr' %}नाव (मराठी){% else %}Name (Marathi){% endif %}
+                            </label>
+                            <input type="text" name="name_mr" class="form-control" 
+                                   value="{% if object %}{{ object.name_mr }}{% endif %}">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}फोन नंबर{% else %}Phone Number{% endif %}
+                            </label>
+                            <input type="tel" name="phone" class="form-control" 
+                                   value="{% if object %}{{ object.phone }}{% endif %}" 
+                                   pattern="[0-9]{10}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                {% if current_language == 'mr' %}पर्यायी फोन{% else %}Alternate Phone{% endif %}
+                            </label>
+                            <input type="tel" name="alternate_phone" class="form-control" 
+                                   value="{% if object %}{{ object.alternate_phone }}{% endif %}" 
+                                   pattern="[0-9]{10}">
+                        </div>
+
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">
+                                {% if current_language == 'mr' %}ईमेल{% else %}Email{% endif %}
+                            </label>
+                            <input type="email" name="email" class="form-control" 
+                                   value="{% if object %}{{ object.email }}{% endif %}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Address Information -->
+                <div class="detail-card">
+                    <h3 class="section-title">
+                        <i class="fas fa-map-marker-alt"></i>
+                        {% if current_language == 'mr' %}पत्ता माहिती{% else %}Address Information{% endif %}
+                    </h3>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}पत्ता ओळ 1{% else %}Address Line 1{% endif %}
+                            </label>
+                            <input type="text" name="address_line1" class="form-control" 
+                                   value="{% if object %}{{ object.address_line1 }}{% endif %}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                {% if current_language == 'mr' %}पत्ता ओळ 2{% else %}Address Line 2{% endif %}
+                            </label>
+                            <input type="text" name="address_line2" class="form-control" 
+                                   value="{% if object %}{{ object.address_line2 }}{% endif %}">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}गाव{% else %}Village{% endif %}
+                            </label>
+                            <input type="text" name="village" class="form-control" 
+                                   value="{% if object %}{{ object.village }}{% endif %}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}तालुका{% else %}Taluka{% endif %}
+                            </label>
+                            <input type="text" name="taluka" class="form-control" 
+                                   value="{% if object %}{{ object.taluka }}{% endif %}" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}जिल्हा{% else %}District{% endif %}
+                            </label>
+                            <input type="text" name="district" class="form-control" 
+                                   value="{% if object %}{{ object.district }}{% endif %}" required>
+                        </div>
+
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">
+                                {% if current_language == 'mr' %}राज्य{% else %}State{% endif %}
+                            </label>
+                            <input type="text" name="state" class="form-control" 
+                                   value="{% if object %}{{ object.state }}{% else %}Maharashtra{% endif %}">
+                        </div>
+
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}पिनकोड{% else %}Pincode{% endif %}
+                            </label>
+                            <input type="text" name="pincode" class="form-control" 
+                                   value="{% if object %}{{ object.pincode }}{% endif %}" 
+                                   pattern="[0-9]{6}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Farm Details -->
+                <div class="detail-card">
+                    <h3 class="section-title">
+                        <i class="fas fa-seedling"></i>
+                        {% if current_language == 'mr' %}शेत तपशील{% else %}Farm Details{% endif %}
+                    </h3>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                {% if current_language == 'mr' %}शेताचा आकार (एकर){% else %}Farm Size (Acres){% endif %}
+                            </label>
+                            <input type="number" name="farm_size_acres" class="form-control" 
+                                   value="{% if object %}{{ object.farm_size_acres }}{% endif %}" 
+                                   step="0.01">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                {% if current_language == 'mr' %}प्राथमिक पीक{% else %}Primary Crop{% endif %}
+                            </label>
+                            <input type="text" name="primary_crop" class="form-control" 
+                                   value="{% if object %}{{ object.primary_crop }}{% endif %}">
+                        </div>
+
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">
+                                {% if current_language == 'mr' %}टिपण्या{% else %}Notes{% endif %}
+                            </label>
+                            <textarea name="notes" class="form-control" rows="3">{% if object %}{{ object.notes }}{% endif %}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Form Actions -->
+                <div class="detail-card sticky-top" style="top: 20px;">
+                    <h3 class="section-title">
+                        <i class="fas fa-save"></i>
+                        {% if current_language == 'mr' %}क्रिया{% else %}Actions{% endif %}
+                    </h3>
+
+                    {% if object %}
+                    <div class="mb-3">
+                        <label class="form-label">
+                            {% if current_language == 'mr' %}स्थिती{% else %}Status{% endif %}
+                        </label>
+                        <select name="is_active" class="form-select">
+                            <option value="True" {% if object.is_active %}selected{% endif %}>Active</option>
+                            <option value="False" {% if not object.is_active %}selected{% endif %}>Inactive</option>
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-save"></i>
+                            {% if object %}
+                                {% if current_language == 'mr' %}अपडेट करा{% else %}Update Farmer{% endif %}
+                            {% else %}
+                                {% if current_language == 'mr' %}शेतकरी जोडा{% else %}Add Farmer{% endif %}
+                            {% endif %}
+                        </button>
+
+                        {% if object %}
+                        <a href="{% url 'farmer_detail' object.pk %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i>
+                            {% if current_language == 'mr' %}रद्द करा{% else %}Cancel{% endif %}
+                        </a>
+                        {% else %}
+                        <a href="{% url 'farmer_lists' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i>
+                            {% if current_language == 'mr' %}रद्द करा{% else %}Cancel{% endif %}
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Help Card -->
+                {% if not object %}
+                <div class="detail-card mt-3">
+                    <h3 class="section-title">
+                        <i class="fas fa-question-circle"></i>
+                        {% if current_language == 'mr' %}मदत{% else %}Help{% endif %}
+                    </h3>
+                    <p class="text-muted small">
+                        {% if current_language == 'mr' %}
+                            लाल तारांकन (*) चिन्हासह फील्ड आवश्यक आहेत
+                        {% else %}
+                            Fields marked with red asterisk (*) are required
+                        {% endif %}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

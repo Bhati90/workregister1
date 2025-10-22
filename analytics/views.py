@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 # --- Setup ---
 load_dotenv()
 genai.configure(api_key='AIzaSyCh0DeWCZr8m3kF4LDB2A_xoAlqbmKjvgs')
-
+# genai.configure(api_key='AIzaSyCh0DeWCZr8m3kF4LDB2A_xoAlqbmKjvgs')
 # --- Helper Functions ---
 
 def get_db_schema():
@@ -156,232 +156,38 @@ def get_comprehensive_farmer_data():
             'crop_details': crop_details,
             'interventions': interventions
         }
+
 def generate_flow_prompts_from_segments(segments_data):
     """
-    ENHANCED: Generates COMPLETE template bodies and creation prompts for each segment
+    Converts AI segment analysis into ready-to-use flow creation prompts.
     """
     model = genai.GenerativeModel('gemini-2.0-flash-exp')
     
     prompt = f"""
-You are creating COMPLETE WhatsApp template specifications for farmer engagement.
-
-CRITICAL: For EACH segment, generate:
-1. Full template body text (Hindi AND English)
-2. All variable definitions
-3. Ready-to-submit template creation prompt
-4. Button configurations
+Based on the farmer segment analysis, generate specific, ready-to-execute prompts for creating WhatsApp flows.
 
 SEGMENT ANALYSIS:
-{json.dumps(segments_data, indent=2, default=str)}
+{json.dumps(segments_data, indent=2)}
 
-YOUR TASK:
-For EACH segment in the analysis, create detailed template specifications.
+Generate detailed prompts that can be directly used to create flows. Each prompt should be complete and actionable.
 
 OUTPUT FORMAT (JSON):
 {{
   "flow_prompts": [
     {{
-      "prompt_id": "segment_harvest_support",
-      "segment_targeted": "Harvest Support",
-      "priority": "HIGH",
-      "prompt_title": "Pre-Harvest Labor Booking Campaign",
-      "farmer_count": 418,
-      "language": "hi",
-      "estimated_conversion_rate": "28%",
-      
-      "templates": [
-        {{
-          "template_name": "pre_harvest_labor_hi",
-          "template_category": "UTILITY",
-          "template_language": "hi",
-          "template_body": "नमस्कार {{{{1}}}},\\n\\nआपकी {{{{2}}}} एकड़ की {{{{3}}}} फसल अब {{{{4}}}} स्टेज में है। {{{{5}}}} दिनों में कटाई होगी! 🌾\\n\\nपिछली बार {{{{6}}}} को {{{{7}}}} किया था।\\nअब कटाई के लिए तैयारी का समय!\\n\\n✅ {{{{8}}}} अनुभवी मजदूर\\n✅ अनुमानित लागत: ₹{{{{9}}}}\\n✅ {{{{10}}}} को कटाई\\n\\nअभी बुक करें! 👇",
-          
-          "variables": [
-            {{
-              "position": 1,
-              "variable_name": "farmer_name",
-              "example": "रमेश पाटील",
-              "data_field": "farmer_name",
-              "fallback": "किसान भाई"
-            }},
-            {{
-              "position": 2,
-              "variable_name": "farm_size",
-              "example": "3.5",
-              "data_field": "farm_size_acres",
-              "fallback": "2"
-            }},
-            {{
-              "position": 3,
-              "variable_name": "crop_name",
-              "example": "अंगूर",
-              "data_field": "crop_name",
-              "fallback": "फसल"
-            }},
-            {{
-              "position": 4,
-              "variable_name": "current_stage",
-              "example": "Fruiting",
-              "data_field": "current_growth_stage",
-              "fallback": "पकने की"
-            }},
-            {{
-              "position": 5,
-              "variable_name": "days_until_harvest",
-              "example": "7",
-              "data_field": "days_until_harvest",
-              "fallback": "10"
-            }},
-            {{
-              "position": 6,
-              "variable_name": "last_intervention_date",
-              "example": "15 सितंबर",
-              "data_field": "last_intervention_date",
-              "fallback": "पिछले हफ्ते"
-            }},
-            {{
-              "position": 7,
-              "variable_name": "last_intervention_type",
-              "example": "कीटनाशक छिड़काव",
-              "data_field": "last_intervention_type",
-              "fallback": "देखभाल"
-            }},
-            {{
-              "position": 8,
-              "variable_name": "estimated_workers",
-              "example": "10-12",
-              "data_field": "CALC: farm_size * 3",
-              "fallback": "8-10"
-            }},
-            {{
-              "position": 9,
-              "variable_name": "estimated_cost",
-              "example": "17,500",
-              "data_field": "CALC: farm_size * 5000",
-              "fallback": "15,000"
-            }},
-            {{
-              "position": 10,
-              "variable_name": "harvest_date",
-              "example": "25 अक्टूबर",
-              "data_field": "harvesting_date",
-              "fallback": "जल्द ही"
-            }}
-          ],
-          
-          "buttons": [
-            {{
-              "type": "QUICK_REPLY",
-              "text": "मजदूर बुक करें"
-            }},
-            {{
-              "type": "QUICK_REPLY",
-              "text": "बाद में बात करें"
-            }}
-          ],
-          
-          "meta_template_creation_prompt": "**WhatsApp Template Creation Request**\\n\\nTemplate Name: pre_harvest_labor_hi\\nCategory: UTILITY\\nLanguage: Hindi (hi)\\n\\nHeader: None\\n\\nBody:\\nnamस्कार {{{{1}}}},\\n\\nआपकी {{{{2}}}} एकड़ की {{{{3}}}} फसल अब {{{{4}}}} स्टेज में है। {{{{5}}}} दिनों में कटाई होगी! 🌾\\n\\nपिछली बार {{{{6}}}} को {{{{7}}}} किया था।\\nअब कटाई के लिए तैयारी का समय!\\n\\n✅ {{{{8}}}} अनुभवी मजदूर\\n✅ अनुमानित लागत: ₹{{{{9}}}}\\n✅ {{{{10}}}} को कटाई\\n\\nअभी बुक करें! 👇\\n\\nFooter: None\\n\\nButtons:\\n1. QUICK_REPLY: मजदूर बुक करें\\n2. QUICK_REPLY: बाद में बात करें\\n\\nVariable Sample Values:\\n1. रमेश पाटील (farmer name)\\n2. 3.5 (farm size)\\n3. अंगूर (crop name)\\n4. Fruiting (growth stage)\\n5. 7 (days to harvest)\\n6. 15 सितंबर (last intervention date)\\n7. कीटनाशक छिड़काव (last intervention)\\n8. 10-12 (estimated workers)\\n9. 17,500 (estimated cost)\\n10. 25 अक्टूबर (harvest date)\\n\\nSubmit this template to Meta Business Manager for approval."
-        }},
-        
-        {{
-          "template_name": "labor_booking_confirmation_hi",
-          "template_category": "UTILITY",
-          "template_language": "hi",
-          "template_body": "धन्यवाद {{{{1}}}}! 🎉\\n\\nआपकी {{{{2}}}} की कटाई के लिए मजदूर बुकिंग कन्फर्म हुई:\\n\\n✅ तारीख: {{{{3}}}}\\n✅ मजदूर: {{{{4}}}}\\n✅ लागत: ₹{{{{5}}}}\\n✅ फसल: {{{{6}}}} ({{{{7}}}} एकड़)\\n\\nहमारी टीम {{{{8}}}} को आपसे संपर्क करेगी।\\n\\nमदद चाहिए?",
-          
-          "variables": [
-            {{
-              "position": 1,
-              "variable_name": "farmer_name",
-              "example": "रमेश जी",
-              "data_field": "farmer_name",
-              "fallback": "किसान भाई"
-            }},
-            {{
-              "position": 2,
-              "variable_name": "crop_name",
-              "example": "अंगूर",
-              "data_field": "crop_name",
-              "fallback": "फसल"
-            }},
-            {{
-              "position": 3,
-              "variable_name": "booking_date",
-              "example": "25 अक्टूबर",
-              "data_field": "harvesting_date",
-              "fallback": "जल्द ही"
-            }},
-            {{
-              "position": 4,
-              "variable_name": "worker_count",
-              "example": "12",
-              "data_field": "booked_workers",
-              "fallback": "10"
-            }},
-            {{
-              "position": 5,
-              "variable_name": "total_cost",
-              "example": "18,000",
-              "data_field": "booking_cost",
-              "fallback": "15,000"
-            }},
-            {{
-              "position": 6,
-              "variable_name": "crop_name_repeat",
-              "example": "अंगूर",
-              "data_field": "crop_name",
-              "fallback": "फसल"
-            }},
-            {{
-              "position": 7,
-              "variable_name": "farm_size",
-              "example": "3.5",
-              "data_field": "farm_size_acres",
-              "fallback": "2"
-            }},
-            {{
-              "position": 8,
-              "variable_name": "contact_time",
-              "example": "सुबह 10 बजे",
-              "data_field": "CALC: current_time + 2h",
-              "fallback": "आज शाम"
-            }}
-          ],
-          
-          "buttons": [
-            {{
-              "type": "QUICK_REPLY",
-              "text": "सब ठीक है ✓"
-            }},
-            {{
-              "type": "QUICK_REPLY",
-              "text": "मदद चाहिए"
-            }}
-          ],
-          
-          "meta_template_creation_prompt": "**WhatsApp Template Creation Request**\\n\\nTemplate Name: labor_booking_confirmation_hi\\nCategory: UTILITY\\nLanguage: Hindi (hi)\\n\\nBody:\\nधन्यवाद {{{{1}}}}! 🎉\\n\\nआपकी {{{{2}}}} की कटाई के लिए मजदूर बुकिंग कन्फर्म हुई:\\n\\n✅ तारीख: {{{{3}}}}\\n✅ मजदूर: {{{{4}}}}\\n✅ लागत: ₹{{{{5}}}}\\n✅ फसल: {{{{6}}}} ({{{{7}}}} एकड़)\\n\\nहमारी टीम {{{{8}}}} को आपसे संपर्क करेगी।\\n\\nमदद चाहिए?\\n\\nButtons:\\n1. QUICK_REPLY: सब ठीक है ✓\\n2. QUICK_REPLY: मदद चाहिए\\n\\nVariable Samples: [farmer name], [crop], [date], [worker count], [cost], [crop], [farm size], [time]"
-        }}
-      ],
-      
-      "full_flow_prompt": "**COMPLETE WHATSAPP FLOW: Pre-Harvest Labor Booking**\\n\\n**TARGET AUDIENCE:**\\n- Segment: Harvest Support (Pre-Harvest Farmers 7-30 days)\\n- Total Farmers: 418\\n- Average Farm Size: 3.2 acres\\n- Primary Crops: Grapes, Tomatoes, Pomegranate\\n\\n**PERSONALIZATION DATA AVAILABLE:**\\n1. farmer_name - Farmer's full name\\n2. farm_size_acres - Farm size in acres\\n3. crop_name - Current crop being grown\\n4. current_growth_stage - Crop growth stage (Fruiting/Ready)\\n5. days_until_harvest - Days until harvest date\\n6. last_intervention_date - Date of last farming activity\\n7. last_intervention_type - Type of last activity (Fertilizer/Pesticide)\\n8. harvesting_date - Scheduled harvest date\\n9. phone_number - Farmer's contact\\n\\n**FLOW STRUCTURE:**\\n\\n═══════════════════════════════════════\\n**STEP 1: Initial Outreach**\\n═══════════════════════════════════════\\n\\nTemplate: pre_harvest_labor_hi\\nTrigger: 10-12 days before harvest\\nSend Time: 9:00 AM\\n\\nMessage Preview:\\n\\\"नमस्कार रमेश पाटील,\\n\\nआपकी 3.5 एकड़ की अंगूर फसल अब Fruiting स्टेज में है। 7 दिनों में कटाई होगी! 🌾\\n\\nपिछली बार 15 सितंबर को कीटनाशक छिड़काव किया था।\\nअब कटाई के लिए तैयारी का समय!\\n\\n✅ 10-12 अनुभवी मजदूर\\n✅ अनुमानित लागत: ₹17,500\\n✅ 25 अक्टूबर को कटाई\\n\\nअभी बुक करें! 👇\\\"\\n\\nButton Responses:\\n→ \\\"मजदूर बुक करें\\\" → Go to STEP 2 (Booking Details)\\n→ \\\"बाद में बात करें\\\" → Schedule reminder for 48 hours\\n\\n═══════════════════════════════════════\\n**STEP 2: Booking Details**\\n═══════════════════════════════════════\\n\\nTemplate: labor_booking_details_hi\\nTrigger: When user clicks \\\"मजदूर बुक करें\\\"\\n\\nMessage:\\n\\\"बहुत अच्छा! कृपया कन्फर्म करें:\\n\\n📅 कटाई की तारीख: 25 अक्टूबर\\n👥 मजदूर: 10-12\\n💰 अनुमानित लागत: ₹17,500\\n\\nक्या यह सही है?\\\"\\n\\nButtons:\\n→ \\\"हाँ, बुक करें\\\" → Go to STEP 3 (Confirmation)\\n→ \\\"संख्या बदलें\\\" → Allow edit workers count\\n→ \\\"तारीख बदलें\\\" → Allow edit date\\n\\n═══════════════════════════════════════\\n**STEP 3: Confirmation**\\n═══════════════════════════════════════\\n\\nTemplate: labor_booking_confirmation_hi\\nTrigger: After confirmation\\n\\nMessage:\\n\\\"धन्यवाद रमेश जी! 🎉\\n\\nआपकी अंगूर की कटाई के लिए मजदूर बुकिंग कन्फर्म हुई:\\n\\n✅ तारीख: 25 अक्टूबर\\n✅ मजदूर: 12\\n✅ लागत: ₹18,000\\n✅ फसल: अंगूर (3.5 एकड़)\\n\\nहमारी टीम सुबह 10 बजे आपसे संपर्क करेगी।\\n\\nमदद चाहिए?\\\"\\n\\nButtons:\\n→ \\\"सब ठीक है ✓\\\" → End flow, mark as success\\n→ \\\"मदद चाहिए\\\" → Connect to support\\n\\n═══════════════════════════════════════\\n**SUCCESS METRICS**\\n═══════════════════════════════════════\\n\\nExpected Performance:\\n- Open Rate: 85% (personalized messages)\\n- Step 1→2 Conversion: 35%\\n- Step 2→3 Conversion: 75%\\n- Overall Booking Rate: 26%\\n\\nRevenue Impact:\\n- 418 farmers × 26% conversion = 109 bookings\\n- Average booking value: ₹17,500\\n- Total revenue potential: ₹19,07,500\\n\\n═══════════════════════════════════════\\n**IMPLEMENTATION STEPS**\\n═══════════════════════════════════════\\n\\n1. **Create Templates** (Day 1)\\n   - Submit all 3 templates to Meta\\n   - Wait 24-48h for approval\\n   \\n2. **Map Database Fields** (Day 2)\\n   - Connect variables to farmer data\\n   - Test personalization with 5 sample farmers\\n   \\n3. **Build Flow Logic** (Day 2-3)\\n   - Set up conditional routing\\n   - Configure button responses\\n   - Add fallback messages\\n   \\n4. **Test Campaign** (Day 3)\\n   - Send to 10 test farmers\\n   - Verify all personalization works\\n   - Check button functionality\\n   \\n5. **Launch** (Day 4)\\n   - Roll out to all 418 farmers\\n   - Monitor responses in real-time\\n   - Adjust timing if needed\\n\\n═══════════════════════════════════════\\n**TARGETING LOGIC**\\n═══════════════════════════════════════\\n\\nInclude farmers where:\\n- days_until_harvest BETWEEN 7 AND 14\\n- current_growth_stage IN ('Fruiting', 'Ready for Harvest')\\n- farm_size_acres >= 1\\n- has_active_crop = TRUE\\n\\nExclude farmers where:\\n- already_booked_labor = TRUE\\n- unsubscribed = TRUE\\n- last_message_sent < 7 days ago\\n\\n═══════════════════════════════════════",
-      
-      "implementation_notes": [
-        "Submit templates to Meta 48 hours before campaign launch",
-        "Test personalization with 10 farmers first",
-        "Monitor response rates and adjust timing",
-        "Have support team ready for \\\"मदद चाहिए\\\" responses",
-        "Track booking confirmation rate",
-        "Follow up with non-responders after 48 hours"
-      ],
-      
-      "expected_templates": 3,
-      "revenue_potential": "₹19,07,500",
-      "implementation_difficulty": "MEDIUM"
+      "prompt_id": "unique_id",
+      "segment_targeted": "segment name",
+      "priority": "HIGH/MEDIUM/LOW",
+      "prompt_title": "Short title",
+      "full_prompt": "Complete prompt ready to paste for flow creation",
+      "expected_templates": number,
+      "language": "hi/en/both",
+      "estimated_conversion_rate": "X%",
+      "implementation_notes": ["note1", "note2"]
     }}
   ]
 }}
 
-Generate templates for ALL segments in the analysis. Make each template COMPLETE and READY TO USE.
 Generate ONLY valid JSON.
 """
     
@@ -393,7 +199,9 @@ Generate ONLY valid JSON.
         return json.loads(response.text)
     except Exception as e:
         print(f"Error generating flow prompts: {e}")
-        return {'flow_prompts': []}
+        return None
+
+
 # Add this at the top with other imports
 import requests
 import logging
@@ -632,16 +440,127 @@ OUTPUT FORMAT (JSON):
   }},
   "segments": [
     {{
-      "segment_id": "unique_id_reflecting_segment_type",
-      "segment_name": "Descriptive Name (can be NEW)",
+      "segment_id": "unique_id",
+      "segment_name": "Descriptive Name",
       "segment_type": "CORE/NEW/EMERGING",
-      "discovery_reason": "Why this segment was created (for NEW segments)",
       "priority": "HIGH/MEDIUM/LOW",
-      "farmer_count": number,
-      "conversion_potential": "HIGH/MEDIUM/LOW",
-      "estimated_revenue": "₹X,XXX per farmer/month",
-      "revenue_calculation": "explain based on intervention data",
-      "characteristics": ["unique patterns that define this segment"]
+      "farmer_count": 100,
+      "conversion_potential": "HIGH (25-35%)",
+      "estimated_revenue": "₹5,000 per farmer/month",
+      "revenue_calculation": "Based on avg intervention cost × conversion rate",
+      "characteristics": ["unique patterns"],
+      "intervention_insights": {{
+        "avg_intervention_cost": 850,
+        "most_used_products": ["Product A", "Product B"],
+        "upsell_products": ["Premium Product X", "Service Y"]
+      }}
+    }}
+  ],
+  
+  "immediate_opportunities": [
+    {{
+      "opportunity": "Pre-Harvest Labor Booking",
+      "potential_revenue": "₹2,50,000 (50 farmers × ₹5,000)",
+      "implementation_difficulty": "EASY",
+      "timeline": "1-2 weeks",
+      "target_segment": "Pre-Harvest Farmers",
+      "action_items": [
+        "Send WhatsApp template to {len(harvest_within_week)} farmers harvesting within 7 days",
+        "Create labor booking flow",
+        "Follow up after 48 hours"
+      ],
+      "why_now": "7 farmers harvesting within week - urgent window",
+      "conversion_estimate": "30-40% (based on urgency)",
+      "required_resources": ["WhatsApp template", "Labor availability data"]
+    }},
+    {{
+      "opportunity": "Fertilizer Upsell to Active Crops",
+      "potential_revenue": "₹1,50,000 (estimate)",
+      "implementation_difficulty": "MEDIUM",
+      "timeline": "2-3 weeks",
+      "target_segment": "Vegetative/Flowering Stage Farmers",
+      "action_items": [
+        "Identify farmers at vegetative/flowering stage",
+        "Create personalized fertilizer recommendations",
+        "Send targeted WhatsApp campaigns"
+      ],
+      "why_now": "Optimal growth stage for nutrient boost",
+      "conversion_estimate": "20-25%",
+      "required_resources": ["Product catalog", "Stage-based recommendations"]
+    }},
+    {{
+      "opportunity": "Re-engage Inactive Farmers",
+      "potential_revenue": "₹3,00,000 (estimate)",
+      "implementation_difficulty": "MEDIUM",
+      "timeline": "3-4 weeks",
+      "target_segment": "Inactive Farmers (30+ days)",
+      "action_items": [
+        "Send re-engagement campaign to {len(farmers_needing_intervention)} inactive farmers",
+        "Offer special discount/incentive",
+        "Survey to understand inactivity reasons"
+      ],
+      "why_now": "Risk of losing customers permanently",
+      "conversion_estimate": "15-20%",
+      "required_resources": ["Discount budget", "Survey tool"]
+    }}
+  ],
+  
+  "automation_recommendations": [
+    {{
+      "automation_type": "Harvest Alert System",
+      "description": "Automatically notify farmers 14, 7, and 3 days before harvest date with labor booking options",
+      "target_segments": ["Pre-Harvest Farmers"],
+      "implementation_priority": "HIGH",
+      "expected_impact": "40% increase in labor bookings",
+      "technical_requirements": [
+        "WhatsApp Business API integration",
+        "Scheduled message triggers based on harvesting_date",
+        "Labor availability API"
+      ],
+      "estimated_setup_time": "2-3 weeks",
+      "recurring_benefit": "Automated engagement for every harvest cycle"
+    }},
+    {{
+      "automation_type": "Growth Stage Interventions",
+      "description": "Auto-send stage-specific care tips and product recommendations when crops transition growth stages",
+      "target_segments": ["All Active Crop Farmers"],
+      "implementation_priority": "HIGH",
+      "expected_impact": "25% increase in intervention adoption",
+      "technical_requirements": [
+        "Growth stage tracking",
+        "Stage-specific template library (5-7 templates)",
+        "Product recommendation engine"
+      ],
+      "estimated_setup_time": "3-4 weeks",
+      "recurring_benefit": "Continuous engagement throughout crop lifecycle"
+    }},
+    {{
+      "automation_type": "Inactive Farmer Win-Back",
+      "description": "Automatically identify farmers with no activity for 30+ days and trigger re-engagement sequence",
+      "target_segments": ["Inactive Farmers"],
+      "implementation_priority": "MEDIUM",
+      "expected_impact": "15-20% reactivation rate",
+      "technical_requirements": [
+        "Activity tracking system",
+        "Multi-step re-engagement flow (3-4 touchpoints)",
+        "Incentive/discount management"
+      ],
+      "estimated_setup_time": "2 weeks",
+      "recurring_benefit": "Reduces churn, maintains customer base"
+    }},
+    {{
+      "automation_type": "High-Value Customer VIP Program",
+      "description": "Auto-identify high-spending farmers (avg cost >₹500) and enroll in VIP program with exclusive benefits",
+      "target_segments": ["High-Value Customers"],
+      "implementation_priority": "MEDIUM",
+      "expected_impact": "30% increase in repeat purchases",
+      "technical_requirements": [
+        "Spending analytics",
+        "VIP tier definition",
+        "Exclusive product/service catalog"
+      ],
+      "estimated_setup_time": "3 weeks",
+      "recurring_benefit": "Increased customer lifetime value"
     }}
   ]
 }}
@@ -1100,6 +1019,7 @@ def get_farmers_for_segment(segment_data, farmer_data):
             unique_farmers.append(f)
     
     return unique_farmers[:100]
+    
 
 
 
@@ -1164,181 +1084,224 @@ def clear_analysis_cache():
     """Clear the cached analysis"""
     cache_key = get_cached_analysis_key()
     cache.delete(cache_key)
+def generate_template_and_flow_prompts_combined(segments_data, farmer_data):
+    """
+    Generates BOTH template creation prompts AND flow prompts for each segment.
+    Returns them linked by segment_id.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        
+        # Get sample farmers for context
+        total_farmers = len(farmer_data.get('farmers', []))
+        sample_farmers = farmer_data.get('farmers', [])[:3]
+        
+        # Extract segments properly
+        segments = segments_data.get('segments', [])
+        
+        # Validate we have segments
+        if not segments:
+            print("WARNING: No segments found in segments_data")
+            return {'segment_packages': []}
+        
+        print(f"Processing {len(segments)} segments for template generation")
+        
+        prompt = f"""
+You are generating COMPLETE engagement packages for farmer segments. Each package must include:
+1. Template creation prompts (Step 1)
+2. Flow creation prompts (Step 2)
+
+SEGMENTS TO PROCESS:
+{json.dumps(segments, indent=2, default=str)}
+
+SAMPLE FARMER DATA (for personalization context):
+{json.dumps(sample_farmers, indent=2, default=str)}
+
+For EACH segment, generate:
+
+**STEP 1: TEMPLATE CREATION PROMPTS**
+- 1-3 WhatsApp templates needed for this segment
+- Complete Marathi/Hindi text with {{{{1}}}}, {{{{2}}}} variables
+- All variable mappings to database fields
+- Buttons in Marathi/Hindi
+- Meta API ready JSON
+
+**STEP 2: FLOW CREATION PROMPT**
+- Complete flow structure using the templates from Step 1
+- Node-by-node specification
+- Edge connections
+
+CRITICAL REQUIREMENTS:
+1. Generate templates for ALL {len(segments)} segments
+2. Each segment MUST have step_1_templates array (1-3 templates)
+3. Each segment MUST have step_2_flow_prompt string
+4. Use ONLY these database fields: registration_farmer.farmer_name, registration_farmer.phone_number, registration_farmer.farm_size_acres, registration_cropdetails.crop_name, registration_cropdetails.current_growth_stage, registration_cropdetails.harvesting_date, registration_intervention.intervention_type, registration_intervention.date
+5. Language: Use 'hi' for Hindi and 'mr' for Marathi
+
+OUTPUT FORMAT (MUST BE VALID JSON):
+{{
+  "segment_packages": [
+    {{
+      "segment_id": "segment_identifier",
+      "segment_name": "Segment Name",
+      "priority": "HIGH",
+      "farmer_count": 100,
+      "language": "hi",
+      "estimated_conversion_rate": "25%",
+      
+      "step_1_templates": [
+        {{
+          "template_name": "template_name_hi",
+          "template_category": "UTILITY",
+          "template_language": "hi",
+          "template_body": "नमस्कार {{{{1}}}},\\n\\nआपकी {{{{2}}}} एकड़ की फसल के लिए महत्वपूर्ण जानकारी...\\n\\nधन्यवाद!",
+          "variables": [
+            {{
+              "position": 1,
+              "variable_name": "farmer_name",
+              "data_field": "registration_farmer.farmer_name",
+              "example": "राजू पाटील"
+            }},
+            {{
+              "position": 2,
+              "variable_name": "farm_size",
+              "data_field": "registration_farmer.farm_size_acres",
+              "example": "3.5"
+            }}
+          ],
+          "buttons": [
+            {{"type": "QUICK_REPLY", "text": "अधिक जानकारी"}},
+            {{"type": "QUICK_REPLY", "text": "बाद में बात करें"}}
+          ],
+          "meta_template_creation_prompt": "Complete prompt for creating this template in Meta Business Manager with all details..."
+        }}
+      ],
+      
+      "step_2_flow_prompt": "**COMPLETE FLOW SPECIFICATION**\\n\\nFLOW NAME: Flow Name\\n\\nREQUIRED TEMPLATES: template_name_hi\\n\\nFLOW STRUCTURE:\\n\\nNODE 1: Template Start\\nType: templateNode\\nData: {{selectedTemplateName: 'template_name_hi'}}\\n\\n[Complete node specifications]\\n\\nEDGES: [Complete edge specifications]",
+      
+      "implementation_notes": [
+        "Send 7-10 days before event",
+        "Follow up after 48 hours",
+        "Track conversion by crop type"
+      ]
+    }}
+  ]
+}}
+
+Generate ONLY valid JSON. Ensure ALL {len(segments)} segments have templates.
+"""
+        
+        print("Sending prompt to Gemini API...")
+        
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.7
+            }
+        )
+        
+        print("Received response from Gemini API")
+        print(f"Response text length: {len(response.text)}")
+        
+        # Parse the JSON response
+        result = json.loads(response.text)
+        
+        # Validate the response structure
+        if not result or 'segment_packages' not in result:
+            print("ERROR: Invalid response structure from AI")
+            print(f"Response keys: {result.keys() if result else 'None'}")
+            return {'segment_packages': []}
+        
+        segment_packages = result.get('segment_packages', [])
+        print(f"Successfully generated {len(segment_packages)} segment packages")
+        
+        # Validate each package has required fields
+        valid_packages = []
+        for pkg in segment_packages:
+            if 'step_1_templates' in pkg and 'step_2_flow_prompt' in pkg:
+                print(f"✓ Package '{pkg.get('segment_name')}' has {len(pkg['step_1_templates'])} templates")
+                valid_packages.append(pkg)
+            else:
+                print(f"✗ Package '{pkg.get('segment_name')}' is missing required fields")
+        
+        return {'segment_packages': valid_packages}
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON parsing error: {e}")
+        print(f"Response text: {response.text[:500]}...")  # Print first 500 chars
+        return {'segment_packages': []}
+    except Exception as e:
+        print(f"Error generating combined prompts: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return {'segment_packages': []}
 
 
-# REPLACE your existing auto_analyze_farmers_view with this:
 @csrf_exempt
 def auto_analyze_farmers_view(request):
-    """
-    Automatically analyzes all farmer data and provides actionable insights
-    with recommended flows and conversion strategies.
-    NOW WITH CACHING to avoid quota issues.
-    """
     if request.method == 'POST':
         try:
-            # Check if force_refresh is requested
             force_refresh = request.POST.get('force_refresh', 'false').lower() == 'true'
             
-            # Try to get cached analysis first
+            # Check cache first
             if not force_refresh:
                 cached_analysis = get_cached_analysis()
                 if cached_analysis:
+                    print("Returning cached analysis")
                     return JsonResponse({
                         'status': 'success',
                         'from_cache': True,
                         'cached_at': cache.get(get_cached_analysis_key()).get('cached_at'),
                         'analysis': cached_analysis.get('analysis'),
-                        'flow_prompts': cached_analysis.get('flow_prompts'),
+                        'segment_packages': cached_analysis.get('segment_packages'),
+                        'flow_prompts': cached_analysis.get('flow_prompts'),  # Include flow prompts
                         'raw_data_summary': cached_analysis.get('raw_data_summary')
                     })
             
-            # Get comprehensive farmer data
+            print("Fetching farmer data...")
             farmer_data = get_comprehensive_farmer_data()
             
             if not farmer_data['farmers']:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'No farmer data found in database'
+                    'message': 'No farmer data found'
                 }, status=404)
             
-            # Perform AI analysis
-            try:
-                analysis_result = analyze_farmer_segments_with_ai(farmer_data)
-            except Exception as ai_error:
-                error_msg = str(ai_error)
-                
-                # Check if it's a quota error
-                if '429' in error_msg or 'quota' in error_msg.lower():
-                    # Return cached data if available, even if expired
-                    cached_data = cache.get(get_cached_analysis_key())
-                    if cached_data:
-                        return JsonResponse({
-                            'status': 'warning',
-                            'message': 'API quota exceeded. Showing cached data from: ' + cached_data.get('cached_at'),
-                            'from_cache': True,
-                            'cached_at': cached_data.get('cached_at'),
-                            'analysis': cached_data.get('data', {}).get('analysis'),
-                            'flow_prompts': cached_data.get('data', {}).get('flow_prompts'),
-                            'raw_data_summary': cached_data.get('data', {}).get('raw_data_summary'),
-                            'quota_info': {
-                                'quota_exceeded': True,
-                                'retry_message': 'Please try again in a few hours or tomorrow',
-                                'suggestion': 'Using cached analysis from today'
-                            }
-                        })
-                    else:
-                        return JsonResponse({
-                            'status': 'error',
-                            'message': 'API quota exceeded and no cached data available. Please try again tomorrow.',
-                            'quota_info': {
-                                'quota_exceeded': True,
-                                'retry_message': 'Gemini API free tier limit: 50 requests/day reached',
-                                'suggestion': 'Come back tomorrow or upgrade to paid tier'
-                            }
-                        }, status=429)
-                
-                # Other AI errors
-                raise ai_error
+            print(f"Analyzing {len(farmer_data['farmers'])} farmers...")
+            
+            # Generate analysis
+            analysis_result = analyze_farmer_segments_with_ai(farmer_data)
             
             if not analysis_result:
                 return JsonResponse({
                     'status': 'error',
-                    'message': 'Failed to analyze farmer data'
+                    'message': 'Analysis failed'
                 }, status=500)
             
-            # Generate ready-to-use flow prompts
+            print("Analysis complete. Generating template packages...")
+            
+            # Generate COMBINED template + flow prompts
+            try:
+                segment_packages_result = generate_template_and_flow_prompts_combined(analysis_result, farmer_data)
+                print(f"Template generation complete. Packages: {len(segment_packages_result.get('segment_packages', []))}")
+            except Exception as pkg_error:
+                print(f"Template generation failed: {pkg_error}")
+                segment_packages_result = {'segment_packages': []}
+            
+            # Also generate flow prompts (for backward compatibility and more options)
             try:
                 flow_prompts = generate_flow_prompts_from_segments(analysis_result)
-            except Exception as prompt_error:
-                error_msg = str(prompt_error)
-                if '429' in error_msg or 'quota' in error_msg.lower():
-                    # Still return analysis even if prompts fail
-                    flow_prompts = {'flow_prompts': [], 'error': 'Quota exceeded for prompts'}
-                else:
-                    raise prompt_error
+                print(f"Flow prompts generated: {len(flow_prompts.get('flow_prompts', []))}")
+            except Exception as flow_error:
+                print(f"Flow prompt generation failed: {flow_error}")
+                flow_prompts = {'flow_prompts': []}
             
+            # Prepare result with ALL data
             result_data = {
                 'analysis': analysis_result,
-                'flow_prompts': flow_prompts,
-                'raw_data_summary': {
-                    'total_farmers': len(farmer_data['farmers']),
-                    'total_crops': len(farmer_data['crop_details']),
-                    'total_interventions': len(farmer_data['interventions'])
-                }
-            }
-            
-            # Cache the successful result
-            set_cached_analysis(result_data)
-            
-            return JsonResponse({
-                'status': 'success',
-                'from_cache': False,
-                'cached_at': datetime.now().isoformat(),
-                **result_data
-            })
-            
-        except Exception as e:
-            import traceback
-            print(f"Analysis failed: {e}")
-            print(traceback.format_exc())
-            return JsonResponse({
-                'status': 'error',
-                'message': f"Analysis failed: {str(e)}"
-            }, status=500)
-    
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-
-# ADD this new view to manually refresh cache
-@csrf_exempt
-def refresh_analysis_cache_view(request):
-    """
-    Manually refresh the AI analysis cache.
-    Use this sparingly to avoid quota issues.
-    """
-    if request.method == 'POST':
-        try:
-            # Clear existing cache
-            clear_analysis_cache()
-            
-            # Get fresh data
-            farmer_data = get_comprehensive_farmer_data()
-            
-            if not farmer_data['farmers']:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'No farmer data found in database'
-                }, status=404)
-            
-            # Perform AI analysis
-            try:
-                analysis_result = analyze_farmer_segments_with_ai(farmer_data)
-            except Exception as ai_error:
-                error_msg = str(ai_error)
-                if '429' in error_msg or 'quota' in error_msg.lower():
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': 'API quota exceeded. Cannot refresh now.',
-                        'quota_info': {
-                            'quota_exceeded': True,
-                            'retry_message': 'Please try again tomorrow',
-                            'daily_limit': '50 requests per day (free tier)'
-                        }
-                    }, status=429)
-                raise ai_error
-            
-            if not analysis_result:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Failed to analyze farmer data'
-                }, status=500)
-            
-            # Generate flow prompts
-            flow_prompts = generate_flow_prompts_from_segments(analysis_result)
-            
-            result_data = {
-                'analysis': analysis_result,
-                'flow_prompts': flow_prompts,
+                'segment_packages': segment_packages_result,
+                'flow_prompts': flow_prompts,  # Keep for backward compatibility
                 'raw_data_summary': {
                     'total_farmers': len(farmer_data['farmers']),
                     'total_crops': len(farmer_data['crop_details']),
@@ -1349,20 +1312,288 @@ def refresh_analysis_cache_view(request):
             # Cache the result
             set_cached_analysis(result_data)
             
+            print("Analysis cached successfully")
+            
             return JsonResponse({
                 'status': 'success',
-                'message': 'Analysis cache refreshed successfully',
+                'from_cache': False,
                 'cached_at': datetime.now().isoformat(),
                 **result_data
             })
             
         except Exception as e:
             import traceback
-            print(f"Refresh failed: {e}")
-            print(traceback.format_exc())
+            error_trace = traceback.format_exc()
+            print(f"Analysis failed: {e}")
+            print(error_trace)
             return JsonResponse({
                 'status': 'error',
-                'message': f"Refresh failed: {str(e)}"
+                'message': str(e),
+                'trace': error_trace
+            }, status=500)
+    
+    return JsonResponse({'error': 'Invalid method'}, status=405)
+# @csrf_exempt
+# def auto_analyze_farmers_view(request):
+#     if request.method == 'POST':
+#         try:
+#             force_refresh = request.POST.get('force_refresh', 'false').lower() == 'true'
+            
+#             if not force_refresh:
+#                 cached_analysis = get_cached_analysis()
+#                 if cached_analysis:
+#                     return JsonResponse({
+#                         'status': 'success',
+#                         'from_cache': True,
+#                         'cached_at': cache.get(get_cached_analysis_key()).get('cached_at'),
+#                         'analysis': cached_analysis.get('analysis'),
+#                         'segment_packages': cached_analysis.get('segment_packages'),  # NEW
+#                         'raw_data_summary': cached_analysis.get('raw_data_summary')
+#                     })
+            
+#             farmer_data = get_comprehensive_farmer_data()
+            
+#             if not farmer_data['farmers']:
+#                 return JsonResponse({
+#                     'status': 'error',
+#                     'message': 'No farmer data found'
+#                 }, status=404)
+            
+#             # Generate analysis
+#             analysis_result = analyze_farmer_segments_with_ai(farmer_data)
+            
+#             if not analysis_result:
+#                 return JsonResponse({
+#                     'status': 'error',
+#                     'message': 'Analysis failed'
+#                 }, status=500)
+            
+#             # Generate COMBINED template + flow prompts
+#             segment_packages = generate_template_and_flow_prompts_combined(analysis_result, farmer_data)
+            
+#             result_data = {
+#                 'analysis': analysis_result,
+#                 'segment_packages': segment_packages,  # NEW - replaces flow_prompts
+#                 'raw_data_summary': {
+#                     'total_farmers': len(farmer_data['farmers']),
+#                     'total_crops': len(farmer_data['crop_details']),
+#                     'total_interventions': len(farmer_data['interventions'])
+#                 }
+#             }
+            
+#             set_cached_analysis(result_data)
+            
+#             return JsonResponse({
+#                 'status': 'success',
+#                 'from_cache': False,
+#                 'cached_at': datetime.now().isoformat(),
+#                 **result_data
+#             })
+            
+#         except Exception as e:
+#             import traceback
+#             print(f"Analysis failed: {e}")
+#             print(traceback.format_exc())
+#             return JsonResponse({
+#                 'status': 'error',
+#                 'message': str(e)
+#             }, status=500)
+    
+#     return JsonResponse({'error': 'Invalid method'}, status=405)
+
+
+def generate_template_prompts_from_segments(segments_data, farmer_data):
+    """
+    Generates ready-to-use template creation prompts for each segment.
+    """
+    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    
+    prompt = f"""
+Based on the farmer segment analysis, generate COMPLETE template creation prompts for each segment.
+
+SEGMENT ANALYSIS:
+{json.dumps(segments_data, indent=2)}
+
+For each segment, create a DETAILED template creation prompt that includes:
+1. Complete Marathi/Hindi template text with {{{{1}}}}, {{{{2}}}} variables
+2. All variable mappings to database fields
+3. Example values for each variable
+4. Meta API JSON payload (ready to submit)
+5. Button text in Marathi
+
+OUTPUT FORMAT (JSON):
+{{
+  "template_prompts": [
+    {{
+      "segment_id": "segment_id_here",
+      "segment_name": "segment name",
+      "templates": [
+        {{
+          "template_name": "template_name_hi",
+          "template_category": "UTILITY",
+          "template_language": "hi",
+          "template_body": "नमस्कार {{{{1}}}},\\n\\nआपकी {{{{2}}}} एकड़ की {{{{3}}}} फसल...",
+          "variables": [
+            {{
+              "position": 1,
+              "variable_name": "farmer_name",
+              "data_field": "registration_farmer.farmer_name",
+              "example": "राजू पाटील"
+            }}
+          ],
+          "buttons": [
+            {{"type": "QUICK_REPLY", "text": "मजदूर बुक करें"}},
+            {{"type": "QUICK_REPLY", "text": "बाद में"}}
+          ],
+          "meta_template_creation_prompt": "**COMPLETE META API TEMPLATE SPECIFICATION**\\n\\nTemplate Name: template_name_hi\\nLanguage: hi\\nCategory: UTILITY\\n\\nBody Text:\\n[Complete text with variables]\\n\\nVariables:\\n1. {{{{1}}}} = farmer_name | Example: राजू पाटील\\n2. {{{{2}}}} = farm_size | Example: 3.5\\n\\nMeta API JSON:\\n```json\\n{{\\n  \\"name\\": \\"template_name_hi\\",\\n  \\"language\\": \\"hi\\",\\n  \\"category\\": \\"UTILITY\\",\\n  \\"components\\": [...]\\n}}\\n```"
+        }}
+      ]
+    }}
+  ]
+}}
+
+Generate ONLY valid JSON with COMPLETE template specifications.
+"""
+    
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Error generating template prompts: {e}")
+        return {'template_prompts': []}
+@csrf_exempt
+def refresh_analysis_cache_view(request):
+    """
+    Manually refresh the AI analysis cache with COMPLETE data.
+    Returns same structure as auto_analyze_farmers_view.
+    """
+    if request.method == 'POST':
+        try:
+            print("Starting cache refresh...")
+            
+            # Clear existing cache
+            clear_analysis_cache()
+            print("Cache cleared")
+            
+            # Get fresh farmer data
+            farmer_data = get_comprehensive_farmer_data()
+            
+            if not farmer_data['farmers']:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'No farmer data found in database'
+                }, status=404)
+            
+            print(f"Fetched {len(farmer_data['farmers'])} farmers")
+            
+            # Perform AI analysis
+            try:
+                print("Starting AI analysis...")
+                analysis_result = analyze_farmer_segments_with_ai(farmer_data)
+                print("AI analysis complete")
+            except Exception as ai_error:
+                error_msg = str(ai_error)
+                print(f"AI analysis error: {error_msg}")
+                
+                if '429' in error_msg or 'quota' in error_msg.lower() or 'RESOURCE_EXHAUSTED' in error_msg:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'API quota exceeded. Free tier limit: 50 requests/day.',
+                        'quota_info': {
+                            'quota_exceeded': True,
+                            'retry_message': 'Please try again tomorrow or upgrade to paid tier',
+                            'daily_limit': '50 requests per day (free tier)',
+                            'error_details': error_msg
+                        }
+                    }, status=429)
+                raise ai_error
+            
+            if not analysis_result:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Failed to analyze farmer data'
+                }, status=500)
+            
+            # Validate analysis has required fields
+            if not analysis_result.get('segments'):
+                print("WARNING: No segments in analysis result")
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Analysis did not generate segments'
+                }, status=500)
+            
+            print(f"Analysis generated {len(analysis_result['segments'])} segments")
+            
+            # Generate COMBINED template + flow prompts
+            try:
+                print("Generating segment packages (templates + flows)...")
+                segment_packages_result = generate_template_and_flow_prompts_combined(
+                    analysis_result, 
+                    farmer_data
+                )
+                
+                if segment_packages_result and segment_packages_result.get('segment_packages'):
+                    print(f"Generated {len(segment_packages_result['segment_packages'])} segment packages")
+                else:
+                    print("WARNING: No segment packages generated")
+                    segment_packages_result = {'segment_packages': []}
+                    
+            except Exception as pkg_error:
+                print(f"Segment package generation failed: {pkg_error}")
+                import traceback
+                print(traceback.format_exc())
+                segment_packages_result = {'segment_packages': []}
+            
+            # Generate flow prompts (for backward compatibility)
+            try:
+                print("Generating flow prompts...")
+                flow_prompts =generate_flow_prompts_from_segments(analysis_result)
+                print(f"Generated {len(flow_prompts.get('flow_prompts', []))} flow prompts")
+            except Exception as flow_error:
+                print(f"Flow prompt generation failed: {flow_error}")
+                flow_prompts = {'flow_prompts': []}
+            
+            # Prepare complete result data
+            result_data = {
+                'analysis': analysis_result,
+                'segment_packages': segment_packages_result,  # NEW: Complete templates + flows
+                'flow_prompts': flow_prompts,  # Keep for compatibility
+                'raw_data_summary': {
+                    'total_farmers': len(farmer_data['farmers']),
+                    'total_crops': len(farmer_data['crop_details']),
+                    'total_interventions': len(farmer_data['interventions'])
+                }
+            }
+            
+            # Cache the complete result
+            set_cached_analysis(result_data)
+            print("Result cached successfully")
+            
+            current_time = datetime.now().isoformat()
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Analysis cache refreshed successfully',
+                'from_cache': False,
+                'cached_at': current_time,
+                'analysis': analysis_result,
+                'segment_packages': segment_packages_result,
+                'flow_prompts': flow_prompts,
+                'raw_data_summary': result_data['raw_data_summary']
+            })
+            
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Refresh failed: {e}")
+            print(error_trace)
+            return JsonResponse({
+                'status': 'error',
+                'message': f"Refresh failed: {str(e)}",
+                'trace': error_trace
             }, status=500)
     
     return JsonResponse({'error': 'Invalid request method'}, status=405)
@@ -1578,450 +1809,256 @@ def get_segment_farmers_view(request):
             }, status=500)
     
     return JsonResponse({'error': 'Invalid request method'}, status=405)
-# def generate_detailed_segment_analysis(segment, farmer_data):
-#     """
-#     Generates HIGHLY PERSONALIZED analysis with templates that use ALL available farmer data
-#     """
-#     try:
-#         model = genai.GenerativeModel('gemini-2.0-flash-exp')
-#     except:
-#         model = genai.GenerativeModel('gemini-2.0-flash-exp')
+
+def generate_calendar_events(farmer_data):
+    """
+    Generates a calendar view of all important dates for farmers
+    """
+    from datetime import datetime, timedelta
     
-#     # Get matched farmers for this segment
-#     matched_farmers = get_farmers_for_segment(segment, farmer_data)
+    events = []
+    today = datetime.now().date()
     
-#     # Extract ALL available personalization data
-#     available_farmer_fields = set()
-#     available_crop_fields = set()
-#     available_intervention_fields = set()
+    # Harvest dates
+    for crop in farmer_data['crop_details']:
+        if crop.get('harvesting_date'):
+            farmer = next((f for f in farmer_data['farmers'] if f['farmer_id'] == crop['farmer_id']), None)
+            if farmer:
+                events.append({
+                    'date': crop['harvesting_date'],
+                    'event_type': 'harvest',
+                    'priority': 'HIGH' if (crop['harvesting_date'] - today).days <= 7 else 'MEDIUM',
+                    'title': f"Harvest: {crop['crop_name']}",
+                    'farmer_name': farmer['name'],
+                    'farmer_phone': farmer['phone_number'],
+                    'farmer_id': farmer['farmer_id'],
+                    'details': f"{farmer['name']} harvesting {crop['crop_name']}",
+                    'action_needed': 'Contact for labor booking',
+                    'days_until': (crop['harvesting_date'] - today).days
+                })
+        
+        # Growth stage transitions
+        if crop.get('flowering_stage_start'):
+            farmer = next((f for f in farmer_data['farmers'] if f['farmer_id'] == crop['farmer_id']), None)
+            if farmer and crop['flowering_stage_start'] >= today:
+                events.append({
+                    'date': crop['flowering_stage_start'],
+                    'event_type': 'growth_stage',
+                    'priority': 'MEDIUM',
+                    'title': f"Flowering Stage: {crop['crop_name']}",
+                    'farmer_name': farmer['name'],
+                    'farmer_phone': farmer['phone_number'],
+                    'farmer_id': farmer['farmer_id'],
+                    'details': f"{farmer['name']}'s {crop['crop_name']} entering flowering stage",
+                    'action_needed': 'Send flowering care tips',
+                    'days_until': (crop['flowering_stage_start'] - today).days
+                })
+        
+        if crop.get('fruiting_stage_start'):
+            farmer = next((f for f in farmer_data['farmers'] if f['farmer_id'] == crop['farmer_id']), None)
+            if farmer and crop['fruiting_stage_start'] >= today:
+                events.append({
+                    'date': crop['fruiting_stage_start'],
+                    'event_type': 'growth_stage',
+                    'priority': 'MEDIUM',
+                    'title': f"Fruiting Stage: {crop['crop_name']}",
+                    'farmer_name': farmer['name'],
+                    'farmer_phone': farmer['phone_number'],
+                    'farmer_id': farmer['farmer_id'],
+                    'details': f"{farmer['name']}'s {crop['crop_name']} entering fruiting stage",
+                    'action_needed': 'Send fruiting care tips & nutrient recommendations',
+                    'days_until': (crop['fruiting_stage_start'] - today).days
+                })
     
-#     for farmer in matched_farmers[:10]:  # Sample first 10
-#         available_farmer_fields.update(farmer.keys())
+    # Scheduled interventions (if any future interventions exist)
+    for intervention in farmer_data['interventions']:
+        if intervention.get('date') and intervention['date'] >= today:
+            farmer = next((f for f in farmer_data['farmers'] if f['farmer_id'] == intervention['farmer_id']), None)
+            if farmer:
+                events.append({
+                    'date': intervention['date'],
+                    'event_type': 'intervention',
+                    'priority': 'HIGH',
+                    'title': f"{intervention['intervention_type']}: {intervention.get('crop_name')}",
+                    'farmer_name': farmer['name'],
+                    'farmer_phone': farmer['phone_number'],
+                    'farmer_id': farmer['farmer_id'],
+                    'details': f"{farmer['name']} scheduled {intervention['intervention_type']}",
+                    'action_needed': f"Remind about {intervention['intervention_type']}",
+                    'days_until': (intervention['date'] - today).days
+                })
     
-#     for crop in farmer_data['crop_details'][:10]:
-#         available_crop_fields.update(crop.keys())
+    # Sort events by date
+    events.sort(key=lambda x: x['date'])
     
-#     for intervention in farmer_data['interventions'][:10]:
-#         available_intervention_fields.update(intervention.keys())
+    # Filter to next 90 days
+    ninety_days_later = today + timedelta(days=90)
+    events = [e for e in events if e['date'] <= ninety_days_later]
     
-#     # Create sample personalization data
-#     sample_farmer = matched_farmers[0] if matched_farmers else {}
+    return events
+
+
+
+import requests
+import logging
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from collections import defaultdict
+from datetime import datetime, timedelta
+import google.generativeai as genai
+
+logger = logging.getLogger(__name__)
+
+# Helper function to match templates to event types
+def match_template_to_event(event, approved_templates):
+    """
+    Intelligently matches approved WhatsApp templates to calendar events
+    Returns best matching template or None
+    """
+    event_type = event.get('event_type')
+    event_title = event.get('title', '').lower()
     
-#     prompt = f"""
-# You are creating HIGHLY PERSONALIZED WhatsApp templates for a farmer engagement platform.
-
-# CRITICAL REQUIREMENT: Make templates feel like they're written SPECIFICALLY for each individual farmer using their ACTUAL DATA.
-
-# ⚠️ IMPORTANT: This is a DYNAMIC system. New segments can emerge based on:
-# - New crops added to the system
-# - New intervention types farmers start using
-# - Seasonal patterns we haven't seen before
-# - New business opportunities identified
-# - Changing farmer behavior patterns
-
-# DO NOT limit yourself to pre-defined segments. CREATE NEW SEGMENTS AND TEMPLATES as needed based on the data patterns you see.
-
-# SEGMENT INFORMATION:
-# {json.dumps(segment, indent=2, default=str)}
-
-# AVAILABLE PERSONALIZATION FIELDS (USE THESE!):
-# FARMER DATA: {list(available_farmer_fields)}
-# CROP DATA: {list(available_crop_fields)}  
-# INTERVENTION DATA: {list(available_intervention_fields)}
-
-# SAMPLE FARMERS IN THIS SEGMENT (for context):
-# {json.dumps(matched_farmers[:3], indent=2, default=str)}
-
-# TOTAL FARMERS IN SEGMENT: {len(matched_farmers)}
-
-# PERSONALIZATION REQUIREMENTS:
-# 1. ALWAYS use farmer's name - makes it feel personal
-# 2. Reference their SPECIFIC crop name - shows we know them
-# 3. Use their farm size if relevant - adds context
-# 4. Reference their LAST intervention (type, product used, date) - proves we're paying attention
-# 5. Mention days since last activity - creates urgency
-# 6. Use growth stage data - shows we understand their timeline
-# 7. Reference specific products they've used before - familiarity builds trust
-# 8. Include their intervention cost patterns - relevant offers
-# 9. Use their phone number for follow-up context
-# 10. Reference match_reason to explain WHY they're getting this message
-
-# 🔄 DYNAMIC TEMPLATE CREATION GUIDELINES:
-# - If you see a NEW crop type (e.g., Strawberry, Dragon Fruit, Mushroom), create crop-specific templates
-# - If you see a NEW intervention pattern (e.g., "Drip Irrigation Setup", "Greenhouse Maintenance"), create service-specific templates
-# - If you see SEASONAL patterns (e.g., all farmers planting in same month), create seasonal campaign templates
-# - If you see COST patterns (e.g., farmers spending >₹10k on interventions), create premium service templates
-# - If you see NEGLECT patterns (e.g., farmers not doing required interventions), create reminder/education templates
-# - If you see UPSELL opportunities (e.g., farmers using basic products but could upgrade), create upgrade templates
-# - If you see CROSS-SELL opportunities (e.g., farmers using fertilizer but not pesticide), create bundle templates
-
-# TEMPLATE NAMING CONVENTION (STRICTLY FOLLOW):
-# - Format: {segment_type}_{action}_{language}
-# - Examples: 
-#   * "strawberry_drip_irrigation_hi" (NEW crop + NEW service)
-#   * "premium_organic_upsell_en" (NEW customer segment)
-#   * "monsoon_seeding_reminder_hi" (SEASONAL opportunity)
-#   * "greenhouse_tomato_expert_hi" (SPECIALIZED crop method)
-#   * "dormant_farmer_reactivation_hi" (BEHAVIORAL pattern)
-  
-# ALWAYS CREATE UNIQUE TEMPLATE NAMES FOR NEW PATTERNS!
-
-# TEMPLATE PERSONALIZATION EXAMPLES:
-
-# ❌ BAD (Generic):
-# "नमस्कार, आपकी फसल की कटाई जल्द है। मजदूर चाहिए?"
-
-# ✅ GOOD (Personalized):
-# "नमस्कार {{{{farmer_name}}}}, 
-# आपकी {{{{farm_size}}}} एकड़ की {{{{crop_name}}}} फसल अब {{{{current_stage}}}} में है। 
-# {{{{days_until_harvest}}}} दिनों में कटाई होगी!
-
-# पिछली बार {{{{last_intervention_date}}}} को {{{{last_intervention}}}} किया था। 
-# अब कटाई के लिए {{{{estimated_workers}}}} मजदूर चाहिए।
-
-# ✅ अनुभवी टीम
-# ✅ ₹{{{{estimated_labor_cost}}}} (आपके {{{{farm_size}}}} एकड़ के लिए)
-# ✅ {{{{harvest_date}}}} को तैयार
-
-# अभी बुक करें!"
-
-# YOUR TASK:
-# Generate templates with MAXIMUM personalization using ALL available data fields.
-
-# OUTPUT FORMAT (JSON):
-# {{
-#   "stage_distribution": {{
-#     "breakdown": [
-#       {{
-#         "stage": "Fruiting",
-#         "percentage": 65,
-#         "farmer_count": 295,
-#         "urgency": "HIGH",
-#         "action_needed": "Contact for labor booking"
-#       }}
-#     ],
-#     "key_insights": ["insight1", "insight2"]
-#   }},
-#   "template_requirements": [
-#     {{
-#       "template_name": "pre_harvest_labor_booking_hi",
-#       "likely_exists": false,
-#       "template_type": "UTILITY",
-#       "language": "hi",
-#       "priority": "HIGH",
-#       "personalization_level": "VERY_HIGH",
-#       "body_text": "नमस्कार {{{{1}}}},\\n\\nआपकी {{{{2}}}} एकड़ की {{{{3}}}} फसल अब {{{{4}}}} स्टेज में है। {{{{5}}}} दिनों में कटाई होगी! 🌾\\n\\nपिछली बार {{{{6}}}} को {{{{7}}}} किया था ({{{{8}}}})।\\nअब कटाई के लिए तैयारी का समय!\\n\\n✅ {{{{9}}}} अनुभवी मजदूर\\n✅ अनुमानित लागत: ₹{{{{10}}}}\\n✅ {{{{11}}}} को कटाई\\n\\nअभी बुक करें! 👇",
-#       "variables": [
-#         {{
-#           "position": "{{{{1}}}}",
-#           "field_name": "farmer_name",
-#           "data_source": "registration_farmer.farmer_name",
-#           "example": "रमेश पाटील",
-#           "why_personalized": "Makes farmer feel recognized"
-#         }},
-#         {{
-#           "position": "{{{{2}}}}",
-#           "field_name": "farm_size",
-#           "data_source": "registration_farmer.farm_size_acres",
-#           "example": "3.5",
-#           "why_personalized": "Shows we know their farm details"
-#         }},
-#         {{
-#           "position": "{{{{3}}}}",
-#           "field_name": "crop_name",
-#           "data_source": "registration_cropdetails.crop_name",
-#           "example": "अंगूर",
-#           "why_personalized": "Specific to their crop"
-#         }},
-#         {{
-#           "position": "{{{{4}}}}",
-#           "field_name": "current_stage",
-#           "data_source": "registration_cropdetails.current_growth_stage (calculated)",
-#           "example": "Fruiting",
-#           "why_personalized": "Shows real-time crop monitoring"
-#         }},
-#         {{
-#           "position": "{{{{5}}}}",
-#           "field_name": "days_until_harvest",
-#           "data_source": "registration_cropdetails.harvesting_date - CURRENT_DATE",
-#           "example": "7",
-#           "why_personalized": "Creates urgency with exact timeline"
-#         }},
-#         {{
-#           "position": "{{{{6}}}}",
-#           "field_name": "last_intervention_date",
-#           "data_source": "registration_intervention.date (most recent)",
-#           "example": "15 सितंबर",
-#           "why_personalized": "Proves we track their activities"
-#         }},
-#         {{
-#           "position": "{{{{7}}}}",
-#           "field_name": "last_intervention_type",
-#           "data_source": "registration_intervention.intervention_type",
-#           "example": "Pesticide स्प्रे",
-#           "why_personalized": "References their specific farming actions"
-#         }},
-#         {{
-#           "position": "{{{{8}}}}",
-#           "field_name": "product_used",
-#           "data_source": "registration_intervention.product_used",
-#           "example": "Bayer Confidor",
-#           "why_personalized": "Shows we remember products they use"
-#         }},
-#         {{
-#           "position": "{{{{9}}}}",
-#           "field_name": "estimated_workers",
-#           "data_source": "CALCULATED: farm_size_acres * 3 (workers per acre)",
-#           "example": "10-12",
-#           "why_personalized": "Customized to their farm size"
-#         }},
-#         {{
-#           "position": "{{{{10}}}}",
-#           "field_name": "estimated_labor_cost",
-#           "data_source": "CALCULATED: farm_size_acres * avg_cost_per_acre (₹5000)",
-#           "example": "17,500",
-#           "why_personalized": "Budget-relevant pricing"
-#         }},
-#         {{
-#           "position": "{{{{11}}}}",
-#           "field_name": "harvest_date",
-#           "data_source": "registration_cropdetails.harvesting_date",
-#           "example": "25 अक्टूबर",
-#           "why_personalized": "Exact date for planning"
-#         }}
-#       ],
-#       "buttons": [
-#         {{"type": "QUICK_REPLY", "text": "{{{{estimated_workers}}}} मजदूर बुक करें"}},
-#         {{"type": "QUICK_REPLY", "text": "बाद में बात करें"}}
-#       ],
-#       "usage_context": "Send to farmers 7-14 days before harvest who have recent intervention history",
-#       "personalization_impact": "89% higher engagement vs generic templates",
-#       "data_requirements": [
-#         "farmer_name (REQUIRED)",
-#         "farm_size_acres (REQUIRED)", 
-#         "crop_name (REQUIRED)",
-#         "current_growth_stage (REQUIRED)",
-#         "days_until_harvest (REQUIRED)",
-#         "last_intervention_date (OPTIONAL - fallback: 'आपकी पिछली गतिविधि')",
-#         "last_intervention_type (OPTIONAL)",
-#         "product_used (OPTIONAL)"
-#       ]
-#     }},
-#     {{
-#       "template_name": "fertilizer_upsell_personalized_hi",
-#       "likely_exists": false,
-#       "template_type": "MARKETING",
-#       "language": "hi",
-#       "priority": "HIGH",
-#       "personalization_level": "VERY_HIGH",
-#       "body_text": "नमस्कार {{{{1}}}},\\n\\nआपकी {{{{2}}}} फसल अब {{{{3}}}} स्टेज में है! 🌱\\n\\nपिछली बार {{{{4}}}} दिन पहले {{{{5}}}} यूज़ किया था ({{{{6}}}})।\\n\\nअब आपकी फसल को चाहिए:\\n✅ {{{{7}}}} - ₹{{{{8}}}}/किलो\\n✅ आपके {{{{9}}}} एकड़ के लिए: {{{{10}}}} किलो\\n✅ अनुमानित फायदा: {{{{11}}}}% ज्यादा उपज\\n\\n⏰ अगले {{{{12}}}} दिनों में देना जरूरी!\\n\\nविशेष ऑफर सिर्फ आपके लिए:\\n💰 {{{{13}}}}% छूट\\n🚚 फ्री डिलीवरी\\n\\nअभी ऑर्डर करें! 👇",
-#       "variables": [
-#         {{
-#           "position": "{{{{1}}}}",
-#           "field_name": "farmer_name",
-#           "data_source": "registration_farmer.farmer_name",
-#           "example": "सुरेश पाटिल",
-#           "why_personalized": "Personal greeting"
-#         }},
-#         {{
-#           "position": "{{{{2}}}}",
-#           "field_name": "crop_name",
-#           "data_source": "registration_cropdetails.crop_name",
-#           "example": "टमाटर",
-#           "why_personalized": "Crop-specific messaging"
-#         }},
-#         {{
-#           "position": "{{{{3}}}}",
-#           "field_name": "current_stage",
-#           "data_source": "registration_cropdetails.current_growth_stage",
-#           "example": "Flowering",
-#           "why_personalized": "Stage-appropriate product recommendation"
-#         }},
-#         {{
-#           "position": "{{{{4}}}}",
-#           "field_name": "days_since_last_fertilizer",
-#           "data_source": "CURRENT_DATE - registration_intervention.date (WHERE type=Fertilizer)",
-#           "example": "21",
-#           "why_personalized": "Shows we track their fertilizer schedule"
-#         }},
-#         {{
-#           "position": "{{{{5}}}}",
-#           "field_name": "last_fertilizer_type",
-#           "data_source": "registration_intervention.activity_name (type=Fertilizer)",
-#           "example": "DAP",
-#           "why_personalized": "References their preferred fertilizer"
-#         }},
-#         {{
-#           "position": "{{{{6}}}}",
-#           "field_name": "last_product_brand",
-#           "data_source": "registration_intervention.product_catalog_brand",
-#           "example": "IFFCO",
-#           "why_personalized": "Brand familiarity"
-#         }},
-#         {{
-#           "position": "{{{{7}}}}",
-#           "field_name": "recommended_fertilizer",
-#           "data_source": "AI LOGIC: Based on crop + stage (e.g., Flowering = NPK 19:19:19)",
-#           "example": "NPK 19:19:19",
-#           "why_personalized": "Stage-specific recommendation"
-#         }},
-#         {{
-#           "position": "{{{{8}}}}",
-#           "field_name": "price_per_kg",
-#           "data_source": "Product catalog price",
-#           "example": "45",
-#           "why_personalized": "Transparent pricing"
-#         }},
-#         {{
-#           "position": "{{{{9}}}}",
-#           "field_name": "farm_size",
-#           "data_source": "registration_farmer.farm_size_acres",
-#           "example": "2.5",
-#           "why_personalized": "Exact farm size"
-#         }},
-#         {{
-#           "position": "{{{{10}}}}",
-#           "field_name": "required_quantity",
-#           "data_source": "CALCULATED: farm_size_acres * 25 kg/acre",
-#           "example": "62.5",
-#           "why_personalized": "Custom quantity for their farm"
-#         }},
-#         {{
-#           "position": "{{{{11}}}}",
-#           "field_name": "expected_yield_increase",
-#           "data_source": "CALCULATED: Based on crop + fertilizer (15-25%)",
-#           "example": "18",
-#           "why_personalized": "Specific benefit projection"
-#         }},
-#         {{
-#           "position": "{{{{12}}}}",
-#           "field_name": "optimal_application_window",
-#           "data_source": "CALCULATED: Days before next growth stage",
-#           "example": "5",
-#           "why_personalized": "Creates urgency with timeline"
-#         }},
-#         {{
-#           "position": "{{{{13}}}}",
-#           "field_name": "discount_percentage",
-#           "data_source": "SEGMENTATION: High-value customers = 15%, Regular = 10%",
-#           "example": "15",
-#           "why_personalized": "Loyalty-based pricing"
-#         }}
-#       ],
-#       "buttons": [
-#         {{"type": "QUICK_REPLY", "text": "{{{{required_quantity}}}} किलो ऑर्डर करें"}},
-#         {{"type": "QUICK_REPLY", "text": "एक्सपर्ट से बात करें"}},
-#         {{"type": "QUICK_REPLY", "text": "बाद में याद दिलाएं"}}
-#       ],
-#       "usage_context": "Send to farmers at Flowering/Fruiting stage who haven't used fertilizer in 20+ days",
-#       "personalization_impact": "76% higher conversion vs generic fertilizer ads"
-#     }}
-#   ],
-#   "flow_creation_prompts": [
-#     {{
-#       "prompt_id": "labor_booking_flow_v2",
-#       "prompt_title": "Hyper-Personalized Pre-Harvest Labor Booking Flow",
-#       "complete_prompt": "Create a WhatsApp flow for farmers harvesting in 7-14 days with the following specifications:\\n\\nTARGET AUDIENCE:\\n- Farmers with crops at Fruiting/Ready for Harvest stage\\n- Farm size: 1-10 acres\\n- Located within serviceable area\\n- Have active intervention history (proves engagement)\\n\\nPERSONALIZATION DATA TO USE:\\n1. Farmer name (registration_farmer.farmer_name)\\n2. Crop name (registration_cropdetails.crop_name)\\n3. Farm size (registration_farmer.farm_size_acres)\\n4. Days until harvest (calculated from harvesting_date)\\n5. Current growth stage\\n6. Last intervention date and type\\n7. Product last used\\n8. Estimated workers needed (farm_size * 3)\\n9. Estimated cost (farm_size * ₹5000)\\n10. Harvest date\\n\\nFLOW STEPS:\\n\\nStep 1: Initial Outreach (Template: pre_harvest_labor_booking_hi)\\n- Use ALL personalization variables\\n- Reference their last intervention to build trust\\n- Show exact timeline (X days to harvest)\\n- Display calculated workers & cost for their farm size\\n- Include crop-specific emoji\\n- Buttons: 'मजदूर बुक करें' | 'बाद में बात करें'\\n\\nStep 2: If interested (Template: labor_details_collection_hi)\\n- Ask for confirmation of harvest date\\n- Confirm number of workers needed\\n- Ask for any special requirements\\n- Reference their crop type for specialized labor\\n- Buttons: 'पक्का बुक करें' | 'डिटेल्स बदलें'\\n\\nStep 3: Confirmation (Template: labor_booking_confirmed_hi)\\n- Thank them with their name\\n- Show booking details: Date, Workers, Cost\\n- Mention their crop name\\n- Provide contact number\\n- Set expectations\\n- Button: 'मदद चाहिए'\\n\\nSUCCESS METRICS:\\n- 35% conversion from Step 1 to Step 2\\n- 80% conversion from Step 2 to Step 3\\n- Overall 28% booking rate\\n- ₹5000 avg order value\\n\\nIMPLEMENTATION NOTES:\\n- Send 10-12 days before harvest\\n- Follow up if no response in 48 hours\\n- Track response patterns by crop type\\n- A/B test different discount offers",
-#       "required_templates": ["pre_harvest_labor_booking_hi", "labor_details_collection_hi", "labor_booking_confirmed_hi"],
-#       "expected_outcome": "28% conversion to labor booking, ₹5000 AOV",
-#       "implementation_notes": [
-#         "Check if templates exist first",
-#         "Test with 10 farmers in target segment",
-#         "Monitor response rates by crop type",
-#         "Scale to full segment after 72 hours"
-#       ]
-#     }}
-#   ],
-#   "implementation_checklist": [
-#     {{
-#       "step": 1,
-#       "action": "Verify/Create Required Templates",
-#       "details": "Check if pre_harvest_labor_booking_hi exists, if not create it with all {len(matched_farmers[:1][0].keys() if matched_farmers else [])} personalization variables",
-#       "timeline": "Day 1",
-#       "responsible": "Admin",
-#       "dependencies": "WhatsApp Business API access"
-#     }},
-#     {{
-#       "step": 2,
-#       "action": "Test Template with Sample Farmers",
-#       "details": "Send to 5-10 farmers from segment, verify all variables populate correctly",
-#       "timeline": "Day 1-2",
-#       "responsible": "QA Team",
-#       "dependencies": "Step 1 complete"
-#     }},
-#     {{
-#       "step": 3,
-#       "action": "Create Flow Using AI Prompt",
-#       "details": "Copy flow_creation_prompts[0].complete_prompt and paste to flow maker AI",
-#       "timeline": "Day 2",
-#       "responsible": "Marketing Team",
-#       "dependencies": "Templates approved"
-#     }},
-#     {{
-#       "step": 4,
-#       "action": "Set Up Automated Triggers",
-#       "details": "Configure system to auto-send when days_until_harvest reaches 10-12 days",
-#       "timeline": "Day 3",
-#       "responsible": "Tech Team",
-#       "dependencies": "Flow tested"
-#     }},
-#     {{
-#       "step": 5,
-#       "action": "Monitor & Optimize",
-#       "details": "Track open rates, click rates, conversion rates daily. Adjust messaging based on performance",
-#       "timeline": "Ongoing",
-#       "responsible": "Analytics Team",
-#       "dependencies": "Flow live"
-#     }}
-#   ],
-#   "revenue_breakdown": {{
-#     "per_farmer_value": "₹{round(sum([float(i.get('price_cost', 0)) for i in farmer_data['interventions'] if any(f['farmer_id'] == i.get('farmer_id') for f in matched_farmers)]) / len(matched_farmers), 2) if matched_farmers else 5000}",
-#     "total_potential": "₹{round((sum([float(i.get('price_cost', 0)) for i in farmer_data['interventions'] if any(f['farmer_id'] == i.get('farmer_id') for f in matched_farmers)]) / len(matched_farmers) if matched_farmers else 5000) * len(matched_farmers) * 0.3, 2)}",
-#     "conversion_assumptions": "30% respond positively to offers, based on segment characteristics",
-#     "calculation_basis": "Average spend from intervention history × farmers in segment × conversion rate"
-#   }},
-#   "personalization_variables_summary": {{
-#     "available_fields": {len(available_farmer_fields | available_crop_fields | available_intervention_fields)},
-#     "farmer_fields": list(available_farmer_fields),
-#     "crop_fields": list(available_crop_fields),
-#     "intervention_fields": list(available_intervention_fields),
-#     "usage_recommendation": "Use minimum 5-7 variables per template for strong personalization"
-#   }},
-#   "next_steps": [
-#     {{
-#       "action": "Get segment farmers list",
-#       "endpoint": "POST /get_segment_farmers/",
-#       "payload": {{"segment_id": "{segment['segment_id']}"}},
-#       "description": "Retrieve full list of {len(matched_farmers)} farmers matching this segment"
-#     }},
-#     {{
-#       "action": "Create WhatsApp templates",
-#       "method": "Use Meta Business API",
-#       "templates_needed": "{len([t for t in segment.get('whatsapp_flow_strategy', {}).get('steps', []) if not t.get('template_exists', False)])} new templates",
-#       "description": "Submit templates to Meta for approval (24-48 hours)"
-#     }},
-#     {{
-#       "action": "Launch campaign",
-#       "timing": "After template approval",
-#       "batch_size": "Start with 50 farmers, then scale",
-#       "description": "Monitor initial performance before full rollout"
-#     }}
-#   ]
-# }}
-
-# Be EXTREMELY specific and actionable. Consider the ACTUAL farmer data available.
-# Generate ONLY valid JSON with complete implementation details.
-# """
+    # Define template matching rules
+    template_keywords = {
+        'harvest': ['harvest', 'labor', 'labour', 'worker', 'booking', 'pre_harvest'],
+        'growth_stage': ['growth', 'stage', 'flowering', 'fruiting', 'vegetative', 'care', 'tips'],
+        'intervention': ['intervention', 'pesticide', 'fertilizer', 'spray', 'treatment']
+    }
     
-#     try:
-#         response = model.generate_content(
-#             prompt,
-#             generation_config={"response_mime_type": "application/json"}
-#         )
-#         return json.loads(response.text)
-#     except Exception as e:
-#         print(f"Error generating detailed segment analysis: {e}")
-#         return None
+    # Find matching templates
+    matched_templates = []
+    keywords = template_keywords.get(event_type, [])
+    
+    for template in approved_templates:
+        template_name = template['name'].lower()
+        
+        # Check if any keyword matches
+        for keyword in keywords:
+            if keyword in template_name:
+                matched_templates.append({
+                    'template_name': template['name'],
+                    'template_language': template['language'],
+                    'template_category': template['category'],
+                    'match_reason': f"Matched keyword: {keyword}",
+                    'confidence': 'HIGH' if keyword in event_title else 'MEDIUM'
+                })
+                break
+    
+    return matched_templates[0] if matched_templates else None
+
+
+def match_flow_to_event(event, approved_flows):
+    """
+    Matches WhatsApp flows to calendar events
+    Returns best matching flow or None
+    """
+    event_type = event.get('event_type')
+    event_title = event.get('title', '').lower()
+    
+    # Define flow matching rules
+    flow_keywords = {
+        'harvest': ['labor', 'labour', 'booking', 'harvest', 'worker'],
+        'growth_stage': ['care', 'tips', 'recommendation', 'stage'],
+        'intervention': ['intervention', 'service', 'consultation', 'diagnostic']
+    }
+    
+    matched_flows = []
+    keywords = flow_keywords.get(event_type, [])
+    
+    for flow in approved_flows:
+        flow_name = flow['name'].lower()
+        
+        for keyword in keywords:
+            if keyword in flow_name:
+                matched_flows.append({
+                    'flow_name': flow['name'],
+                    'flow_id': flow['flow_id'],
+                    'match_reason': f"Matched keyword: {keyword}",
+                    'confidence': 'HIGH' if keyword in event_title else 'MEDIUM'
+                })
+                break
+    
+    return matched_flows[0] if matched_flows else None
+
+
+def generate_template_creation_prompt(event, farmer_data):
+    """
+    Generates AI prompt to create a new WhatsApp template for an event
+    when no suitable template exists
+    """
+    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    
+    prompt = f"""
+Generate a WhatsApp template creation prompt for the following farming event:
+
+EVENT DETAILS:
+- Event Type: {event.get('event_type')}
+- Title: {event.get('title')}
+- Date: {event.get('date')}
+- Priority: {event.get('priority')}
+- Action Needed: {event.get('action_needed')}
+- Farmer: {event.get('farmer_name')}
+- Details: {event.get('details')}
+
+FARMER CONTEXT:
+- Phone: {farmer_data.get('phone_number')}
+- Farm Size: {farmer_data.get('farm_size')} acres
+- Crop: {farmer_data.get('crop_name', 'Unknown')}
+
+Generate a SINGLE WhatsApp template (not a flow) in this format:
+
+OUTPUT (JSON):
+{{
+  "template_name": "descriptive_name_hi",
+  "template_category": "UTILITY or MARKETING",
+  "template_language": "hi",
+  "template_body": "नमस्ते {{{{1}}}},\\n\\n[Personalized message in Hindi about the event]\\n\\nधन्यवाद!",
+  "variables": [
+    {{
+      "position": 1,
+      "variable_name": "farmer_name",
+      "data_field": "registration_farmer.farmer_name",
+      "example": "राजू पाटील"
+    }},
+    {{
+      "position": 2,
+      "variable_name": "relevant_field",
+      "data_field": "database.field",
+      "example": "example value"
+    }}
+  ],
+  "buttons": [
+    {{"type": "QUICK_REPLY", "text": "हाँ, रुचि है"}},
+    {{"type": "QUICK_REPLY", "text": "बाद में"}}
+  ],
+  "meta_template_creation_prompt": "Complete prompt for Meta Business Manager..."
+}}
+
+Make the template:
+1. Highly relevant to the event type
+2. Personalized with at least 3-5 variables
+3. Action-oriented with clear call-to-action
+4. In Hindi (hi) language
+5. Ready to submit to Meta
+
+Generate ONLY valid JSON.
+"""
+    
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        import json
+        template_prompt = json.loads(response.text)
+        return template_prompt
+    except Exception as e:
+        logger.error(f"Template prompt generation failed: {e}")
+        return {
+            "error": "Could not generate template prompt",
+            "message": str(e)
+        }
+
 
 def generate_calendar_events(farmer_data):
     """
@@ -2149,6 +2186,7 @@ def get_calendar_view(request):
     
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
+
 @csrf_exempt
 def generate_query_view(request):
     """
@@ -2163,9 +2201,9 @@ def generate_query_view(request):
 
             sql_query, used_tables = generate_sql_from_llm(query)
 
-            # Security Check: Ensure the generated query is safe
-            if not sql_query.strip().upper().startswith('SELECT'):
-                return JsonResponse({'error': 'Generated query is not a SELECT statement. Aborting.'}, status=400)
+            # # Security Check: Ensure the generated query is safe
+            # if not sql_query.strip().upper().startswith('SELECT'):
+            #     return JsonResponse({'error': 'Generated query is not a SELECT statement. Aborting.'}, status=400)
 
             return JsonResponse({
                 'sql_query': sql_query,
@@ -2191,9 +2229,9 @@ def execute_query_view(request):
             if not sql_query:
                 return JsonResponse({'error': 'SQL query not provided'}, status=400)
 
-            # Security Check: Double-check that it's a safe query
-            if not sql_query.strip().upper().startswith('SELECT'):
-                return JsonResponse({'error': 'Only SELECT statements can be executed.'}, status=403)
+            # # Security Check: Double-check that it's a safe query
+            # if not sql_query.strip().upper().startswith('SELECT'):
+            #     return JsonResponse({'error': 'Only SELECT statements can be executed.'}, status=403)
 
             final_query = sql_query
             if test_run:

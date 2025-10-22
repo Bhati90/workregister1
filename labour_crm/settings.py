@@ -424,7 +424,29 @@ ALLOWED_HOSTS = ['*']
 AUTH_USER_MODEL = 'auth.User' 
 
 # Application definition
-
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'generate-daily-summary': {
+        'task': 'generate_daily_summary',
+        'schedule': crontab(hour=0, minute=5),  # Run at 00:05 every day
+    },
+    'generate-weekly-analytics': {
+        'task': 'generate_weekly_analytics',
+        'schedule': crontab(day_of_week=1, hour=1, minute=0),  # Monday at 1 AM
+    },
+    'generate-monthly-analytics': {
+        'task': 'generate_monthly_analytics',
+        'schedule': crontab(day_of_month=1, hour=2, minute=0),  # 1st of month at 2 AM
+    },
+    'detect-anomalies': {
+        'task': 'detect_anomalies_task',
+        'schedule': crontab(hour='*/6'),  # Every 6 hours
+    },
+    'cleanup-old-alerts': {
+        'task': 'cleanup_old_alerts',
+        'schedule': crontab(hour=3, minute=0),  # Daily at 3 AM
+    },
+}
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -434,8 +456,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # 'authentication',
     #        # PWA support
-    
+    'tasks',
+    'summery',
+    'cropcycle',
+    'order',
+    'recommandations',
     'rest_framework',
+    'inventory',
+    'schedule',
     'corsheaders',
     'flow',
     'analytics',
@@ -533,7 +561,7 @@ USE_I18N = True
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR/'media' # 
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/

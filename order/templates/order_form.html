@@ -1,0 +1,554 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .detail-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+    
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .form-label.required::after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .order-item-row {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .stock-info {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+    
+    .stock-warning {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    
+    .total-summary {
+        background: var(--primary-color);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-top: 20px;
+    }
+    
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+    
+    .total-amount {
+        font-size: 28px;
+        font-weight: 700;
+        border-top: 2px solid rgba(255,255,255,0.3);
+        padding-top: 10px;
+        margin-top: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'order_dashboard' %}">
+                    <i class="fas fa-tachometer-alt"></i>
+                    {% if current_language == 'mr' %}डॅशबोर्ड{% else %}Dashboard{% endif %}
+                </a>
+            </li>
+            {% if object %}
+            <li class="breadcrumb-item">
+                <a href="{% url 'order_detail' object.pk %}">{{ object.order_number }}</a>
+            </li>
+            <li class="breadcrumb-item active">
+                {% if current_language == 'mr' %}संपादित करा{% else %}Edit{% endif %}
+            </li>
+            {% else %}
+            <li class="breadcrumb-item active">
+                {% if current_language == 'mr' %}नवीन ऑर्डर{% else %}New Order{% endif %}
+            </li>
+            {% endif %}
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="detail-card">
+        <h1 class="mb-0">
+            <i class="fas fa-{% if object %}edit{% else %}plus-circle{% endif %}"></i>
+            {% if object %}
+                {% if current_language == 'mr' %}ऑर्डर संपादित करा{% else %}Edit Order{% endif %} - {{ object.order_number }}
+            {% else %}
+                {% if current_language == 'mr' %}नवीन ऑर्डर तयार करा{% else %}Create New Order{% endif %}
+            {% endif %}
+        </h1>
+    </div>
+
+    <form method="POST" id="orderForm">
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- Main Form -->
+            <div class="col-lg-8">
+                <!-- Farmer Selection -->
+                <div class="detail-card">
+                    <h3 class="section-title">
+                        <i class="fas fa-user"></i>
+                        {% if current_language == 'mr' %}शेतकरी निवडा{% else %}Select Farmer{% endif %}
+                    </h3>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}शेतकरी{% else %}Farmer{% endif %}
+                            </label>
+                            <select name="farmer" class="form-select" id="farmerSelect" required onchange="loadFarmerDetails()">
+                                <option value="">
+                                    {% if current_language == 'mr' %}शेतकरी निवडा{% else %}Select Farmer{% endif %}
+                                </option>
+                                {% for farmer in farmers %}
+                                <option value="{{ farmer.id }}" 
+                                        {% if object and object.farmer.id == farmer.id %}selected{% endif %}
+                                        data-phone="{{ farmer.phone }}"
+                                        data-address="{{ farmer.address_line1 }}, {{ farmer.village }}, {{ farmer.taluka }}, {{ farmer.district }} - {{ farmer.pincode }}">
+                                    {{ farmer.name }} - {{ farmer.phone }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="text-end mt-2">
+                                <a href="{% url 'farmer_create' %}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                    <i class="fas fa-plus"></i>
+                                    {% if current_language == 'mr' %}नवीन शेतकरी{% else %}Add New Farmer{% endif %}
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3" id="farmerInfo" style="display: none;">
+                            <div class="alert alert-info">
+                                <strong id="farmerName"></strong><br>
+                                <small id="farmerPhone"></small><br>
+                                <small id="farmerAddress"></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Items -->
+                <div class="detail-card">
+                    <h3 class="section-title">
+                        <i class="fas fa-boxes"></i>
+                        {% if current_language == 'mr' %}ऑर्डर आयटम{% else %}Order Items{% endif %}
+                    </h3>
+
+                    <div id="itemsContainer">
+                        {% if object and object.items.all %}
+                            {% for item in object.items.all %}
+                            <div class="order-item-row" data-item-index="{{ forloop.counter0 }}">
+                                <input type="hidden" name="item_id_{{ forloop.counter0 }}" value="{{ item.id }}">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Product</label>
+                                        <select name="item_sku_{{ forloop.counter0 }}" class="form-select sku-select" required onchange="loadSKUDetails(this, {{ forloop.counter0 }})">
+                                            <option value="">Select Product</option>
+                                            {% for sku in products %}
+                                            <option value="{{ sku.id }}" 
+                                                  {% if item.sku.id == sku.id %}selected{% endif %}
+                                                    data-price="{{ sku.price }}"
+                                                    data-stock="{{ sku.stock_quantity }}">
+                                                {{ sku.product.name }} - {{ sku.size }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="stock-info" id="stock_{{ forloop.counter0 }}">Stock: {{ item.sku.stock_quantity }}</div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small">Quantity</label>
+                                        <input type="number" name="item_quantity_{{ forloop.counter0 }}" 
+                                               class="form-control quantity-input" 
+                                               value="{{ item.quantity }}"
+                                               min="1" required onchange="calculateItemTotal({{ forloop.counter0 }})">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small">Unit Price</label>
+                                        <input type="number" name="item_price_{{ forloop.counter0 }}" 
+                                               class="form-control price-input" 
+                                               value="{{ item.unit_price }}"
+                                               step="0.01" required onchange="calculateItemTotal({{ forloop.counter0 }})">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small">Discount</label>
+                                        <input type="number" name="item_discount_{{ forloop.counter0 }}" 
+                                               class="form-control" 
+                                               value="{{ item.discount }}"
+                                               step="0.01" onchange="calculateItemTotal({{ forloop.counter0 }})">
+                                    </div>
+                                    <div class="col-md-2 d-flex flex-column">
+                                        <label class="form-label small">Total</label>
+                                        <input type="text" class="form-control item-total" 
+                                               id="item_total_{{ forloop.counter0 }}"
+                                               value="{{ item.total_price }}" readonly>
+                                        <button type="button" class="btn btn-sm btn-danger mt-1" onclick="removeItem(this)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                        <div class="order-item-row" data-item-index="0">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small">Product</label>
+                                    <select name="item_sku_0" class="form-select sku-select" required onchange="loadSKUDetails(this, 0)">
+                                        <option value="">Select Product</option>
+                                        {% for sku in products %}
+                                        <option value="{{ sku.id }}" 
+                                                data-price="{{ sku.price }}"
+                                                data-stock="{{ sku.stock_quantity }}">
+                                            {{ sku.product.name }} - {{ sku.size }} (₹{{ sku.price }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="stock-info" id="stock_0"></div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small">Quantity</label>
+                                    <input type="number" name="item_quantity_0" class="form-control quantity-input" 
+                                           value="1" min="1" required onchange="calculateItemTotal(0)">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small">Unit Price</label>
+                                    <input type="number" name="item_price_0" class="form-control price-input" 
+                                           step="0.01" required onchange="calculateItemTotal(0)">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small">Discount</label>
+                                    <input type="number" name="item_discount_0" class="form-control" 
+                                           value="0" step="0.01" onchange="calculateItemTotal(0)">
+                                </div>
+                                <div class="col-md-2 d-flex flex-column">
+                                    <label class="form-label small">Total</label>
+                                    <input type="text" class="form-control item-total" 
+                                           id="item_total_0" value="0" readonly>
+                                    <button type="button" class="btn btn-sm btn-danger mt-1" onclick="removeItem(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <button type="button" class="btn btn-outline-primary mt-3" onclick="addItem()">
+                        <i class="fas fa-plus"></i>
+                        {% if current_language == 'mr' %}आयटम जोडा{% else %}Add Item{% endif %}
+                    </button>
+                </div>
+
+                <!-- Delivery Details -->
+                <div class="detail-card">
+                    <h3 class="section-title">
+                        <i class="fas fa-truck"></i>
+                        {% if current_language == 'mr' %}वितरण तपशील{% else %}Delivery Details{% endif %}
+                    </h3>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}वितरण पत्ता{% else %}Delivery Address{% endif %}
+                            </label>
+                            <textarea name="delivery_address" class="form-control" rows="3" required 
+                                      id="deliveryAddress">{% if object %}{{ object.delivery_address }}{% endif %}</textarea>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">
+                                {% if current_language == 'mr' %}वितरण संपर्क{% else %}Delivery Contact{% endif %}
+                            </label>
+                            <input type="text" name="delivery_contact" class="form-control" 
+                                   id="deliveryContact"
+                                   value="{% if object %}{{ object.delivery_contact }}{% endif %}" required>
+                            
+                            <label class="form-label mt-3">
+                                {% if current_language == 'mr' %}अपेक्षित वितरण तारीख{% else %}Expected Delivery Date{% endif %}
+                            </label>
+                            <input type="date" name="expected_delivery_date" class="form-control"
+                                   value="{% if object %}{{ object.expected_delivery_date|date:'Y-m-d' }}{% endif %}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Order Summary -->
+                <div class="detail-card sticky-top" style="top: 20px;">
+                    <h3 class="section-title">
+                        <i class="fas fa-calculator"></i>
+                        {% if current_language == 'mr' %}ऑर्डर सारांश{% else %}Order Summary{% endif %}
+                    </h3>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            {% if current_language == 'mr' %}पेमेंट पद्धत{% else %}Payment Method{% endif %}
+                        </label>
+                        <select name="payment_method" class="form-select">
+                            <option value="CASH">Cash on Delivery</option>
+                            <option value="UPI">UPI</option>
+                            <option value="BANK_TRANSFER">Bank Transfer</option>
+                            <option value="CREDIT">Credit</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            {% if current_language == 'mr' %}सवलत{% else %}Discount{% endif %}
+                        </label>
+                        <input type="number" name="discount" class="form-control" 
+                               value="{% if object %}{{ object.discount }}{% else %}0{% endif %}"
+                               step="0.01" onchange="calculateOrderTotal()">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            {% if current_language == 'mr' %}डिलिव्हरी चार्ज{% else %}Delivery Charges{% endif %}
+                        </label>
+                        <input type="number" name="delivery_charges" class="form-control" 
+                               value="{% if object %}{{ object.delivery_charges }}{% else %}0{% endif %}"
+                               step="0.01" onchange="calculateOrderTotal()">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            {% if current_language == 'mr' %}टिपण्या{% else %}Notes{% endif %}
+                        </label>
+                        <textarea name="notes" class="form-control" rows="3">{% if object %}{{ object.notes }}{% endif %}</textarea>
+                    </div>
+
+                    <!-- Total Summary -->
+                    <div class="total-summary">
+                        <div class="total-row">
+                            <span>Subtotal:</span>
+                            <span id="subtotal">₹0.00</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Discount:</span>
+                            <span id="discountDisplay">₹0.00</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Delivery:</span>
+                            <span id="deliveryDisplay">₹0.00</span>
+                        </div>
+                        <div class="total-row total-amount">
+                            <span>Total:</span>
+                            <span id="grandTotal">₹0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-save"></i>
+                            {% if object %}
+                                {% if current_language == 'mr' %}ऑर्डर अपडेट करा{% else %}Update Order{% endif %}
+                            {% else %}
+                                {% if current_language == 'mr' %}ऑर्डर तयार करा{% else %}Create Order{% endif %}
+                            {% endif %}
+                        </button>
+                        <a href="{% url 'order_dashboard' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i>
+                            {% if current_language == 'mr' %}रद्द करा{% else %}Cancel{% endif %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// The itemCounter initialization is correct.
+let itemCounter = {% if object and object.items.all %}{{ object.items.count }}{% else %}1{% endif %};
+
+// This function is correct.
+function loadFarmerDetails() {
+    const select = document.getElementById('farmerSelect');
+    const option = select.options[select.selectedIndex];
+    
+    if (option.value) {
+        document.getElementById('farmerInfo').style.display = 'block';
+        document.getElementById('farmerName').textContent = option.text.split(' - ')[0];
+        document.getElementById('farmerPhone').textContent = option.dataset.phone;
+        document.getElementById('farmerAddress').textContent = option.dataset.address;
+        
+        // Auto-fill delivery details
+        document.getElementById('deliveryAddress').value = option.dataset.address;
+        document.getElementById('deliveryContact').value = option.dataset.phone;
+    } else {
+        document.getElementById('farmerInfo').style.display = 'none';
+    }
+}
+
+// This function is correct.
+function loadSKUDetails(select, index) {
+    const option = select.options[select.selectedIndex];
+    
+    if (option.value) {
+        const price = option.dataset.price;
+        const stock = option.dataset.stock;
+        
+        document.querySelector(`input[name="item_price_${index}"]`).value = price;
+        
+        const stockDiv = document.getElementById(`stock_${index}`);
+        if (stock > 0) {
+            stockDiv.innerHTML = `<span class="text-success">Stock: ${stock} available</span>`;
+        } else {
+            stockDiv.innerHTML = `<span class="stock-warning">Out of Stock!</span>`;
+        }
+        
+        calculateItemTotal(index);
+    }
+}
+
+// IMPROVEMENT: Made the total calculation robust against negative values.
+function calculateItemTotal(index) {
+    const quantity = parseFloat(document.querySelector(`input[name="item_quantity_${index}"]`).value) || 0;
+    const price = parseFloat(document.querySelector(`input[name="item_price_${index}"]`).value) || 0;
+    const discount = parseFloat(document.querySelector(`input[name="item_discount_${index}"]`).value) || 0;
+    
+    // Use Math.max to ensure the total for an item never drops below zero.
+    const total = Math.max(0, (quantity * price) - discount);
+    document.getElementById(`item_total_${index}`).value = total.toFixed(2);
+    
+    calculateOrderTotal();
+}
+
+// This function is correct.
+function calculateOrderTotal() {
+    let subtotal = 0;
+    
+    document.querySelectorAll('.item-total').forEach(input => {
+        subtotal += parseFloat(input.value) || 0;
+    });
+    
+    const discount = parseFloat(document.querySelector('input[name="discount"]').value) || 0;
+    const delivery = parseFloat(document.querySelector('input[name="delivery_charges"]').value) || 0;
+    
+    // Ensure the final total is also not negative.
+    const total = Math.max(0, subtotal - discount + delivery);
+    
+    document.getElementById('subtotal').textContent = '₹' + subtotal.toFixed(2);
+    document.getElementById('discountDisplay').textContent = '₹' + discount.toFixed(2);
+    document.getElementById('deliveryDisplay').textContent = '₹' + delivery.toFixed(2);
+    document.getElementById('grandTotal').textContent = '₹' + total.toFixed(2);
+}
+
+// The addItem function is syntactically correct.
+function addItem() {
+    const container = document.getElementById('itemsContainer');
+    const newItem = document.createElement('div');
+    newItem.className = 'order-item-row';
+    newItem.setAttribute('data-item-index', itemCounter);
+    newItem.innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small">Product</label>
+                <select name="item_sku_${itemCounter}" class="form-select sku-select" required onchange="loadSKUDetails(this, ${itemCounter})">
+                    <option value="">Select Product</option>
+                    {% for sku in products %}
+                    <option value="{{ sku.id }}" 
+                            data-price="{{ sku.price }}"
+                            data-stock="{{ sku.stock_quantity }}">
+                        {{ sku.product.name }} - {{ sku.size }} (₹{{ sku.price }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="stock-info" id="stock_${itemCounter}"></div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Quantity</label>
+                <input type="number" name="item_quantity_${itemCounter}" class="form-control quantity-input" 
+                       value="1" min="1" required onchange="calculateItemTotal(${itemCounter})">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Unit Price</label>
+                <input type="number" name="item_price_${itemCounter}" class="form-control price-input" 
+                       step="0.01" required onchange="calculateItemTotal(${itemCounter})">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Discount</label>
+                <input type="number" name="item_discount_${itemCounter}" class="form-control" 
+                       value="0" step="0.01" onchange="calculateItemTotal(${itemCounter})">
+            </div>
+            <div class="col-md-2 d-flex flex-column">
+                <label class="form-label small">Total</label>
+                <input type="text" class="form-control item-total" 
+                       id="item_total_${itemCounter}" value="0" readonly>
+                <button type="button" class="btn btn-sm btn-danger mt-1" onclick="removeItem(this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(newItem);
+    itemCounter++;
+}
+
+// FIX: Added 'escapejs' filter to prevent syntax errors.
+function removeItem(button) {
+    const container = document.getElementById('itemsContainer');
+    if (container.children.length > 1) {
+        button.closest('.order-item-row').remove();
+        calculateOrderTotal();
+    } else {
+        // The strings here are now safely escaped for JavaScript.
+        alert('{% if current_language == "mr" %}{{ "किमान एक आयटम आवश्यक आहे"|escapejs }}{% else %}{{ "At least one item is required"|escapejs }}{% endif %}');
+    }
+}
+
+// FIX: Added 'escapejs' filter here as well.
+document.getElementById('orderForm').addEventListener('submit', function(e) {
+    const container = document.getElementById('itemsContainer');
+    if (container.children.length === 0) {
+        e.preventDefault();
+        // The strings here are now safely escaped for JavaScript.
+        alert('{% if current_language == "mr" %}{{ "कृपया किमान एक आयटम जोडा"|escapejs }}{% else %}{{ "Please add at least one item"|escapejs }}{% endif %}');
+        return false;
+    }
+});
+
+// This function is correct.
+document.addEventListener('DOMContentLoaded', function() {
+    calculateOrderTotal();
+    {% if object %}
+    loadFarmerDetails();
+    {% endif %}
+});
+</script>
+{% endblock %}

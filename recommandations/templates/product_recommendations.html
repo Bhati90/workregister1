@@ -1,0 +1,606 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load date_extras %}
+
+
+{% block title %}Product Recommendations{% endblock %}
+
+{% block extra_css %}
+<style>
+    .recommendation-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        border-left: 5px solid var(--primary-color);
+        transition: all 0.3s ease;
+    }
+
+    .recommendation-card:hover {
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+        transform: translateY(-3px);
+    }
+
+    .recommendation-card.urgent {
+        border-left-color: #dc3545;
+        background: linear-gradient(135deg, #fff5f5 0%, white 100%);
+    }
+
+    .recommendation-card.medium {
+        border-left-color: #ffc107;
+        background: linear-gradient(135deg, #fffbf0 0%, white 100%);
+    }
+
+    .recommendation-card.low {
+        border-left-color: #28a745;
+        background: linear-gradient(135deg, #f0fff4 0%, white 100%);
+    }
+
+    .rec-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .farmer-info {
+        flex: 1;
+    }
+
+    .farmer-name {
+        font-size: 20px;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 5px;
+    }
+
+    .crop-info {
+        font-size: 15px;
+        color: var(--primary-color);
+        font-weight: 600;
+    }
+
+    .stage-info {
+        font-size: 14px;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+
+    .urgency-badge {
+        padding: 8px 16px;
+        border-radius: 25px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .urgency-high {
+        background-color: #dc3545;
+        color: white;
+        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.8; }
+    }
+
+    .urgency-medium {
+        background-color: #ffc107;
+        color: #2d3748;
+        box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+    }
+
+    .urgency-low {
+        background-color: #28a745;
+        color: white;
+        box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+    }
+
+    .timeline-section {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .timeline-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 10px;
+        font-size: 14px;
+    }
+
+    .timeline-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .timeline-icon {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--primary-color);
+        color: white;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .product-card {
+        background: linear-gradient(135deg, var(--primary-color) 0%, #2d4a32 100%);
+        padding: 20px;
+        border-radius: 10px;
+        color: white;
+        box-shadow: 0 4px 12px rgba(58, 90, 64, 0.2);
+    }
+
+    .product-name {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .product-dosage {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .product-unit {
+        font-size: 13px;
+        opacity: 0.9;
+    }
+
+    .product-benefit {
+        background-color: rgba(255, 255, 255, 0.2);
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 10px;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .purpose-section {
+        background-color: #fff;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 20px;
+    }
+
+    .purpose-title {
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .purpose-text {
+        color: #4a5568;
+        line-height: 1.6;
+        font-size: 14px;
+    }
+
+    .stats-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        text-align: center;
+    }
+
+    .stats-number {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 5px;
+    }
+
+    .stats-label {
+        font-size: 14px;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .filter-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .quick-filters {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .quick-filter-btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        background-color: white;
+        color: #4a5568;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .quick-filter-btn:hover,
+    .quick-filter-btn.active {
+        border-color: var(--primary-color);
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .language-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .lang-btn {
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: 2px solid var(--primary-color);
+        background-color: white;
+        color: var(--primary-color);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .lang-btn.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    @media (max-width: 768px) {
+        .product-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Language Toggle -->
+    <div class="language-toggle">
+        <a href="{% url 'advisory_set_language' 'en' %}" class="lang-btn {% if current_language == 'en' %}active{% endif %}">
+            <i class="fas fa-language"></i> English
+        </a>
+        <a href="{% url 'advisory_set_language' 'mr' %}" class="lang-btn {% if current_language == 'mr' %}active{% endif %}">
+            <i class="fas fa-language"></i> मराठी
+        </a>
+    </div>
+
+    <!-- Add this after the Language Toggle section -->
+<div class="mb-3">
+    <a href="{% url 'product_demand_analysis' %}" class="btn btn-success">
+        <i class="fas fa-chart-bar"></i>
+        {% if current_language == 'mr' %}मागणी विश्लेषण पहा{% else %}View Demand Analysis{% endif %}
+    </a>
+</div>
+
+<!-- Add Product filter in the Advanced Filters section -->
+<div class="col-md-3">
+    <label class="form-label">
+        {% if current_language == 'mr' %}उत्पादन{% else %}Product{% endif %}
+    </label>
+    <select class="form-select" name="product">
+        <option value="">{% if current_language == 'mr' %}सर्व उत्पादने{% else %}All Products{% endif %}</option>
+        {% for product in products %}
+        <option value="{{ product.id }}" {% if filters.product == product.id|stringformat:"s" %}selected{% endif %}>
+            {{ product.name }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+
+    <!-- Quick Filters -->
+    <div class="quick-filters">
+        <a href="{% url 'product_recommendations' %}?urgency=urgent" 
+           class="quick-filter-btn {% if filters.urgency == 'urgent' %}active{% endif %}">
+            <i class="fas fa-exclamation-circle"></i>
+            {% if current_language == 'mr' %}तातडीचे (३ दिवस){% else %}Urgent (3 days){% endif %}
+        </a>
+        <a href="{% url 'product_recommendations' %}?urgency=this_week" 
+           class="quick-filter-btn {% if filters.urgency == 'this_week' %}active{% endif %}">
+            <i class="fas fa-calendar-week"></i>
+            {% if current_language == 'mr' %}या आठवड्यात (७ दिवस){% else %}This Week (7 days){% endif %}
+        </a>
+        <a href="{% url 'product_recommendations' %}" 
+           class="quick-filter-btn {% if not filters.urgency %}active{% endif %}">
+            <i class="fas fa-list"></i>
+            {% if current_language == 'mr' %}सर्व{% else %}All{% endif %}
+        </a>
+    </div>
+
+    <!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-4 col-6">
+        <div class="stats-card">
+            <div class="stats-number">{{ page_obj.paginator.count }}</div>
+            <div class="stats-label">
+                {% if current_language == 'mr' %}आगामी कार्ये{% else %}Upcoming Tasks{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-6">
+        <div class="stats-card">
+            <div class="stats-number" style="color: #dc3545;">
+                {{ urgent_count }}
+            </div>
+            <div class="stats-label">
+                {% if current_language == 'mr' %}तातडीचे{% else %}Urgent{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-12">
+        <div class="stats-card">
+            <div class="stats-number" style="color: #28a745;">
+                {{ total_products_count }}
+            </div>
+            <div class="stats-label">
+                {% if current_language == 'mr' %}शिफारस केलेली उत्पादने{% else %}Products Recommended{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Advanced Filters -->
+    <div class="filter-card">
+        <form method="GET">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}शेतकरी{% else %}Farmer{% endif %}
+                    </label>
+                    <select class="form-select" name="farmer">
+                        <option value="">{% if current_language == 'mr' %}सर्व शेतकरी{% else %}All Farmers{% endif %}</option>
+                        {% for farmer in farmers %}
+                        <option value="{{ farmer.id }}" {% if filters.farmer == farmer.id|stringformat:"s" %}selected{% endif %}>
+                            {{ farmer.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}पीक{% else %}Crop{% endif %}
+                    </label>
+                    <select class="form-select" name="crop">
+                        <option value="">{% if current_language == 'mr' %}सर्व पिके{% else %}All Crops{% endif %}</option>
+                        {% for crop in crops %}
+                        <option value="{{ crop.id }}" {% if filters.crop == crop.id|stringformat:"s" %}selected{% endif %}>
+                            {{ crop.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        {% if current_language == 'mr' %}तातडी{% else %}Urgency{% endif %}
+                    </label>
+                    <select class="form-select" name="urgency">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        <option value="urgent" {% if filters.urgency == 'urgent' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}तातडीचे (३ दिवस){% else %}Urgent (3 days){% endif %}
+                        </option>
+                        <option value="this_week" {% if filters.urgency == 'this_week' %}selected{% endif %}>
+                            {% if current_language == 'mr' %}या आठवड्यात{% else %}This Week{% endif %}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="filter-btn">
+                        <i class="fas fa-filter"></i>
+                        {% if current_language == 'mr' %}फिल्टर लागू करा{% else %}Apply Filters{% endif %}
+                    </button>
+                    <a href="{% url 'product_recommendations' %}" class="reset-btn ms-2">
+                        <i class="fas fa-redo"></i>
+                        {% if current_language == 'mr' %}रीसेट{% else %}Reset{% endif %}
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Recommendations List -->
+    <div class="row">
+        {% if recommendations %}
+            {% for rec in recommendations %}
+            {% now "Y-m-d" as today %}
+             <div class="col-12">
+                <div class="recommendation-card {% if rec.planned_start_date|date:'Y-m-d' <= today|add_days:3 %}urgent{% elif rec.planned_start_date|date:'Y-m-d' <= today|add_days:7 %}medium{% else %}low{% endif %}">
+                    <div class="rec-header">
+                        <div class="farmer-info">
+                            <div class="farmer-name">
+                                <i class="fas fa-user-circle"></i> {{ rec.farmer_crop_cycle.farmer.name }}
+                            </div>
+                            <div class="crop-info">
+                                <i class="fas fa-leaf"></i> {{ rec.farmer_crop_cycle.crop_variety.name }}
+                            </div>
+                            <div class="stage-info">
+                                <i class="fas fa-tasks"></i> 
+                                <strong>{% if current_language == 'mr' %}टप्पा:{% else %}Stage:{% endif %}</strong> 
+                                {{ rec.schedule_task.stage_name }}
+                            </div>
+                        </div>
+                        <span class="urgency-badge {% if rec.planned_start_date|date:'Y-m-d' <= today|add_days:3 %}urgency-high{% elif rec.planned_start_date|date:'Y-m-d' <= today|add_days:7 %}urgency-medium{% else %}urgency-low{% endif %}">
+                            <i class="fas fa-clock"></i>
+                            {% if rec.planned_start_date|date:'Y-m-d' <= today|add_days:3 %}
+                                {% if current_language == 'mr' %}अत्यावश्यक{% else %}URGENT{% endif %}
+                            {% elif rec.planned_start_date|date:'Y-m-d' <= today|add_days:7 %}
+                                {% if current_language == 'mr' %}या आठवड्यात{% else %}THIS WEEK{% endif %}
+                            {% else %}
+                                {% if current_language == 'mr' %}नियोजित{% else %}SCHEDULED{% endif %}
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <!-- Timeline -->
+                    <div class="timeline-section">
+                        <div class="timeline-item">
+                            <div class="timeline-icon">
+                                <i class="fas fa-calendar-plus"></i>
+                            </div>
+                            <div>
+                                <strong>{% if current_language == 'mr' %}सुरवात तारीख:{% else %}Start Date:{% endif %}</strong>
+                                {{ rec.planned_start_date|date:"d M, Y (D)" }}
+                                <span class="text-muted">({{ rec.planned_start_date|timeuntil }})</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-icon">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div>
+                                <strong>{% if current_language == 'mr' %}समाप्ती तारीख:{% else %}End Date:{% endif %}</strong>
+                                {{ rec.planned_end_date|date:"d M, Y (D)" }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommended Products -->
+                    {% if rec.schedule_task.products.all %}
+                    <div>
+                        <h5 class="mb-3">
+                            <i class="fas fa-box-open"></i>
+                            {% if current_language == 'mr' %}
+                                शिफारस केलेली उत्पादने:
+                            {% else %}
+                                Recommended Products:
+                            {% endif %}
+                        </h5>
+                        <div class="product-grid">
+                            {% for task_product in rec.schedule_task.taskproduct_set.all %}
+                            <div class="product-card">
+                                <div class="product-name">
+                                    {{ task_product.product.name }}
+                                </div>
+                                <div class="product-dosage">
+                                    {{ task_product.dosage_amount }}
+                                </div>
+                                <div class="product-unit">
+                                    {{ task_product.dosage_unit }}
+                                </div>
+                                
+                                {% if task_product.product.crop_benefits.all %}
+                                <div class="product-benefit">
+                                    <i class="fas fa-info-circle"></i>
+                                    {% for benefit in task_product.product.crop_benefits.all %}
+                                        {% if benefit.crop == rec.farmer_crop_cycle.crop_variety.crop %}
+                                            {{ benefit.description|truncatewords:15 }}
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Purpose and Benefits -->
+                    {% if rec.schedule_task.purpose_and_benefits %}
+                    <div class="purpose-section">
+                        <div class="purpose-title">
+                            <i class="fas fa-lightbulb"></i>
+                            {% if current_language == 'mr' %}उद्देश आणि फायदे:{% else %}Purpose & Benefits:{% endif %}
+                        </div>
+                        <div class="purpose-text">
+                            {{ rec.schedule_task.purpose_and_benefits }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+           
+            {% endfor %}
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                {% if current_language == 'mr' %}मागील{% else %}Previous{% endif %}
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                {% if current_language == 'mr' %}पुढील{% else %}Next{% endif %}
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
+        {% else %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-check-circle" style="font-size: 64px; color: #28a745;"></i>
+                    <h4 class="mt-3">
+                        {% if current_language == 'mr' %}
+                            कोणतीही शिफारस नाही
+                        {% else %}
+                            No Recommendations
+                        {% endif %}
+                    </h4>
+                    <p class="text-muted">
+                        {% if current_language == 'mr' %}
+                            सध्या कोणतीही आगामी कार्ये नाहीत. सर्व काही नियोजित आहे!
+                        {% else %}
+                            No upcoming tasks at this time. Everything is on schedule!
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,566 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Inventory Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .inventory-container {
+        background-color: #f8f9fa;
+    }
+
+    .filter-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .product-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .product-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .product-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 15px;
+    }
+
+    .product-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 5px;
+    }
+
+    .product-subtitle {
+        font-size: 14px;
+        color: #6c757d;
+    }
+
+    .category-badge {
+        background-color: var(--secondary-color);
+        color: var(--primary-color);
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .product-details {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 14px;
+    }
+
+    .detail-label {
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .detail-value {
+        color: #2d3748;
+        font-weight: 600;
+    }
+
+    .sku-container {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+
+    .sku-badge {
+        background-color: #f1f5f9;
+        padding: 8px 15px;
+        border-radius: 8px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .sku-size {
+        color: #2d3748;
+        font-weight: 600;
+    }
+
+    .sku-price {
+        color: var(--primary-color);
+        font-weight: 700;
+    }
+
+    .filter-btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .filter-btn:hover {
+        background-color: #2d4a32;
+        transform: translateY(-1px);
+    }
+
+    .reset-btn {
+        background-color: #f1f5f9;
+        color: #4a5568;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .reset-btn:hover {
+        background-color: #e2e8f0;
+    }
+
+    .search-input {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+
+    .search-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(58, 90, 64, 0.1);
+    }
+
+    .filter-select {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+
+    .filter-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(58, 90, 64, 0.1);
+    }
+
+    .stats-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .stats-number {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 5px;
+    }
+
+    .stats-label {
+        font-size: 14px;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        color: #e2e8f0;
+        margin-bottom: 20px;
+    }
+
+    .technical-info {
+        background-color: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 10px;
+        font-size: 13px;
+        color: #4a5568;
+    }
+
+    .company-name {
+        color: var(--primary-color);
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .action-btn {
+        flex: 1;
+        padding: 8px 15px;
+        border-radius: 8px;
+        border: none;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .btn-view {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .btn-view:hover {
+        background-color: #2d4a32;
+    }
+
+    .btn-edit {
+        background-color: #ffc107;
+        color: #2d3748;
+    }
+
+    .btn-edit:hover {
+        background-color: #ffb300;
+    }
+
+    .language-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .lang-btn {
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: 2px solid var(--primary-color);
+        background-color: white;
+        color: var(--primary-color);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .lang-btn.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .lang-btn:hover {
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 768px) {
+        .product-card {
+            padding: 15px;
+        }
+
+        .product-title {
+            font-size: 16px;
+        }
+
+        .sku-container {
+            flex-direction: column;
+        }
+
+        .filter-card {
+            padding: 15px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="inventory-container">
+    <!-- Stats Row -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-6">
+            <div class="stats-card">
+                <div class="stats-number" id="total-products">{{ total_products }}</div>
+                <div class="stats-label">Total Products</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stats-card">
+                <div class="stats-number" id="total-categories">{{ total_categories }}</div>
+                <div class="stats-label">Categories</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stats-card">
+                <div class="stats-number" id="total-companies">{{ total_companies }}</div>
+                <div class="stats-label">Companies</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stats-card">
+                <div class="stats-number" id="total-skus">{{ total_skus }}</div>
+                <div class="stats-label">SKUs</div>
+            </div>
+        </div>
+    </div>
+<!-- 
+    Language Toggle
+    <div class="language-toggle">
+        <button class="lang-btn active" data-lang="en" onclick="toggleLanguage('en')">
+            <i class="fas fa-language"></i> English
+        </button>
+        <button class="lang-btn" data-lang="mr" onclick="toggleLanguage('mr')">
+            <i class="fas fa-language"></i> मराठी
+        </button>
+    </div> -->
+
+    <!-- Add this after the language toggle in inventory_list.html -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="page-title">
+        <i class="fas fa-boxes"></i>
+        {% if current_language == 'mr' %}इन्व्हेंटरी{% else %}Inventory{% endif %}
+    </h1>
+    <a href="{% url 'product_add' %}" class="btn btn-success btn-lg">
+        <i class="fas fa-plus-circle"></i>
+        {% if current_language == 'mr' %}नवीन उत्पादन जोडा{% else %}Add New Product{% endif %}
+    </a>
+</div>
+
+    <!-- Filters Card -->
+    <div class="filter-card">
+        <form method="GET" id="filter-form">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Search Products</label>
+                    <input type="text" 
+                           class="form-control search-input" 
+                           name="search" 
+                           placeholder="Search by name or composition..."
+                           value="{{ request.GET.search }}">
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label">Category</label>
+                    <select class="form-select filter-select" name="category">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" 
+                                {% if request.GET.category == category.id|stringformat:"s" %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Company</label>
+                    <select class="form-select filter-select" name="company">
+                        <option value="">All Companies</option>
+                        {% for company in companies %}
+                        <option value="{{ company.id }}"
+                                {% if request.GET.company == company.id|stringformat:"s" %}selected{% endif %}>
+                            {{ company.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select class="form-select filter-select" name="sort">
+                        <option value="name" {% if request.GET.sort == 'name' %}selected{% endif %}>Name A-Z</option>
+                        <option value="-name" {% if request.GET.sort == '-name' %}selected{% endif %}>Name Z-A</option>
+                        <option value="category" {% if request.GET.sort == 'category' %}selected{% endif %}>Category</option>
+                        <option value="-created_at" {% if request.GET.sort == '-created_at' %}selected{% endif %}>Newest First</option>
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="filter-btn">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                    <a href="{% url 'inventory_list' %}" class="reset-btn ms-2">
+                        <i class="fas fa-redo"></i> Reset
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Products List -->
+    <div class="row">
+        {% if products %}
+            {% for product in products %}
+            <div class="col-12">
+                <div class="product-card">
+                    <div class="product-header">
+                        <div>
+                            <div class="product-title" data-en="{{ product.name }}" data-mr="{{ product.name_mr }}">
+                                {{ product.name }}
+                            </div>
+                            <div class="company-name">
+                                <i class="fas fa-building"></i> {{ product.company.name }}
+                            </div>
+                        </div>
+                        <div>
+                            <span class="category-badge">{{ product.category.name }}</span>
+                        </div>
+                    </div>
+
+                    <div class="product-details">
+                        <div class="detail-row">
+                            <span class="detail-label">
+                                <i class="fas fa-flask"></i> Technical Composition:
+                            </span>
+                            <span class="detail-value">{{ product.technical_composition }}</span>
+                        </div>
+
+                        {% if product.skus.all %}
+                        <div class="detail-row">
+                            <span class="detail-label">
+                                <i class="fas fa-box"></i> Available Sizes & Prices:
+                            </span>
+                        </div>
+                        <div class="sku-container">
+                            {% for sku in product.skus.all %}
+                            <div class="sku-badge">
+                                <span class="sku-size">{{ sku.size }}</span>
+                                <span>-</span>
+                                <span class="sku-price">₹{{ sku.price }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if product.crop_benefits.all %}
+                        <div class="technical-info">
+                            <strong><i class="fas fa-leaf"></i> Benefits for Grapes:</strong><br>
+                            {% for benefit in product.crop_benefits.all %}
+                                <div class="mt-2" data-en="{{ benefit.description }}" data-mr="{{ benefit.description_mr }}">
+                                    {{ benefit.description }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="action-btn btn-view" onclick="viewProductDetail('{{ product.id }}')">
+                            <i class="fas fa-eye"></i> View Details
+                        </button>
+                        <button class="action-btn btn-edit" onclick="editProduct('{{ product.id }}')">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.company %}&company={{ request.GET.company }}{% endif %}">First</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.company %}&company={{ request.GET.company }}{% endif %}">Previous</a>
+                        </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.company %}&company={{ request.GET.company }}{% endif %}">Next</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.company %}&company={{ request.GET.company }}{% endif %}">Last</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
+        {% else %}
+            <div class="col-12">
+                <div class="empty-state">
+                    <i class="fas fa-box-open"></i>
+                    <h4>No Products Found</h4>
+                    <p>Try adjusting your filters or search criteria</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentLanguage = 'en';
+
+    function toggleLanguage(lang) {
+        currentLanguage = lang;
+        
+        // Update button states
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-lang="${lang}"]`).classList.add('active');
+
+        // Update all translatable elements
+        document.querySelectorAll('[data-en][data-mr]').forEach(element => {
+            const enText = element.getAttribute('data-en');
+            const mrText = element.getAttribute('data-mr');
+            element.textContent = lang === 'en' ? enText : mrText;
+        });
+    }
+
+   function viewProductDetail(productId) {
+    window.location.href = `/register/inventory/product/${productId}/`;
+}
+
+function editProduct(productId) {
+    window.location.href = `/register/inventory/product/${productId}/edit/`;
+}
+    // Auto-submit form on filter change
+    document.querySelectorAll('.filter-select').forEach(select => {
+        select.addEventListener('change', function() {
+            document.getElementById('filter-form').submit();
+        });
+    });
+
+    // Search with debounce
+    let searchTimeout;
+    document.querySelector('.search-input').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            document.getElementById('filter-form').submit();
+        }, 500);
+    });
+</script>
+{% endblock %}

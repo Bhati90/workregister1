@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <h2>
+        {% if current_language == 'mr' %}
+            [translate:नवीन पिक सायकल तयार करा]
+        {% else %}
+            Create New Crop Cycle
+        {% endif %}
+    </h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">
+            {% if current_language == 'mr' %}
+                [translate:जतन करा]
+            {% else %}
+                Save
+            {% endif %}
+        </button>
+        <a href="{% url 'crop_cycle_list' %}" class="btn btn-secondary">
+            {% if current_language == 'mr' %}
+                [translate:रद्द करा]
+            {% else %}
+                Cancel
+            {% endif %}
+        </a>
+    </form>
+</div>
+{% endblock %}

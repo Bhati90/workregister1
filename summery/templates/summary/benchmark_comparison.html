@@ -1,0 +1,126 @@
+<!-- templates/summary/benchmark_comparison.html -->
+{% extends 'bases.html' %}
+
+{% block title %}Benchmark Comparison{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Benchmark Comparison</h1>
+    <p>Compare performance against benchmarks and peers</p>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Entity Type</label>
+                <select name="entity_type" class="form-select">
+                    <option value="">All Types</option>
+                    {% for entity in entity_types %}
+                    <option value="{{ entity }}" {% if selected_entity_type == entity %}selected{% endif %}>{{ entity }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Metric</label>
+                <select name="metric" class="form-select">
+                    <option value="">All Metrics</option>
+                    {% for metric in metric_names %}
+                    <option value="{{ metric }}" {% if selected_metric == metric %}selected{% endif %}>{{ metric }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Apply
+                </button>
+                <a href="{% url 'benchmark_comparison' %}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Comparisons -->
+{% if comparisons %}
+<div class="table-container">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Rank</th>
+                    <th>Entity</th>
+                    <th>Metric</th>
+                    <th class="text-end">Actual Value</th>
+                    <th class="text-end">Benchmark</th>
+                    <th class="text-end">Difference</th>
+                    <th>Performance</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for comp in comparisons %}
+                <tr>
+                    <td>
+                        {% if comp.rank %}
+                        <span class="badge {% if comp.rank <= 3 %}bg-warning{% else %}bg-secondary{% endif %}">
+                            #{{ comp.rank }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div>
+                            <strong>{{ comp.entity_name }}</strong>
+                        </div>
+                        <small class="text-muted">{{ comp.entity_type }}</small>
+                    </td>
+                    <td>{{ comp.metric_name }}</td>
+                    <td class="text-end">
+                        <strong>{{ comp.actual_value|floatformat:2 }}</strong>
+                    </td>
+                    <td class="text-end">
+                        {{ comp.benchmark_value|floatformat:2 }}
+                    </td>
+                    <td class="text-end">
+                        <span class="{% if comp.is_above_benchmark %}text-success{% else %}text-danger{% endif %}">
+                            {% if comp.is_above_benchmark %}+{% endif %}{{ comp.difference|floatformat:2 }}
+                            <small>({{ comp.difference_percentage|floatformat:1 }}%)</small>
+                        </span>
+                    </td>
+                    <td>
+                        {% if comp.performance_tier %}
+                        <span class="badge 
+                            {% if comp.performance_tier == 'TOP' %}bg-success
+                            {% elif comp.performance_tier == 'ABOVE_AVG' %}bg-info
+                            {% elif comp.performance_tier == 'AVERAGE' %}bg-secondary
+                            {% elif comp.performance_tier == 'BELOW_AVG' %}bg-warning
+                            {% else %}bg-danger{% endif %}">
+                            {{ comp.get_performance_tier_display }}
+                        </span>
+                        {% endif %}
+                        {% if comp.percentile %}
+                        <br><small class="text-muted">{{ comp.percentile }}th percentile</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'benchmark_detail' comp.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-bullseye fs-1 text-muted"></i>
+        <p class="text-muted mt-3">No benchmark comparisons available</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

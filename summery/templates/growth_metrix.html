@@ -1,0 +1,96 @@
+
+{% extends 'bases.html' %}
+
+{% block title %}Growth Metrics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Growth Metrics</h1>
+    <p>Analyze growth trends and patterns</p>
+</div>
+
+
+<!-- Period Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Period Type</label>
+                <select name="period" class="form-select">
+                    {% for value, label in period_types %}
+                    <option value="{{ value }}" {% if period_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Apply
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Growth Metrics Cards -->
+{% if metrics %}
+<div class="row g-4">
+    {% for metric in metrics %}
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="mb-1">{{ metric.metric_name }}</h5>
+                        <small class="text-muted">{{ metric.period_start|date:"M d" }} - {{ metric.period_end|date:"M d, Y" }}</small>
+                    </div>
+                    <span class="badge {% if metric.is_positive_growth %}bg-success{% else %}bg-danger{% endif %} fs-6">
+                        <i class="bi bi-arrow-{% if metric.is_positive_growth %}up{% else %}down{% endif %}"></i>
+                        {{ metric.growth_rate }}%
+                    </span>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <small class="text-muted d-block">Start Value</small>
+                            <h4 class="mb-0">{{ metric.start_value|floatformat:0 }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded">
+                            <small class="text-muted d-block">End Value</small>
+                            <h4 class="mb-0">{{ metric.end_value|floatformat:0 }}</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <small class="text-muted d-block">Absolute Growth</small>
+                        <strong class="{% if metric.is_positive_growth %}text-success{% else %}text-danger{% endif %}">
+                            {{ metric.growth_absolute|floatformat:0 }}
+                        </strong>
+                    </div>
+                    {% if metric.previous_period_growth %}
+                    <div class="text-end">
+                        <small class="text-muted d-block">Previous Period</small>
+                        <strong>{{ metric.previous_period_growth }}%</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-arrow-up-circle fs-1 text-muted"></i>
+        <p class="text-muted mt-3">No growth metrics available</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

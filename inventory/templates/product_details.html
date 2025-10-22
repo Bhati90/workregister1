@@ -1,0 +1,628 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .stock-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .stock-in { background: #d4edda; color: #155724; }
+    .stock-low { background: #fff3cd; color: #856404; }
+    .stock-out { background: #f8d7da; color: #721c24; }
+    
+    /* Image Gallery Styles */
+    .product-image-gallery {
+        display: flex;
+        gap: 15px;
+        overflow-x: auto;
+        padding: 15px 0;
+        margin-bottom: 20px;
+    }
+    
+    .sku-image-card {
+        min-width: 200px;
+        text-align: center;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 10px;
+        background: white;
+    }
+    
+    .sku-image {
+        width: 100%;
+        height: 150px;
+        object-fit: contain;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+    
+    .sku-image-placeholder {
+        width: 100%;
+        height: 150px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 10px;
+        color: #999;
+    }
+    
+    .sku-image-info {
+        font-size: 14px;
+    }
+    
+    /* Purpose and Benefits Cards */
+    .purpose-benefits-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+    }
+    
+    .purpose-benefits-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-top: 20px;
+    }
+    
+    @media (max-width: 768px) {
+        .purpose-benefits-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .pb-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .pb-card h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .pb-card ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+    
+    .pb-card li {
+        margin-bottom: 8px;
+    }
+    
+    .history-timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    .history-timeline::before {
+        content: '';
+        position: absolute;
+        left: 8px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e0e0e0;
+    }
+    .history-item {
+        position: relative;
+        padding: 15px;
+        margin-bottom: 15px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .history-item::before {
+        content: '';
+        position: absolute;
+        left: -22px;
+        top: 20px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        border: 2px solid white;
+    }
+    .history-positive { border-left: 4px solid #28a745; }
+    .history-negative { border-left: 4px solid #dc3545; }
+    .history-neutral { border-left: 4px solid #6c757d; }
+    
+    .benefit-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .alert-banner {
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .alert-warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+    .alert-danger { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+    
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .stat-number {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+    .stat-label {
+        color: #6c757d;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Language Toggle -->
+    <div class="language-toggle mb-3">
+        <a href="{% url 'set_language' 'en' %}" class="lang-btn {% if current_language == 'en' %}active{% endif %}">
+            <i class="fas fa-language"></i> English
+        </a>
+        <a href="{% url 'set_language' 'mr' %}" class="lang-btn {% if current_language == 'mr' %}active{% endif %}">
+            <i class="fas fa-language"></i> मराठी
+        </a>
+    </div>
+
+    <!-- Stock Alerts -->
+    {% if active_alerts %}
+    <div class="alert-banner alert-{% if out_of_stock_skus %}danger{% else %}warning{% endif %}">
+        <i class="fas fa-exclamation-triangle fa-2x"></i>
+        <div>
+            <strong>
+                {% if current_language == 'mr' %}स्टॉक सूचना{% else %}Stock Alert{% endif %}:
+            </strong>
+            {% if out_of_stock_skus %}
+                {% if current_language == 'mr' %}
+                    {{ out_of_stock_skus|length }} SKU स्टॉकमध्ये नाहीत
+                {% else %}
+                    {{ out_of_stock_skus|length }} SKU(s) out of stock
+                {% endif %}
+            {% elif low_stock_skus %}
+                {% if current_language == 'mr' %}
+                    {{ low_stock_skus|length }} SKU कमी स्टॉक आहेत
+                {% else %}
+                    {{ low_stock_skus|length }} SKU(s) running low on stock
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'inventory_list' %}">
+                    <i class="fas fa-boxes"></i>
+                    {% if current_language == 'mr' %}इन्व्हेंटरी{% else %}Inventory{% endif %}
+                </a>
+            </li>
+            <li class="breadcrumb-item active">
+                {% if current_language == 'mr' and product.name_mr %}
+                    {{ product.name_mr }}
+                {% else %}
+                    {{ product.name }}
+                {% endif %}
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Product Header -->
+    <div class="detail-card mb-4">
+        <div class="product-detail-header">
+            <div class="product-header-left">
+                <div class="product-icon">
+                    <i class="fas fa-box-open"></i>
+                </div>
+                <div>
+                    <h1 class="product-detail-title">
+                        {% if current_language == 'mr' and product.name_mr %}
+                            {{ product.name_mr }}
+                        {% else %}
+                            {{ product.name }}
+                        {% endif %}
+                    </h1>
+                    <div class="product-meta">
+                        <span class="meta-item">
+                            <i class="fas fa-building"></i>
+                            {{ product.company.name }}
+                        </span>
+                        <span class="meta-item">
+                            <i class="fas fa-tag"></i>
+                            {{ product.category.name }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="product-header-actions">
+                <a href="{% url 'product_edit' product.pk %}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i>
+                    {% if current_language == 'mr' %}संपादित करा{% else %}Edit{% endif %}
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Images Gallery (if SKUs have images) -->
+    {% if skus_with_images %}
+    <div class="detail-card mb-4">
+        <h2 class="section-title">
+            <i class="fas fa-images"></i>
+            {% if current_language == 'mr' %}उत्पादन प्रतिमा{% else %}Product Images{% endif %}
+        </h2>
+        <div class="product-image-gallery">
+            {% for sku in product.skus.all %}
+            <div class="sku-image-card">
+                {% if sku.image %}
+                    <img src="{{ sku.image.url }}" alt="{{ product.name }} - {{ sku.size }}" class="sku-image">
+                {% else %}
+                    <div class="sku-image-placeholder">
+                        <i class="fas fa-image fa-3x"></i>
+                    </div>
+                {% endif %}
+                <div class="sku-image-info">
+                    <strong>{{ sku.size }}</strong><br>
+                    <span class="text-muted">₹{{ sku.price }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Purpose and Benefits Section -->
+    {% if product.purpose or product.benefits %}
+    <div class="purpose-benefits-section">
+        <h2 style="margin-top: 0;">
+            <i class="fas fa-star"></i>
+            {% if current_language == 'mr' %}उद्देश आणि फायदे{% else %}Purpose & Benefits{% endif %}
+        </h2>
+        
+        <div class="purpose-benefits-grid">
+            {% if product.purpose %}
+            <div class="pb-card">
+                <h3>
+                    <i class="fas fa-bullseye"></i>
+                    {% if current_language == 'mr' %}उद्देश / वापर{% else %}Purpose / Use Cases{% endif %}
+                </h3>
+                <div>
+                    {% if current_language == 'mr' and product.purpose_mr %}
+                        {{ product.purpose_mr|linebreaks }}
+                    {% else %}
+                        {{ product.purpose|linebreaks }}
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if product.benefits %}
+            <div class="pb-card">
+                <h3>
+                    <i class="fas fa-chart-line"></i>
+                    {% if current_language == 'mr' %}फायदे / प्रभाव{% else %}Benefits / Impact{% endif %}
+                </h3>
+                <div>
+                    {% if current_language == 'mr' and product.benefits_mr %}
+                        {{ product.benefits_mr|linebreaks }}
+                    {% else %}
+                        {{ product.benefits|linebreaks }}
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Stock Overview Stats -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ total_stock }}</div>
+                        <div class="stat-label">
+                            {% if current_language == 'mr' %}एकूण स्टॉक{% else %}Total Stock{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ product.skus.count }}</div>
+                        <div class="stat-label">
+                            {% if current_language == 'mr' %}SKU प्रकार{% else %}SKU Types{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <div class="stat-number text-{% if low_stock_skus %}warning{% else %}success{% endif %}">
+                            {{ low_stock_skus|length }}
+                        </div>
+                        <div class="stat-label">
+                            {% if current_language == 'mr' %}कमी स्टॉक{% else %}Low Stock{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Description -->
+            {% if product.description %}
+            <div class="detail-card mb-4">
+                <h2 class="section-title">
+                    <i class="fas fa-info-circle"></i>
+                    {% if current_language == 'mr' %}वर्णन{% else %}Description{% endif %}
+                </h2>
+                <p>
+                    {% if current_language == 'mr' and product.description_mr %}
+                        {{ product.description_mr|linebreaks }}
+                    {% else %}
+                        {{ product.description|linebreaks }}
+                    {% endif %}
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- Technical Information -->
+            <div class="detail-card mb-4">
+                <h2 class="section-title">
+                    <i class="fas fa-flask"></i>
+                    {% if current_language == 'mr' %}तांत्रिक माहिती{% else %}Technical Information{% endif %}
+                </h2>
+                <div class="info-row">
+                    <div class="info-label">
+                        {% if current_language == 'mr' %}तांत्रिक रचना{% else %}Composition{% endif %}
+                    </div>
+                    <div class="info-value">{{ product.technical_composition }}</div>
+                </div>
+                
+                {% if product.application_method %}
+                <div class="info-row">
+                    <div class="info-label">
+                        {% if current_language == 'mr' %}वापर पद्धत{% else %}Application Method{% endif %}
+                    </div>
+                    <div class="info-value">
+                        {% if current_language == 'mr' and product.application_method_mr %}
+                            {{ product.application_method_mr|linebreaks }}
+                        {% else %}
+                            {{ product.application_method|linebreaks }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if product.precautions %}
+                <div class="info-row">
+                    <div class="info-label text-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {% if current_language == 'mr' %}सावधगिरी{% else %}Precautions{% endif %}
+                    </div>
+                    <div class="info-value text-danger">
+                        {% if current_language == 'mr' and product.precautions_mr %}
+                            {{ product.precautions_mr|linebreaks }}
+                        {% else %}
+                            {{ product.precautions|linebreaks }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Available SKUs with Stock -->
+            <div class="detail-card mb-4">
+                <h2 class="section-title">
+                    <i class="fas fa-boxes"></i>
+                    {% if current_language == 'mr' %}उपलब्ध आकार आणि स्टॉक{% else %}Available Sizes & Stock{% endif %}
+                </h2>
+
+                {% if product.skus.all %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>{% if current_language == 'mr' %}प्रतिमा{% else %}Image{% endif %}</th>
+                                <th>{% if current_language == 'mr' %}आकार{% else %}Size{% endif %}</th>
+                                <th>{% if current_language == 'mr' %}किंमत{% else %}Price{% endif %}</th>
+                                <th>{% if current_language == 'mr' %}MRP{% else %}MRP{% endif %}</th>
+                                <th>{% if current_language == 'mr' %}स्टॉक{% else %}Stock{% endif %}</th>
+                                <th>{% if current_language == 'mr' %}स्थिती{% else %}Status{% endif %}</th>
+                                <th>{% if current_language == 'mr' %}क्रिया{% else %}Actions{% endif %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sku in product.skus.all %}
+                            <tr>
+                                <td>
+                                    {% if sku.image %}
+                                        <img src="{{ sku.image.url }}" alt="{{ sku.size }}" style="width: 50px; height: 50px; object-fit: contain;">
+                                    {% else %}
+                                        <div style="width: 50px; height: 50px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+                                            <i class="fas fa-image text-muted"></i>
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ sku.size }}</strong></td>
+                                <td>₹{{ sku.price }}</td>
+                                <td>{% if sku.mrp %}₹{{ sku.mrp }}{% else %}-{% endif %}</td>
+                                <td>
+                                    <strong class="{% if sku.stock_quantity == 0 %}text-danger{% elif sku.is_low_stock %}text-warning{% else %}text-success{% endif %}">
+                                        {{ sku.stock_quantity }}
+                                    </strong>
+                                    <small class="text-muted">/ {{ sku.reorder_level }}</small>
+                                </td>
+                                <td>
+                                    {% if sku.stock_quantity == 0 %}
+                                        <span class="stock-badge stock-out">
+                                            {% if current_language == 'mr' %}आउट ऑफ स्टॉक{% else %}Out of Stock{% endif %}
+                                        </span>
+                                    {% elif sku.is_low_stock %}
+                                        <span class="stock-badge stock-low">
+                                            {% if current_language == 'mr' %}कमी स्टॉक{% else %}Low Stock{% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="stock-badge stock-in">
+                                            {% if current_language == 'mr' %}स्टॉकमध्ये{% else %}In Stock{% endif %}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'stock_history' sku.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-history"></i>
+                                        {% if current_language == 'mr' %}इतिहास{% else %}History{% endif %}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Crop-Specific Benefits (if exists) -->
+            {% if product.crop_benefits.all %}
+            <div class="detail-card mb-4">
+                <h2 class="section-title">
+                    <i class="fas fa-leaf"></i>
+                    {% if current_language == 'mr' %}पीक-विशिष्ट फायदे{% else %}Crop-Specific Benefits{% endif %}
+                </h2>
+
+                {% for benefit in product.crop_benefits.all %}
+                <div class="benefit-card">
+                    <h5>
+                        <i class="fas fa-seedling"></i>
+                        {{ benefit.crop.name }}
+                    </h5>
+                    <p>
+                        {% if current_language == 'mr' and benefit.description_mr %}
+                            {{ benefit.description_mr }}
+                        {% else %}
+                            {{ benefit.description }}
+                        {% endif %}
+                    </p>
+                    
+                    {% if benefit.dosage_recommendation %}
+                    <div class="mt-2">
+                        <strong>
+                            {% if current_language == 'mr' %}डोस{% else %}Dosage{% endif %}:
+                        </strong>
+                        {% if current_language == 'mr' and benefit.dosage_recommendation_mr %}
+                            {{ benefit.dosage_recommendation_mr }}
+                        {% else %}
+                            {{ benefit.dosage_recommendation }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Recent Stock History -->
+            {% if recent_stock_history %}
+            <div class="detail-card mb-4">
+                <h2 class="section-title">
+                    <i class="fas fa-history"></i>
+                    {% if current_language == 'mr' %}अलीकडील स्टॉक हालचाली{% else %}Recent Stock Movements{% endif %}
+                </h2>
+
+                <div class="history-timeline">
+                    {% for history in recent_stock_history|slice:":10" %}
+                    <div class="history-item {% if history.quantity_changed > 0 %}history-positive{% elif history.quantity_changed < 0 %}history-negative{% else %}history-neutral{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ history.sku.size }}</strong> - 
+                                <span class="badge bg-secondary">{{ history.get_transaction_type_display }}</span>
+                                <div class="text-muted small mt-1">
+                                    {{ history.transaction_date|date:"d M, Y h:i A" }}
+                                    {% if history.performed_by %}
+                                    • {% if current_language == 'mr' %}द्वारा{% else %}by{% endif %} {{ history.performed_by.username }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold {% if history.quantity_changed > 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ history.quantity_changed|stringformat:"+d" }}
+                                </div>
+                                <small class="text-muted">
+                                    {{ history.quantity_before }} → {{ history.quantity_after }}
+                                </small>
+                            </div>
+                        </div>
+                        {% if history.notes %}
+                        <div class="text-muted small mt-2">
+                            <i class="fas fa-sticky-note"></i> {{ history.notes }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Company Information -->
+            <div class="detail-card mb-4">
+                <h3 class="section-title">
+                    <i class="fas fa-building"></i>
+                    {% if current_language == 'mr' %}कंपनी माहिती{% else %}Company Information{% endif %}
+                </h3>
+                <h4>{{ product.company.name }}</h4>
+                {% if product.company.description %}
+                <p class="text-muted">{{ product.company.description }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Related Products -->
+            {% if related_products %}
+            <div class="detail-card mb-4">
+                <h3 class="section-title">
+                    <i class="fas fa-link"></i>
+                    {% if current_language == 'mr' %}संबंधित उत्पादने{% else %}Related Products{% endif %}
+                </h3>
+                <div class="related-products-list">
+                    {% for related in related_products %}
+                    <a href="{% url 'product_detail' related.pk %}" class="related-product-item">
+                        <div>
+                            <div class="related-product-name">{{ related.name }}</div>
+                            <div class="related-product-company">{{ related.company.name }}</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

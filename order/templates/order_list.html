@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .filter-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 30px;
+    }
+    
+    .order-table {
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .order-table thead {
+        background: var(--primary-color);
+        color: white;
+    }
+    
+    .order-table th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 13px;
+    }
+    
+    .order-table td {
+        padding: 15px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .order-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-confirmed { background: #d1ecf1; color: #0c5460; }
+    .status-shipped { background: #d4edda; color: #155724; }
+    .status-in-transit { background: #d4edda; color: #155724; }
+    .status-delivered { background: #28a745; color: white; }
+    .status-completed { background: #28a745; color: white; }
+    .status-cancelled { background: #f8d7da; color: #721c24; }
+    
+    .payment-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    
+    .payment-unpaid { background: #f8d7da; color: #721c24; }
+    .payment-partiallypaid { background: #fff3cd; color: #856404; }
+    .payment-paid { background: #d4edda; color: #155724; }
+    
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+    }
+    
+    .btn-action {
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        text-decoration: none;
+    }
+    
+    .inventory-warning {
+        background: #fff3cd;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        color: #856404;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title">
+            <i class="fas fa-list"></i>
+            {% if current_language == 'mr' %}सर्व ऑर्डर{% else %}All Orders{% endif %}
+        </h1>
+        <div>
+            <a href="{% url 'order_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-tachometer-alt"></i>
+                {% if current_language == 'mr' %}डॅशबोर्ड{% else %}Dashboard{% endif %}
+            </a>
+            <a href="{% url 'order_create' %}" class="btn btn-success">
+                <i class="fas fa-plus-circle"></i>
+                {% if current_language == 'mr' %}नवीन ऑर्डर{% else %}New Order{% endif %}
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-card">
+        <form method="GET" id="filterForm">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">{% if current_language == 'mr' %}शोध{% else %}Search{% endif %}</label>
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="Order #, Farmer, Phone..." 
+                           value="{{ filters.search }}">
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">{% if current_language == 'mr' %}स्थिती{% else %}Status{% endif %}</label>
+                    <select name="status" class="form-select">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        {% for code, name in status_choices %}
+                        <option value="{{ code }}" {% if filters.status == code %}selected{% endif %}>
+                            {{ name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">{% if current_language == 'mr' %}पेमेंट{% else %}Payment{% endif %}</label>
+                    <select name="payment_status" class="form-select">
+                        <option value="">{% if current_language == 'mr' %}सर्व{% else %}All{% endif %}</option>
+                        {% for code, name in payment_status_choices %}
+                        <option value="{{ code }}" {% if filters.payment_status == code %}selected{% endif %}>
+                            {{ name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">{% if current_language == 'mr' %}तारखे पासून{% else %}Date From{% endif %}</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ filters.date_from }}">
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">{% if current_language == 'mr' %}तारखे पर्यंत{% else %}Date To{% endif %}</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ filters.date_to }}">
+                </div>
+                
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input type="checkbox" name="inventory_update" value="needed" 
+                               class="form-check-input" id="inventoryCheck"
+                               {% if filters.inventory_update == 'needed' %}checked{% endif %}>
+                        <label class="form-check-label" for="inventoryCheck">
+                            {% if current_language == 'mr' %}इन्व्हेंटरी अपडेट आवश्यक{% else %}Inventory Update Needed{% endif %}
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-9 text-end">
+                    <a href="{% url 'order_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-redo"></i>
+                        {% if current_language == 'mr' %}रीसेट{% else %}Reset{% endif %}
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="table-responsive">
+        <table class="order-table">
+            <thead>
+                <tr>
+                    <th>{% if current_language == 'mr' %}ऑर्डर क्र.{% else %}Order #{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}शेतकरी{% else %}Farmer{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}आयटम{% else %}Items{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}रक्कम{% else %}Amount{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}स्थिती{% else %}Status{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}पेमेंट{% else %}Payment{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}तारीख{% else %}Date{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}इन्व्हेंटरी{% else %}Inventory{% endif %}</th>
+                    <th>{% if current_language == 'mr' %}क्रिया{% else %}Actions{% endif %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if orders %}
+                    {% for order in orders %}
+                    <tr>
+                        <td><strong>{{ order.order_number }}</strong></td>
+                        <td>
+                            <div><strong>{{ order.farmer.name }}</strong></div>
+                            <small class="text-muted">{{ order.farmer.phone }}</small>
+                        </td>
+                        <td>{{ order.items.count }} items</td>
+                        <td><strong>₹{{ order.total_amount }}</strong></td>
+                        <td>
+                            <span class="status-badge status-{{ order.status|lower|cut:'_' }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="payment-badge payment-{{ order.payment_status|lower|cut:'_' }}">
+                                {{ order.get_payment_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ order.created_at|date:"d M, Y" }}</td>
+                        <td>
+                            {% if not order.inventory_updated and order.status in 'COMPLETED,DELIVERED' %}
+                            <span class="inventory-warning">
+                                <i class="fas fa-exclamation-triangle"></i> UPDATE
+                            </span>
+                            {% elif order.inventory_updated %}
+                            <span class="text-success">
+                                <i class="fas fa-check-circle"></i>
+                            </span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{% url 'order_detail' order.pk %}" class="btn btn-sm btn-primary btn-action">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'order_edit' order.pk %}" class="btn btn-sm btn-warning btn-action">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">
+                                {% if current_language == 'mr' %}कोणतेही ऑर्डर आढळले नाहीत{% else %}No orders found{% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.inventory_update %}&inventory_update={{ filters.inventory_update }}{% endif %}">First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.inventory_update %}&inventory_update={{ filters.inventory_update }}{% endif %}">Previous</a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.inventory_update %}&inventory_update={{ filters.inventory_update }}{% endif %}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.inventory_update %}&inventory_update={{ filters.inventory_update }}{% endif %}">Last</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('filterForm').addEventListener('change', function() {
+    this.submit();
+});
+</script>
+{% endblock %}

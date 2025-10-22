@@ -1,0 +1,40 @@
+
+{% extends 'bases.html' %}
+
+{% block title %}Resolve Alert{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">Resolve Alert</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <h5 class="alert-heading">{{ alert.title }}</h5>
+                    <p class="mb-0">{{ alert.description }}</p>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="resolution_notes" class="form-label">Resolution Notes</label>
+                        <textarea class="form-control" id="resolution_notes" name="resolution_notes" rows="5" required placeholder="Describe how this alert was resolved..."></textarea>
+                        <div class="form-text">Provide details about the actions taken to resolve this alert.</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-all"></i> Mark as Resolved
+                        </button>
+                        <a href="{% url 'alert_detail' alert.pk %}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

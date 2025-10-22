@@ -1,0 +1,197 @@
+{% load static %}
+<aside class="sidebar">
+    <div class="sidebar-items">
+        <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'DashboardView' %}active{% endif %}">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        {% comment %} <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'chat_interface' %}active{% endif %}">
+                <i class="fas fa-comment-dots"></i>
+                <span>Chatbot</span>
+            </div>
+        </a> {% endcomment %}
+        <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'search_page' %}active{% endif %}">
+                <i class="fas fa-search"></i>
+                <span>Search</span>
+            </div>
+        </a>
+         <!-- NEW: Inventory Menu Item -->
+        <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if 'inventory' in request.path %}active{% endif %}">
+                <i class="fas fa-boxes"></i>
+                <span>Inventory</span>
+            </div>
+        </a>
+
+       <!-- Farmers Menu Item -->
+<a href="{% url 'farmer_list' %}" class="text-decoration-none text-white">
+    <div class="sidebar-item {% if 'farmer' in request.path and 'task' not in request.path %}active{% endif %}">
+        <i class="fas fa-user-friends"></i>
+        <span>
+            {% if current_language == 'mr' %}शेतकरी{% else %}Farmers{% endif %}
+        </span>
+    </div>
+</a>
+
+<!-- Tasks Menu Item -->
+<a href="{% url 'task_status_list' %}" class="text-decoration-none text-white">
+    <div class="sidebar-item {% if 'task' in request.path %}active{% endif %}">
+        <i class="fas fa-tasks"></i>
+        <span>
+            {% if current_language == 'mr' %}कार्ये{% else %}Tasks{% endif %}
+        </span>
+    </div>
+</a>
+
+<!-- Recommendations Menu Item -->
+<a href="{% url 'product_recommendations' %}" class="text-decoration-none text-white">
+    <div class="sidebar-item {% if 'recommendation' in request.path %}active{% endif %}">
+        <i class="fas fa-lightbulb"></i>
+        <span>
+            {% if current_language == 'mr' %}शिफारसी{% else %}Recommendations{% endif %}
+        </span>
+    </div>
+</a>
+
+<!-- Crop Cycles Menu Item -->
+<a href="{% url 'crop_cycle_list' %}" class="text-decoration-none text-white">
+    <div class="sidebar-item {% if 'crop-cycle' in request.path or 'cycle' in request.path %}active{% endif %}">
+        <i class="fas fa-sync-alt"></i>
+        <span>
+            {% if current_language == 'mr' %}पीक चक्र{% else %}Crop Cycles{% endif %}
+        </span>
+    </div>
+</a>
+
+        
+        {% comment %} <a href="{% url 'farmer_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'farmer_profile' %}active{% endif %}">
+                <i class="fas fa-user-friends"></i>
+                <span>Vendor</span>
+            </div>
+        </a>  {% endcomment %}
+      
+        {% comment %} <a href="#" class="text-decoration-none text-white">
+            <div class="sidebar-item">
+                <i class="fas fa-seedling"></i>
+                <span>Crops</span>
+            </div>
+        </a> {% endcomment %}
+        {% comment %} <a href="#" class="text-decoration-none text-white">
+            <div class="sidebar-item">
+                <i class="fas fa-tasks"></i>
+                <span>Tasks</span>
+            </div>
+        </a> {% endcomment %}
+        <!-- WhatsApp Toggle Button -->
+        <a href="#" class="text-decoration-none text-white" id="whatsapp-toggle">
+            <div class="sidebar-item whatsapp-item {% if 'whatsapp' in request.path or 'template' in request.path %}active{% endif %}">
+                <i class="fab fa-whatsapp"></i>
+                <span>Whatsapp</span>
+            </div>
+        </a>
+        <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'ivr_page' %}active{% endif %}">
+                <i class="fas fa-phone"></i>
+                <span>Calls</span>
+            </div>
+        </a>
+         <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'schedule' %}active{% endif %}">
+                <i class="fa fa-calendar-check"></i>
+                <span>Schedule</span>
+            </div>
+        </a>
+        <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'actionables_list' %}active{% endif %}">
+                <i class="fa-solid fa-location-arrow"></i>
+                <span>Actions</span>
+            </div>
+        </a>
+        <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'dial_pad' %}active{% endif %}">
+                <image src="https://img.icons8.com/?size=25&id=AX0e5jWa8Bdl&format=png&color=FFFFFF">
+                <span>Dial Pad</span>
+            </div>
+        </a>
+        {% comment %} <a href="{% url 'inventory_list' %}" class="text-decoration-none text-white">
+            <div class="sidebar-item {% if request.resolver_match.url_name == 'schedule' %}active{% endif %}">
+                <i class="fa-brands fa-wpforms"></i>
+                <span>Register</span>
+            </div>
+        </a> {% endcomment %}
+
+        {% comment %} <a href="#" class="text-decoration-none text-white">
+            <div class="sidebar-item">
+                <i class="fas fa-phone"></i>
+                <span>IVR Calls</span>
+            </div>
+        </a> {% endcomment %}
+    </div>
+    {% comment %} <div class="sidebar-footer">
+        <div class="sidebar-item">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
+        </div>
+    </div> {% endcomment %}
+</aside>
+
+
+<!-- WhatsApp Sidebar -->
+<aside class="whatsapp-sidebar" id="whatsapp-sidebar">
+    <div class="whatsapp-header">
+        <button class="back-arrow" id="close-whatsapp-sidebar">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <span>Whatsapp</span>
+    </div>
+    <div class="whatsapp-menu">
+        {% comment %} <a href="#" class="whatsapp-menu-link">
+            <div class="whatsapp-menu-item">
+                <span>Live Chat</span>
+            </div>
+        </a> {% endcomment %}
+        <a href="{% url 'inventory_list' %}" class="whatsapp-menu-link">
+            <div class="whatsapp-menu-item {% if 'chat_message' in request.path %}active{% endif %}">
+                <span>Chat</span>
+            </div>
+        </a>
+        <a href="{% url 'inventory_list' %}" class="whatsapp-menu-link">
+            <div class="whatsapp-menu-item {% if 'campaign_page' in request.path or 'groups' in request.path %}active{% endif %}">
+                <span>Campaign</span>
+            </div>
+        </a>
+        <a href="{% url 'inventory_list' %}" class="whatsapp-menu-link">
+            <div class="whatsapp-menu-item {% if 'analytics' in request.path %}active{% endif %}">
+                <span>Analytics</span>
+            </div>
+        </a>
+        <a href="{% url 'inventory_list' %}" class="whatsapp-menu-link">
+            <div class="whatsapp-menu-item {% if 'template_flows' in request.path %}active{% endif %}">
+                <span>Flow Builder</span>
+            </div>
+        </a>
+        {% comment %} <a href="#" class="whatsapp-menu-link">
+            <div class="whatsapp-menu-item">
+                <span>Flow Builder</span>
+            </div>
+        </a> {% endcomment %}
+        {% comment %} <a href="#" class="whatsapp-menu-link">
+            <div class="whatsapp-menu-item">
+                <span>Credit tracker</span>
+            </div>
+        </a> {% endcomment %}
+        <a href="{% url 'inventory_list' %}" class="whatsapp-menu-link">
+            <div class="whatsapp-menu-item {% if 'templates' in request.path %}active{% endif %}">
+                <span>Template</span>
+            </div>
+        </a>
+    </div>
+</aside>
+
+<!-- Overlay for mobile -->
+<div class="whatsapp-overlay" id="whatsapp-overlay"></div>

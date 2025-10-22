@@ -1,0 +1,140 @@
+<!-- ========================================= -->
+<!-- templates/summary/anomaly_detail.html -->
+<!-- ========================================= -->
+
+{% extends 'bases.html' %}
+
+{% block title %}Anomaly Detail{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'anomaly_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to Anomalies
+    </a>
+</div>
+
+<div class="page-header">
+    <h1><i class="bi bi-lightning text-danger me-2"></i>Anomaly Details</h1>
+    <p>{{ anomaly.metric_name }}</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Anomaly Information</h5>
+                    <span class="badge bg-danger">{{ anomaly.get_anomaly_type_display }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <small class="text-muted d-block mb-2">Expected Value</small>
+                                <h3 class="mb-0">{{ anomaly.expected_value|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <small class="text-muted d-block mb-2">Actual Value</small>
+                                <h3 class="mb-0 text-danger">{{ anomaly.actual_value|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <small class="text-muted d-block mb-2">Deviation</small>
+                                <h3 class="mb-0 text-danger">{{ anomaly.deviation_percentage }}%</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-info-circle me-2"></i>Confidence Score
+                    </h6>
+                    <div class="progress mb-2" style="height: 20px;">
+                        <div class="progress-bar bg-warning" style="width: {{ anomaly.confidence_score }}%">
+                            {{ anomaly.confidence_score }}%
+                        </div>
+                    </div>
+                    <small>Detection confidence level</small>
+                </div>
+
+                <hr>
+
+                <h6 class="mb-3">Additional Information</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Metric:</strong> {{ anomaly.metric_name }}</p>
+                        <p><strong>Detected:</strong> {{ anomaly.detected_at|date:"M d, Y H:i" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        {% if anomaly.entity_type %}
+                        <p><strong>Entity:</strong> {{ anomaly.entity_type }}</p>
+                        {% endif %}
+                        {% if anomaly.location %}
+                        <p><strong>Location:</strong> {{ anomaly.location }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if anomaly.possible_causes %}
+                <hr>
+                <h6 class="mb-3">Possible Causes</h6>
+                <div class="alert alert-info mb-0">
+                    {{ anomaly.possible_causes }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if anomaly.alert %}
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Related Alert</h5>
+            </div>
+            <div class="card-body">
+                <a href="{% url 'alert_detail' anomaly.alert.pk %}" class="btn btn-outline-primary">
+                    <i class="bi bi-exclamation-triangle"></i> View Related Alert
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card sticky-top" style="top: 20px;">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Quick Stats</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-3">
+                        <small class="text-muted d-block">Type</small>
+                        <strong>{{ anomaly.get_anomaly_type_display }}</strong>
+                    </li>
+                    <li class="mb-3">
+                        <small class="text-muted d-block">Confidence</small>
+                        <strong>{{ anomaly.confidence_score }}%</strong>
+                    </li>
+                    <li class="mb-3">
+                        <small class="text-muted d-block">Deviation</small>
+                        <strong class="text-danger">{{ anomaly.deviation_percentage }}%</strong>
+                    </li>
+                    <li class="mb-3">
+                        <small class="text-muted d-block">Detected</small>
+                        <strong>{{ anomaly.detected_at|timesince }} ago</strong>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends 'bases.html' %}
+
+{% block title %}Daily Summaries - Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Daily Summaries</h1>
+    <p>Historical daily performance reports and analytics</p>
+</div>
+
+<div class="table-container">
+    {% if summaries %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th class="text-end">Revenue</th>
+                    <th class="text-end">Orders</th>
+                    <th class="text-end">Active Farmers</th>
+                    <th class="text-end">Task Completion</th>
+                    <th class="text-end">Inventory Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for summary in summaries %}
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-calendar3 text-primary me-2 fs-5"></i>
+                            <div>
+                                <strong>{{ summary.date|date:"M d, Y" }}</strong>
+                                <br>
+                                <small class="text-muted">{{ summary.date|date:"l" }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="text-end">
+                        <div>
+                            <strong class="text-success fs-5">₹{{ summary.total_revenue|floatformat:0 }}</strong>
+                        </div>
+                        <small class="text-muted">₹{{ summary.average_order_value|floatformat:0 }} avg</small>
+                    </td>
+                    <td class="text-end">
+                        <div>
+                            <strong class="fs-5">{{ summary.total_orders }}</strong>
+                        </div>
+                        <div class="small">
+                            <span class="text-success">{{ summary.orders_completed }} completed</span>
+                            {% if summary.orders_cancelled > 0 %}
+                            <br><span class="text-danger">{{ summary.orders_cancelled }} cancelled</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="text-end">
+                        <div>
+                            <strong class="fs-5">{{ summary.active_farmers }}</strong>
+                        </div>
+                        {% if summary.new_farmers > 0 %}
+                        <small class="text-success">
+                            <i class="bi bi-arrow-up"></i> +{{ summary.new_farmers }} new
+                        </small>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="mb-1">
+                            <span class="badge {% if summary.task_completion_rate >= 80 %}bg-success{% elif summary.task_completion_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %} fs-6">
+                                {{ summary.task_completion_rate }}%
+                            </span>
+                        </div>
+                        <small class="text-muted">{{ summary.tasks_completed }}/{{ summary.tasks_pending|add:summary.tasks_completed }}</small>
+                    </td>
+                    <td class="text-end">
+                        <div class="mb-1">
+                            <i class="bi bi-box-seam text-primary"></i>
+                            <strong>{{ summary.total_products }}</strong>
+                        </div>
+                        {% if summary.low_stock_items > 0 or summary.out_of_stock_items > 0 %}
+                        <div class="small">
+                            {% if summary.low_stock_items > 0 %}
+                            <span class="text-warning">{{ summary.low_stock_items }} low</span>
+                            {% endif %}
+                            {% if summary.out_of_stock_items > 0 %}
+                            <br><span class="text-danger">{{ summary.out_of_stock_items }} out</span>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <small class="text-success">All good</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'daily_summary_detail' summary.date|date:'Y-m-d' %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> View Details
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Summary Statistics -->
+    <div class="row g-3 mt-4 pt-4 border-top">
+        <div class="col-md-3">
+            <div class="text-center">
+                <h5 class="text-muted mb-1">Total Days</h5>
+                <h3 class="mb-0">{{ summaries|length }}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <h5 class="text-muted mb-1">Total Revenue</h5>
+                <h3 class="mb-0 text-success">₹{% widthratio summaries|length 1 1 %}{% for s in summaries %}{% if forloop.first %}{{ s.total_revenue|floatformat:0 }}{% endif %}{% endfor %}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <h5 class="text-muted mb-1">Total Orders</h5>
+                <h3 class="mb-0">{% for s in summaries %}{% if forloop.first %}{{ s.total_orders }}{% endif %}{% endfor %}</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-center">
+                <h5 class="text-muted mb-1">Avg Task Rate</h5>
+                <h3 class="mb-0">{% for s in summaries %}{% if forloop.first %}{{ s.task_completion_rate }}%{% endif %}{% endfor %}</h3>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-inbox fs-1 text-muted"></i>
+        <p class="text-muted mt-3 fs-5">No daily summaries available</p>
+        <p class="text-muted">Daily summaries will appear here as data is collected.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.table-hover tbody tr:hover {
+    background-color: rgba(79, 70, 229, 0.05);
+    cursor: pointer;
+}
+.fs-5 {
+    font-size: 1.1rem;
+}
+.fs-6 {
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}

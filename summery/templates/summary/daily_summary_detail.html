@@ -1,0 +1,444 @@
+{% extends 'bases.html' %}
+
+{% block title %}Daily Summary - {{ summary.date|date:"M d, Y" }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'daily_summary_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to Daily Summaries
+    </a>
+</div>
+
+<div class="page-header">
+    <h1><i class="bi bi-calendar-check text-primary me-2"></i>Daily Summary</h1>
+    <p class="mb-0">{{ summary.date|date:"l, F d, Y" }}</p>
+</div>
+
+<!-- Key Performance Indicators -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+                <i class="bi bi-currency-rupee"></i>
+            </div>
+            <h3>₹{{ summary.total_revenue|floatformat:0 }}</h3>
+            <p>Total Revenue</p>
+            {% if prev_summary %}
+            <div class="mt-2">
+                {% if summary.total_revenue > prev_summary.total_revenue %}
+                <small class="text-success">
+                    <i class="bi bi-arrow-up"></i>
+                    {% widthratio summary.total_revenue prev_summary.total_revenue 100 %}% from previous day
+                </small>
+                {% elif summary.total_revenue < prev_summary.total_revenue %}
+                <small class="text-danger">
+                    <i class="bi bi-arrow-down"></i>
+                    {% widthratio summary.total_revenue prev_summary.total_revenue 100 %}% from previous day
+                </small>
+                {% else %}
+                <small class="text-muted">
+                    <i class="bi bi-dash"></i> Same as previous day
+                </small>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="icon" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white;">
+                <i class="bi bi-cart-check"></i>
+            </div>
+            <h3>{{ summary.total_orders }}</h3>
+            <p>Total Orders</p>
+            <div class="progress mt-2" style="height: 10px;">
+                <div class="progress-bar bg-success" style="width: {% widthratio summary.orders_completed summary.total_orders 100 %}%"></div>
+                <div class="progress-bar bg-warning" style="width: {% widthratio summary.orders_pending summary.total_orders 100 %}%"></div>
+                <div class="progress-bar bg-danger" style="width: {% widthratio summary.orders_cancelled summary.total_orders 100 %}%"></div>
+            </div>
+            <div class="d-flex justify-content-between mt-2 small">
+                <span class="text-success">{{ summary.orders_completed }} done</span>
+                <span class="text-danger">{{ summary.orders_cancelled }} cancelled</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">
+                <i class="bi bi-people"></i>
+            </div>
+            <h3>{{ summary.active_farmers }}</h3>
+            <p>Active Farmers</p>
+            <div class="mt-2">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-muted">New Farmers</span>
+                    <strong class="text-success">{{ summary.new_farmers }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <span class="text-muted">Active Cycles</span>
+                    <strong>{{ summary.active_crop_cycles }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="icon" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+                <i class="bi bi-check2-square"></i>
+            </div>
+            <h3>{{ summary.task_completion_rate }}%</h3>
+            <p>Task Completion</p>
+            <div class="mt-2">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-muted">Completed</span>
+                    <strong class="text-success">{{ summary.tasks_completed }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <span class="text-muted">Overdue</span>
+                    <strong class="text-danger">{{ summary.tasks_overdue }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Metrics -->
+<div class="row g-4 mb-4">
+    <!-- Financial Breakdown -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-currency-rupee text-success me-2"></i>Financial Breakdown
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div>
+                            <h6 class="text-muted mb-1">Total Revenue</h6>
+                            <small class="text-muted">All orders combined</small>
+                        </div>
+                        <h4 class="mb-0 text-success">₹{{ summary.total_revenue|floatformat:0 }}</h4>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div>
+                            <h6 class="text-muted mb-1">Payments Collected</h6>
+                            <small class="text-muted">Successfully received</small>
+                        </div>
+                        <h4 class="mb-0 text-info">₹{{ summary.total_payments_collected|floatformat:0 }}</h4>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div>
+                            <h6 class="text-muted mb-1">Pending Payments</h6>
+                            <small class="text-muted">Yet to be collected</small>
+                        </div>
+                        <h4 class="mb-0 text-warning">₹{{ summary.pending_payments|floatformat:0 }}</h4>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div>
+                            <h6 class="text-muted mb-1">Average Order Value</h6>
+                            <small class="text-muted">Per order amount</small>
+                        </div>
+                        <h4 class="mb-0">₹{{ summary.average_order_value|floatformat:0 }}</h4>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Inventory Value</h6>
+                            <small class="text-muted">Total stock worth</small>
+                        </div>
+                        <h4 class="mb-0 text-primary">₹{{ summary.inventory_value|floatformat:0 }}</h4>
+                    </div>
+                </div>
+                
+                <!-- Payment Collection Rate -->
+                <div class="alert alert-{% if summary.total_payments_collected >= summary.total_revenue %}success{% else %}warning{% endif %} mb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-percent me-2"></i>Payment Collection Rate</span>
+                        <strong>{% if summary.total_revenue > 0 %}{% widthratio summary.total_payments_collected summary.total_revenue 100 %}%{% else %}0%{% endif %}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory Status -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-box-seam text-primary me-2"></i>Inventory Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="bi bi-boxes text-primary fs-3 mb-2"></i>
+                                <h3 class="mb-0">{{ summary.total_products }}</h3>
+                                <small class="text-muted">Total Products</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="bi bi-exclamation-triangle text-warning fs-3 mb-2"></i>
+                                <h3 class="mb-0">{{ summary.low_stock_items }}</h3>
+                                <small class="text-muted">Low Stock</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="bi bi-x-circle text-danger fs-3 mb-2"></i>
+                                <h3 class="mb-0">{{ summary.out_of_stock_items }}</h3>
+                                <small class="text-muted">Out of Stock</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check-circle text-success fs-3 mb-2"></i>
+                                <h3 class="mb-0">{{ summary.total_products|add:summary.low_stock_items|add:summary.out_of_stock_items|add:summary.total_products }}</h3>
+                                <small class="text-muted">In Stock</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if summary.low_stock_items > 0 or summary.out_of_stock_items > 0 %}
+                <div class="alert alert-warning mb-0">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Attention Required
+                    </h6>
+                    <p class="mb-0 small">
+                        {% if summary.low_stock_items > 0 %}
+                        <strong>{{ summary.low_stock_items }}</strong> product{{ summary.low_stock_items|pluralize }} running low on stock.
+                        {% endif %}
+                        {% if summary.out_of_stock_items > 0 %}
+                        <strong>{{ summary.out_of_stock_items }}</strong> product{{ summary.out_of_stock_items|pluralize }} out of stock.
+                        {% endif %}
+                    </p>
+                </div>
+                {% else %}
+                <div class="alert alert-success mb-0">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    All inventory levels are healthy!
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Order Details -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">
+            <i class="bi bi-cart-check text-info me-2"></i>Order Details
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-3">
+                <div class="text-center p-3 border rounded">
+                    <i class="bi bi-cart-plus text-primary fs-2 mb-2"></i>
+                    <h4 class="mb-0">{{ summary.total_orders }}</h4>
+                    <small class="text-muted">Total Orders</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center p-3 border rounded bg-success bg-opacity-10">
+                    <i class="bi bi-check-circle text-success fs-2 mb-2"></i>
+                    <h4 class="mb-0">{{ summary.orders_completed }}</h4>
+                    <small class="text-muted">Completed</small>
+                    <div class="progress mt-2" style="height: 5px;">
+                        <div class="progress-bar bg-success" style="width: {% if summary.total_orders > 0 %}{% widthratio summary.orders_completed summary.total_orders 100 %}{% else %}0{% endif %}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center p-3 border rounded bg-warning bg-opacity-10">
+                    <i class="bi bi-clock text-warning fs-2 mb-2"></i>
+                    <h4 class="mb-0">{{ summary.orders_pending }}</h4>
+                    <small class="text-muted">Pending</small>
+                    <div class="progress mt-2" style="height: 5px;">
+                        <div class="progress-bar bg-warning" style="width: {% if summary.total_orders > 0 %}{% widthratio summary.orders_pending summary.total_orders 100 %}{% else %}0{% endif %}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center p-3 border rounded bg-danger bg-opacity-10">
+                    <i class="bi bi-x-circle text-danger fs-2 mb-2"></i>
+                    <h4 class="mb-0">{{ summary.orders_cancelled }}</h4>
+                    <small class="text-muted">Cancelled</small>
+                    <div class="progress mt-2" style="height: 5px;">
+                        <div class="progress-bar bg-danger" style="width: {% if summary.total_orders > 0 %}{% widthratio summary.orders_cancelled summary.total_orders 100 %}{% else %}0{% endif %}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <div class="alert alert-{% if summary.order_completion_rate >= 80 %}success{% elif summary.order_completion_rate >= 60 %}warning{% else %}danger{% endif %} mb-0">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-speedometer me-2"></i>Order Completion Rate</span>
+                    <strong class="fs-5">{{ summary.order_completion_rate }}%</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WhatsApp Engagement -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">
+            <i class="bi bi-whatsapp text-success me-2"></i>WhatsApp Engagement
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <i class="bi bi-send text-primary fs-2 mb-2"></i>
+                        <h3 class="mb-0">{{ summary.total_messages_sent }}</h3>
+                        <small class="text-muted">Messages Sent</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <i class="bi bi-inbox text-info fs-2 mb-2"></i>
+                        <h3 class="mb-0">{{ summary.total_messages_received }}</h3>
+                        <small class="text-muted">Messages Received</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-all text-success fs-2 mb-2"></i>
+                        <h3 class="mb-0">{{ summary.flow_completions }}</h3>
+                        <small class="text-muted">Flow Completions</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <i class="bi bi-telephone text-warning fs-2 mb-2"></i>
+                        <h3 class="mb-0">{{ summary.call_volume }}</h3>
+                        <small class="text-muted">Call Volume</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if summary.flow_dropoffs > 0 %}
+        <div class="alert alert-warning mt-3 mb-0">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>{{ summary.flow_dropoffs }}</strong> flow dropoff{{ summary.flow_dropoffs|pluralize }} recorded today.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Performance Metrics -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">
+            <i class="bi bi-graph-up text-primary me-2"></i>Performance Metrics
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if metrics %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>Metric Type</th>
+                        <th class="text-end">Value</th>
+                        <th class="text-end">Target</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for metric in metrics %}
+                    <tr>
+                        <td>{{ metric.get_metric_type_display }}</td>
+                        <td class="text-end"><strong>{{ metric.value|floatformat:2 }}</strong></td>
+                        <td class="text-end">
+                            {% if metric.target_value %}
+                            {{ metric.target_value|floatformat:2 }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if metric.target_value %}
+                                {% if metric.is_meeting_target %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Met
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-exclamation-circle"></i> Below
+                                </span>
+                                {% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center mb-0">No performance metrics recorded for this date.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Alerts for this Day -->
+{% if alerts %}
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">
+            <i class="bi bi-exclamation-triangle text-warning me-2"></i>Alerts Generated
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="list-group list-group-flush">
+            {% for alert in alerts %}
+            <a href="{% url 'alert_detail' alert.pk %}" class="list-group-item list-group-item-action">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="alert-badge badge-{{ alert.severity|lower }} me-2">{{ alert.severity }}</span>
+                        <span class="badge bg-light text-dark">{{ alert.get_category_display }}</span>
+                        <h6 class="mt-2 mb-1">{{ alert.title }}</h6>
+                        <p class="mb-0 text-muted small">{{ alert.description|truncatewords:20 }}</p>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

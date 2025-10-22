@@ -1,0 +1,249 @@
+<!-- templates/summary/benchmark_detail.html -->
+<!-- ========================================= -->
+
+{% extends 'bases.html' %}
+
+{% block title %}Benchmark Detail{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'benchmark_comparison' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to Benchmarks
+    </a>
+</div>
+
+<div class="page-header">
+    <h1>{{ comparison.entity_name }}</h1>
+    <p>{{ comparison.metric_name }} - {{ comparison.entity_type }}</p>
+    <small class="text-muted">Period: {{ comparison.period_start|date:"M d, Y" }} - {{ comparison.period_end|date:"M d, Y" }}</small>
+</div>
+
+<!-- Performance Overview -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Actual Value</h6>
+                <h3 class="mb-0">{{ comparison.actual_value|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Benchmark</h6>
+                <h3 class="mb-0">{{ comparison.benchmark_value|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Difference</h6>
+                <h3 class="mb-0 {% if comparison.is_above_benchmark %}text-success{% else %}text-danger{% endif %}">
+                    {% if comparison.is_above_benchmark %}+{% endif %}{{ comparison.difference|floatformat:2 }}
+                </h3>
+                <small class="text-muted">{{ comparison.difference_percentage|floatformat:1 }}%</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Rank</h6>
+                {% if comparison.rank %}
+                <h3 class="mb-0">
+                    <span class="badge {% if comparison.rank <= 3 %}bg-warning{% else %}bg-secondary{% endif %} fs-4">
+                        #{{ comparison.rank }}
+                    </span>
+                </h3>
+                <small class="text-muted">of {{ comparison.total_entities }}</small>
+                {% else %}
+                <h3 class="mb-0 text-muted">-</h3>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Status -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <h5 class="mb-0">Performance Tier</h5>
+            </div>
+            <div class="col-md-6">
+                {% if comparison.performance_tier %}
+                <span class="badge 
+                    {% if comparison.performance_tier == 'TOP' %}bg-success
+                    {% elif comparison.performance_tier == 'ABOVE_AVG' %}bg-info
+                    {% elif comparison.performance_tier == 'AVERAGE' %}bg-secondary
+                    {% elif comparison.performance_tier == 'BELOW_AVG' %}bg-warning
+                    {% else %}bg-danger{% endif %} fs-5 px-4 py-2">
+                    {{ comparison.get_performance_tier_display }}
+                </span>
+                {% endif %}
+            </div>
+            <div class="col-md-3">
+                {% if comparison.percentile %}
+                <div class="text-end">
+                    <h4 class="mb-0">{{ comparison.percentile }}th</h4>
+                    <small class="text-muted">Percentile</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if comparison.percentile %}
+        <div class="mt-3">
+            <div class="progress" style="height: 25px;">
+                <div class="progress-bar 
+                    {% if comparison.percentile >= 80 %}bg-success
+                    {% elif comparison.percentile >= 60 %}bg-info
+                    {% elif comparison.percentile >= 40 %}bg-secondary
+                    {% elif comparison.percentile >= 20 %}bg-warning
+                    {% else %}bg-danger{% endif %}"
+                    style="width: {{ comparison.percentile }}%">
+                    {{ comparison.percentile }}th percentile
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Performance Indicator -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Status</h5>
+            </div>
+            <div class="card-body">
+                {% if comparison.is_above_benchmark %}
+                <div class="alert alert-success mb-0">
+                    <h5 class="alert-heading">
+                        <i class="bi bi-check-circle-fill me-2"></i>Above Benchmark
+                    </h5>
+                    <p class="mb-0">This entity is performing above the benchmark by {{ comparison.difference_percentage|floatformat:1 }}%.</p>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <h5 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Below Benchmark
+                    </h5>
+                    <p class="mb-0">This entity is performing below the benchmark by {{ comparison.difference_percentage|floatformat:1|cut:"-" }}%. Consider improvement strategies.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Quick Stats</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Metric</span>
+                            <strong>{{ comparison.metric_name }}</strong>
+                        </div>
+                    </li>
+                    <li class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Entity Type</span>
+                            <strong>{{ comparison.entity_type }}</strong>
+                        </div>
+                    </li>
+                    <li class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Period</span>
+                            <strong>{{ comparison.period_start|date:"M d" }} - {{ comparison.period_end|date:"M d" }}</strong>
+                        </div>
+                    </li>
+                    {% if comparison.total_entities %}
+                    <li class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Total Entities</span>
+                            <strong>{{ comparison.total_entities }}</strong>
+                        </div>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Similar Entities Comparison -->
+{% if similar %}
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Peer Comparison</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Rank</th>
+                        <th>Entity</th>
+                        <th class="text-end">Value</th>
+                        <th class="text-end">vs Benchmark</th>
+                        <th>Tier</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in similar %}
+                    <tr {% if item.pk == comparison.pk %}class="table-active"{% endif %}>
+                        <td>
+                            <span class="badge {% if item.rank <= 3 %}bg-warning{% else %}bg-secondary{% endif %}">
+                                #{{ item.rank }}
+                            </span>
+                        </td>
+                        <td>
+                            <strong>{{ item.entity_name }}</strong>
+                            {% if item.pk == comparison.pk %}
+                            <span class="badge bg-primary ms-2">You</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">{{ item.actual_value|floatformat:2 }}</td>
+                        <td class="text-end">
+                            <span class="{% if item.is_above_benchmark %}text-success{% else %}text-danger{% endif %}">
+                                {% if item.is_above_benchmark %}+{% endif %}{{ item.difference_percentage|floatformat:1 }}%
+                            </span>
+                        </td>
+                        <td>
+                            {% if item.performance_tier %}
+                            <span class="badge 
+                                {% if item.performance_tier == 'TOP' %}bg-success
+                                {% elif item.performance_tier == 'ABOVE_AVG' %}bg-info
+                                {% elif item.performance_tier == 'AVERAGE' %}bg-secondary
+                                {% elif item.performance_tier == 'BELOW_AVG' %}bg-warning
+                                {% else %}bg-danger{% endif %} badge-sm">
+                                {{ item.get_performance_tier_display }}
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.badge-sm {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+</style>
+{% endblock %}

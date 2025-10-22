@@ -1,0 +1,374 @@
+{% extends 'bases.html' %}
+
+{% block title %}Inventory Update Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-box-seam text-primary me-2"></i>Inventory Update Dashboard</h1>
+        <p class="text-muted mb-0">Manage pending inventory updates for completed orders</p>
+    </div>
+    <div>
+        <a href="{% url 'product_wise_inventory' %}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-grid-3x3-gap me-2"></i>Product View
+        </a>
+        {% if pending_orders %}
+        <button onclick="showBulkUpdateModal()" class="btn btn-success">
+            <i class="bi bi-lightning-charge-fill me-2"></i>Bulk Update All
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-cart-check text-primary fs-2 mb-2"></i>
+                <h3 class="mb-0">{{ total_orders }}</h3>
+                <p class="text-muted mb-0">Pending Orders</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-box text-info fs-2 mb-2"></i>
+                <h3 class="mb-0">{{ total_products }}</h3>
+                <p class="text-muted mb-0">Products Affected</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card {% if has_stock_issues %}border-danger{% endif %}">
+            <div class="card-body text-center">
+                <i class="bi bi-exclamation-triangle {% if has_stock_issues %}text-danger{% else %}text-success{% endif %} fs-2 mb-2"></i>
+                <h3 class="mb-0">{{ stock_issues|length }}</h3>
+                <p class="text-muted mb-0">Stock Issues</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle text-success fs-2 mb-2"></i>
+                <h3 class="mb-0">{{ total_orders|add:"-"|add:stock_issues|length }}</h3>
+                <p class="text-muted mb-0">Ready to Update</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Issues Alert -->
+{% if stock_issues %}
+<div class="alert alert-danger alert-dismissible fade show mb-4">
+    <h5 class="alert-heading">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>Stock Issues Detected
+    </h5>
+    <p class="mb-3">The following products have insufficient stock:</p>
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered bg-white mb-0">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Size</th>
+                    <th class="text-end">Available</th>
+                    <th class="text-end">Required</th>
+                    <th class="text-end">Shortage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for issue in stock_issues %}
+                <tr>
+                    <td><strong>{{ issue.product.name }}</strong></td>
+                    <td>{{ issue.sku.size }}</td>
+                    <td class="text-end">{{ issue.available }}</td>
+                    <td class="text-end">{{ issue.required }}</td>
+                    <td class="text-end text-danger"><strong>{{ issue.shortage }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#productView">
+            <i class="bi bi-box-seam me-2"></i>Product Summary
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#orderView">
+            <i class="bi bi-list-ul me-2"></i>Order View
+        </a>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Product Summary Tab -->
+    <div class="tab-pane fade show active" id="productView">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Product-wise Summary</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th>Size</th>
+                            <th class="text-end">Current Stock</th>
+                            <th class="text-end">Total Pending</th>
+                            <th class="text-end">After Update</th>
+                            <th class="text-center">Orders</th>
+                            <th class="text-end">Total Value</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in product_summary %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.product.name }}</strong>
+                                <br><small class="text-muted">{{ item.product.company.name }}</small>
+                            </td>
+                            <td>{{ item.sku.size }}</td>
+                            <td class="text-end">
+                                <span class="badge {% if item.current_stock < item.sku.reorder_level %}bg-warning{% else %}bg-success{% endif %}">
+                                    {{ item.current_stock }}
+                                </span>
+                            </td>
+                            <td class="text-end"><strong>{{ item.total_quantity }}</strong></td>
+                            <td class="text-end">
+                                <span class="badge {% if item.projected_stock < 0 %}bg-danger{% elif item.projected_stock < item.sku.reorder_level %}bg-warning{% else %}bg-success{% endif %}">
+                                    {{ item.projected_stock }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-primary" onclick="showProductOrders('{{ item.sku.id }}')">
+                                    {{ item.order_count }} order{{ item.order_count|pluralize }}
+                                </button>
+                            </td>
+                            <td class="text-end">₹{{ item.total_value|floatformat:0 }}</td>
+                            <td class="text-center">
+                                {% if item.projected_stock < 0 %}
+                                <span class="badge bg-danger">
+                                    <i class="bi bi-x-circle me-1"></i>Insufficient
+                                </span>
+                                {% else %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle me-1"></i>OK
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <i class="bi bi-check-circle fs-3 d-block mb-2"></i>
+                                No pending inventory updates
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order View Tab -->
+    <div class="tab-pane fade" id="orderView">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Order-wise Details</h5>
+            </div>
+            <div class="card-body">
+                {% for detail in order_details %}
+                <div class="card mb-3 border">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0">
+                                    <a href="{% url 'order_detail' detail.order.pk %}" class="text-decoration-none">
+                                        {{ detail.order.order_number }}
+                                    </a>
+                                </h6>
+                                <small class="text-muted">
+                                    {{ detail.order.farmer.name }} • {{ detail.order.created_at|date:"M d, Y" }}
+                                </small>
+                            </div>
+                            <div>
+                                <span class="badge bg-{{ detail.order.status|lower }}">{{ detail.order.get_status_display }}</span>
+                                <button onclick="updateSingleOrder('{{ detail.order.id }}')" 
+                                        class="btn btn-sm btn-success ms-2"
+                                        {% if not detail.items|length %}disabled{% endif %}>
+                                    <i class="bi bi-check-circle me-1"></i>Update Inventory
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Size</th>
+                                    <th class="text-end">Quantity</th>
+                                    <th class="text-end">Current Stock</th>
+                                    <th class="text-end">After Update</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in detail.items %}
+                                <tr>
+                                    <td>{{ item.sku.product.name }}</td>
+                                    <td>{{ item.sku.size }}</td>
+                                    <td class="text-end">{{ item.quantity }}</td>
+                                    <td class="text-end">{{ item.current_stock }}</td>
+                                    <td class="text-end">
+                                        <span class="{% if not item.is_sufficient %}text-danger fw-bold{% endif %}">
+                                            {{ item.after_update }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if item.is_sufficient %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> OK
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-x-circle"></i> Insufficient
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-center text-muted py-4">No pending orders</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Update Modal -->
+<div class="modal fade" id="bulkUpdateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-lightning-charge-fill text-warning me-2"></i>
+                    Bulk Update Inventory
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Confirm Bulk Update
+                    </h6>
+                    <p class="mb-0">
+                        This will update inventory for <strong>{{ total_orders }}</strong> order(s) affecting 
+                        <strong>{{ total_products }}</strong> product(s). This action cannot be undone.
+                    </p>
+                </div>
+                
+                <div id="bulkUpdatePreview" class="d-none">
+                    <!-- Preview will be loaded here -->
+                </div>
+                
+                {% if has_stock_issues %}
+                <div class="alert alert-danger">
+                    <strong>Cannot proceed!</strong> There are stock shortage issues that must be resolved first.
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="confirmBulkUpdate()" 
+                        {% if has_stock_issues %}disabled{% endif %}>
+                    <i class="bi bi-check-circle me-2"></i>Confirm & Update
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showBulkUpdateModal() {
+    const modal = new bootstrap.Modal(document.getElementById('bulkUpdateModal'));
+    modal.show();
+}
+
+function confirmBulkUpdate() {
+    if (!confirm('Are you absolutely sure? This will update inventory for all pending orders.')) {
+        return;
+    }
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-arrow-clockwise spin me-2"></i>Updating...';
+    
+    fetch('{% url "bulk_update_inventory" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Success! Updated ${data.orders_updated} orders and ${data.items_updated} items.`);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+            if (data.issues) {
+                console.log('Stock issues:', data.issues);
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Confirm & Update';
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Confirm & Update';
+    });
+}
+
+function updateSingleOrder(orderId) {
+    if (!confirm('Update inventory for this order?')) {
+        return;
+    }
+    
+    window.location.href = `/orders/inventory/update-single/${orderId}/`;
+}
+
+function showProductOrders(skuId) {
+    // Show orders for specific product
+    alert('Product orders detail - To be implemented');
+}
+</script>
+
+<style>
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.spin {
+    animation: spin 1s linear infinite;
+}
+</style>
+
+{% endblock %}

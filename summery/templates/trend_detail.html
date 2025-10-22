@@ -1,0 +1,148 @@
+
+{% extends 'bases.html' %}
+
+{% block title %}Trend Detail{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'trend_analysis' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to Trends
+    </a>
+</div>
+
+<div class="page-header">
+    <h1>{{ trend.metric_name }}</h1>
+    <p>{{ trend.period_start|date:"M d, Y" }} - {{ trend.period_end|date:"M d, Y" }}</p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Trend Direction</h6>
+                <h3 class="mb-0">
+                    <span class="badge {% if trend.trend_direction == 'UP' %}bg-success{% elif trend.trend_direction == 'DOWN' %}bg-danger{% elif trend.trend_direction == 'VOLATILE' %}bg-warning{% else %}bg-secondary{% endif %}">
+                        <i class="bi bi-arrow-{% if trend.trend_direction == 'UP' %}up{% elif trend.trend_direction == 'DOWN' %}down{% else %}right{% endif %}"></i>
+                        {{ trend.get_trend_direction_display }}
+                    </span>
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Trend Strength</h6>
+                <h3 class="mb-0">{{ trend.trend_strength }}%</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Average Value</h6>
+                <h3 class="mb-0">{{ trend.average_value|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted mb-2">Volatility</h6>
+                <h3 class="mb-0">{{ trend.volatility|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if trend.forecasted_next_value %}
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-graph-up-arrow me-2"></i>Forecast</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h3 class="text-primary">{{ trend.forecasted_next_value|floatformat:2 }}</h3>
+                <p class="text-muted">Predicted next value</p>
+            </div>
+            <div class="col-md-6">
+                <div class="progress" style="height: 30px;">
+                    <div class="progress-bar bg-info" style="width: {{ trend.forecast_confidence }}%">
+                        {{ trend.forecast_confidence }}% Confidence
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if trend.insights or trend.recommendations %}
+<div class="row g-4">
+    {% if trend.insights %}
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-lightbulb me-2"></i>Insights</h5>
+            </div>
+            <div class="card-body">
+                <p>{{ trend.insights }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if trend.recommendations %}
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Recommendations</h5>
+            </div>
+            <div class="card-body">
+                <p>{{ trend.recommendations }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Historical Trends -->
+{% if historical %}
+<div class="card mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Historical Trends</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>Period</th>
+                        <th>Direction</th>
+                        <th class="text-end">Strength</th>
+                        <th class="text-end">Avg Value</th>
+                        <th class="text-end">Volatility</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hist in historical %}
+                    <tr>
+                        <td>{{ hist.period_start|date:"M d" }} - {{ hist.period_end|date:"M d, Y" }}</td>
+                        <td>
+                            <span class="badge {% if hist.trend_direction == 'UP' %}bg-success{% elif hist.trend_direction == 'DOWN' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ hist.get_trend_direction_display }}
+                            </span>
+                        </td>
+                        <td class="text-end">{{ hist.trend_strength }}%</td>
+                        <td class="text-end">{{ hist.average_value|floatformat:2 }}</td>
+                        <td class="text-end">{{ hist.volatility|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

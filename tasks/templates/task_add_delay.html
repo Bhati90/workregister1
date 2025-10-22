@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="detail-card">
+        <h2 class="section-title">
+            <i class="fas fa-clock"></i>
+            {% if current_language == 'mr' %}विलंब जोडा{% else %}Add Delay{% endif %}
+        </h2>
+
+        <div class="mb-4">
+            <h4>{{ object.schedule_task.stage_name }}</h4>
+            <p class="text-muted">
+                {% if current_language == 'mr' %}
+                    शेतकरी: {{ object.farmer_crop_cycle.farmer.name }} | पीक: {{ object.farmer_crop_cycle.crop_variety.name }}
+                {% else %}
+                    Farmer: {{ object.farmer_crop_cycle.farmer.name }} | Crop: {{ object.farmer_crop_cycle.crop_variety.name }}
+                {% endif %}
+            </p>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label">
+                    {% if current_language == 'mr' %}विलंबाचे दिवस{% else %}Delay Days{% endif %} *
+                </label>
+                <input type="number" 
+                       name="delay_days" 
+                       class="form-control" 
+                       value="{{ object.delay_days }}"
+                       min="1"
+                       required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">
+                    {% if current_language == 'mr' %}विलंबाचे कारण{% else %}Reason for Delay{% endif %}
+                </label>
+                <textarea name="delay_reason" 
+                          class="form-control" 
+                          rows="3"
+                          placeholder="{% if current_language == 'mr' %}विलंबाचे कारण प्रविष्ट करा...{% else %}Enter reason for delay...{% endif %}">{{ object.delay_reason }}</textarea>
+            </div>
+
+            <div class="alert alert-warning">
+                <strong><i class="fas fa-info-circle"></i> {% if current_language == 'mr' %}टीप:{% else %}Note:{% endif %}</strong>
+                {% if current_language == 'mr' %}
+                    हा विलंब फक्त या कार्यासाठी लागू होईल. पुढील कार्ये प्रभावित होणार नाहीत.
+                {% else %}
+                    This delay will only apply to this task. Subsequent tasks will not be affected.
+                {% endif %}
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>{% if current_language == 'mr' %}वर्तमान सुरवात:{% else %}Current Start:{% endif %}</strong>
+                    {{ object.planned_start_date|date:"d M, Y" }}
+                </div>
+                <div class="col-md-6">
+                    <strong>{% if current_language == 'mr' %}वर्तमान समाप्ती:{% else %}Current End:{% endif %}</strong>
+                    {{ object.planned_end_date|date:"d M, Y" }}
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-clock"></i>
+                    {% if current_language == 'mr' %}विलंब जोडा{% else %}Add Delay{% endif %}
+                </button>
+                <a href="{% url 'farmer_detail' object.farmer_crop_cycle.farmer.id %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i>
+                    {% if current_language == 'mr' %}रद्द करा{% else %}Cancel{% endif %}
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

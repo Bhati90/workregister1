@@ -1,0 +1,109 @@
+
+<!-- templates/summary/trend_analysis.html -->
+<!-- ========================================= -->
+
+{% extends 'bases.html' %}
+
+{% block title %}Trend Analysis{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Trend Analysis</h1>
+    <p>Analyze trends and forecast future values</p>
+</div>
+
+<!-- Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Metric</label>
+                <select name="metric" class="form-select">
+                    <option value="">All Metrics</option>
+                    {% for metric in metric_names %}
+                    <option value="{{ metric }}" {% if selected_metric == metric %}selected{% endif %}>{{ metric }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Apply
+                </button>
+                <a href="{% url 'trend_analysis' %}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Trends -->
+{% if trends %}
+<div class="row g-4">
+    {% for trend in trends %}
+    <div class="col-lg-6">
+        <a href="{% url 'trend_detail' trend.pk %}" class="text-decoration-none">
+            <div class="card h-100 hover-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5 class="mb-1 text-dark">{{ trend.metric_name }}</h5>
+                            <small class="text-muted">
+                                {{ trend.period_start|date:"M d" }} - {{ trend.period_end|date:"M d, Y" }}
+                            </small>
+                        </div>
+                        <span class="badge {% if trend.trend_direction == 'UP' %}bg-success{% elif trend.trend_direction == 'DOWN' %}bg-danger{% elif trend.trend_direction == 'VOLATILE' %}bg-warning{% else %}bg-secondary{% endif %} fs-6">
+                            <i class="bi bi-arrow-{% if trend.trend_direction == 'UP' %}up{% elif trend.trend_direction == 'DOWN' %}down{% else %}right{% endif %}"></i>
+                            {{ trend.get_trend_direction_display }}
+                        </span>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <div class="p-2 bg-light rounded">
+                                <small class="text-muted d-block">Average Value</small>
+                                <strong>{{ trend.average_value|floatformat:2 }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-2 bg-light rounded">
+                                <small class="text-muted d-block">Strength</small>
+                                <strong>{{ trend.trend_strength }}%</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if trend.forecasted_next_value %}
+                    <div class="alert alert-info mb-0 py-2">
+                        <div class="d-flex justify-content-between">
+                            <span><i class="bi bi-graph-up-arrow me-1"></i> Forecast</span>
+                            <strong>{{ trend.forecasted_next_value|floatformat:2 }}</strong>
+                        </div>
+                        <small class="text-muted">{{ trend.forecast_confidence }}% confidence</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-graph-up-arrow fs-1 text-muted"></i>
+        <p class="text-muted mt-3">No trend analysis available</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.hover-card {
+    transition: all 0.3s ease;
+}
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+</style>
+{% endblock %}a
