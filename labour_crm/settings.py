@@ -458,6 +458,7 @@ INSTALLED_APPS = [
     #        # PWA support
     'tasks',
     'summery',
+    'registration',
     'cropcycle',
     'order',
     'recommandations',
@@ -468,7 +469,6 @@ INSTALLED_APPS = [
     'flow',
     'analytics',
     'whitenoise.storage',  # For serving static files in production
-    'registration',
     'pwa',  
 ]
 
@@ -497,7 +497,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.debug',
-                'registration.context_processors.notifications_processor', 
+                
             ],
         },
     },

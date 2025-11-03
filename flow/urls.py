@@ -12,7 +12,7 @@ urlpatterns = [
     # path('api/flows/list/', views.get_flows_list_api, name='api_list_flows'),
     path('api/attributes/', views.attribute_list_create_view, name='attribute-list-create'),
     path('api/attributes/<int:pk>/', views.attribute_detail_view, name='attribute-detail'),
-    path('api/initiate-call/', views.initiate_whatsapp_call_view, name='initiate_whatsapp_call'),
+    # path('api/initiate-call/', views.initiate_whatsapp_call_view, name='initiate_whatsapp_call'),
     # path('api/get-flow-details/<str:flow_id>/', views.get_flow_details_api_view, name='get_flow_details_api'),
 
 #    path('api/whatsapp-forms/', views.get_whatsapp_forms_api, name='get_whatsapp_forms'),
@@ -46,24 +46,28 @@ urlpatterns = [
     
 
         # FIXED: Call handling webhooks
-    path('business-answer/<str:call_id>/', views.business_answer_webhook, name='business_answer'),
-    path('business-accept/<str:call_id>/', views.business_accept_webhook, name='business_accept'), 
-    path('business-decline/<str:call_id>/', views.business_decline_webhook, name='business_decline'),
-    path('bridge-connect/<str:call_id>/', views.bridge_connect_webhook, name='bridge_connect'),
-    path('conference-joined/<str:call_id>/', views.conference_joined_webhook, name='conference_joined'),
+    # path('business-answer/<str:call_id>/', views.business_answer_webhook, name='business_answer'),
+    # path('business-accept/<str:call_id>/', views.business_accept_webhook, name='business_accept'), 
+    # path('business-decline/<str:call_id>/', views.business_decline_webhook, name='business_decline'),
+    # path('bridge-connect/<str:call_id>/', views.bridge_connect_webhook, name='bridge_connect'),
+    # path('conference-joined/<str:call_id>/', views.conference_joined_webhook, name='conference_joined'),
 
-    # FIXED: Status webhooks
-    path('call-status/<str:call_id>/<str:call_type>/', views.call_status_webhook, name='call_status'),
-    path('conference-status/<str:call_id>/', views.conference_status_webhook, name='conference_status'),
-    path('dial-result/<str:call_id>/<str:call_type>/', views.dial_result_webhook, name='dial_result'),
+    # # FIXED: Status webhooks
+    # path('call-status/<str:call_id>/<str:call_type>/', views.call_status_webhook, name='call_status'),
+    # path('conference-status/<str:call_id>/', views.conference_status_webhook, name='conference_status'),
+    # path('dial-result/<str:call_id>/<str:call_type>/', views.dial_result_webhook, name='dial_result'),
     
-    # Debug and utility endpoints
-    path('debug-calls/', views.debug_active_calls, name='debug_calls'),
-    path('test-business/', views.test_business_number, name='test_business'),
-    path('terminate-call/', views.terminate_call, name='terminate_call'),
-    path('health/', views.system_health, name='system_health'),
+    # # Debug and utility endpoints
+    # path('debug-calls/', views.debug_active_calls, name='debug_calls'),
+    # path('test-business/', views.test_business_number, name='test_business'),
+    # path('terminate-call/', views.terminate_call, name='terminate_call'),
+    # path('health/', views.system_health, name='system_health'),
     path('api/flows/generate-ai/', views.generate_flow_with_ai, name='api_generate_flow_ai'),
     path('api/flows/ai-list/', views.get_ai_generated_flows, name='api_ai_flows_list'),
+    
+
+    path('api/template-generator/generate/', views.generate_multiple_templates, name='generate_templates'),
+    path('api/template-generator/submit/', views.submit_customized_template, name='submit_customized_template'),
     
 
     path('api/template-flow/analyze/', views.analyze_and_generate_template, name='analyze_template'),

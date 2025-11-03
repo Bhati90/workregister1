@@ -382,7 +382,7 @@
             <div class="info-box">
                 <div class="info-number">{{ farmer.crop_cycles.count }}</div>
                 <div class="info-label">
-                    {% if current_language == 'mr' %}एकूण पीक चक्र{% else %}Total Crop Cycles{% endif %}
+                    {% if current_language == 'mr' %}एकूण पीक चक्र{% else %}Total Cycles{% endif %}
                 </div>
             </div>
             <div class="info-box" style="background: linear-gradient(135deg, #28a745 0%, #20753a 100%);">
@@ -410,7 +410,7 @@
     <div class="detail-card">
         <h2 class="section-title">
             <i class="fas fa-seedling"></i>
-            {% if current_language == 'mr' %}पीक चक्र{% else %}Crop Cycles{% endif %}
+            {% if current_language == 'mr' %}पीक चक्र{% else %}Stages{% endif %}
         </h2>
 
         {% if farmer.crop_cycles.all %}
@@ -576,7 +576,7 @@
                         {% if current_language == 'mr' %}
                             या चक्रासाठी कोणतीही कार्ये नाहीत
                         {% else %}
-                            No tasks for this cycle
+                            No tasks for this Stage
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -604,14 +604,14 @@
                     {% if current_language == 'mr' %}
                         या शेतकर्‍यासाठी कोणतेही पीक चक्र नाही
                     {% else %}
-                        No Crop Cycles for This Farmer
+                        No Crop Stages for This Farmer
                     {% endif %}
                 </h4>
                 <p class="text-muted">
                     {% if current_language == 'mr' %}
                         नवीन पीक चक्र जोडण्यासाठी प्रशासकाशी संपर्क साधा
                     {% else %}
-                        Contact administrator to add a new crop cycle
+                        Contact administrator to add a new crop Stage
                     {% endif %}
                 </p>
             </div>

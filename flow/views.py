@@ -12,12 +12,12 @@ from django.shortcuts import render # Make sure render is imported
 
 # from .models import Flow, Message, 
 #  # Make sure these are imported
-from registration.models import ChatContact, Message
+from .models import ChatContact, Message
 from .models import Flows as Flow
 from .models import UserFlowSessions as UserFlowSession
 from .models import Attribute  # <-- Add this import for Attribute model
 from .models import ContactAttributeValue  # <-- Add this import for ContactAttributeValue model
-from registration.whats_app import send_whatsapp_message, save_outgoing_message, upload_media_for_template_handle
+from .whats_app import send_whatsapp_message, save_outgoing_message, upload_media_for_template_handle
 from django.utils import timezone
 import os
 import mimetypes
@@ -36,10 +36,10 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.shortcuts import render
-from registration.models import ChatContact, Message
+
 from .models import Flows as Flow
 from .models import UserFlowSessions as UserFlowSession
-from registration.whats_app import send_whatsapp_message, save_outgoing_message
+from .whats_app import send_whatsapp_message, save_outgoing_message
 from django.utils import timezone
 import logging
 import requests
@@ -57,10 +57,10 @@ def home_page(request):
 
 
 # --- Constants ---
-API_VERSION = 'v19.0'
+API_VERSION = 'v23.0'
 META_API_URL = f"https://graph.facebook.com/{API_VERSION}"
-PHONE_NUMBER_ID = "694609297073147" # Replace with your Phone Number ID
-META_ACCESS_TOKEN = "EAAhMBt21QaMBPCyLtJj6gwjDy6Gai4fZApb3MXuZBZCCm0iSEd8ZCZCJdkRt4cOtvhyeFLZCNUwitFaLZA3ZCwv7enN6FBFgDMAOKl7LMx0J2kCjy6Qd6AqnbnhB2bo2tgsdGmn9ZCN5MD6yCgE3shuP62t1spfSB6ZALy1QkNLvIaeWZBcvPH00HHpyW6US4kil2ENZADL4ZCvDLVWV9seSbZCxXYzVCezIenCjhSYtoKTIlJ" # Replace with your Meta Access Token
+PHONE_NUMBER_ID = "705449502657013" # Replace with your Phone Number ID
+META_ACCESS_TOKEN = "EAAhMBt21QaMBPvjRpT7P1mhB0xKD1sb7ZCsal0MfRM6yx3p5hInGYHguN70XRCuo18NeuB2BYlM6e1ZBJtpH1ZBmRg6BZB9MeULcfXWdYptZCpzHzSXa0fFBlAzVJh7ZC22njeo5mgIWKY5ZBsiJrryJTh8sOvBp4HZBy51hnZA7hDegmowduSachpXCvH5vLlVMunBAv6ej41X6143kP5pSEKQfqO6NzlVUnA7ZC4HHTj" # Replace with your Meta Access Token
 WABA_ID = "1477047197063313" # Replace with your WABA ID
 
 # --- Core Flow Execution Logic ---
@@ -1798,7 +1798,7 @@ def upload_image_to_meta_api(request):
 import google.generativeai as genai
 
 # Configure Gemini API
-GEMINI_API_KEY = 'AIzaSyCh0DeWCZr8m3kF4LDB2A_xoAlqbmKjvgs'  # Add to settings.py
+GEMINI_API_KEY = 'AIzaSyBwgjwmBlcQp2W5pX5UlopmKUOqVjWLcYg'  # Add to settings.py
 genai.configure(api_key=GEMINI_API_KEY)
 
 
@@ -1901,7 +1901,436 @@ def generate_flow_with_ai(request):
         }, status=500)
 
 
+import json
+import logging
+import requests
+import re
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import google.generativeai as genai
 
+logger = logging.getLogger(__name__)
+
+@csrf_exempt
+def generate_multiple_templates(request):
+    """
+    Generates 3-4 template options based on user requirements.
+    Includes existing templates if they match the requirements.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        requirements = data.get('requirements', '')
+        
+        if not requirements:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Requirements are needed'
+            }, status=400)
+        
+        # Fetch existing templates
+        # existing_templates = fetch_whatsapp_templates()
+        
+        # Generate multiple template options
+        template_options = generate_template_options_with_ai(requirements)
+        
+        if not template_options:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to generate template options'
+            }, status=500)
+        
+        return JsonResponse({
+            'status': 'success',
+            'templates': template_options
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating templates: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+def generate_template_options_with_ai(requirements):
+    """
+    Uses Gemini to generate 3-4 template variations based on requirements.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        prompt = f"""
+You are a WhatsApp Business API template expert. Generate 3-4 different template options based on user requirements.
+
+USER REQUIREMENTS:
+{requirements}
+
+
+
+META'S TEMPLATE GUIDELINES:
+- UTILITY category: Transactional, account updates, order status
+- MARKETING category: Promotional offers, announcements
+- Variables: {{{{1}}}}, {{{{2}}}} for personalization
+- Body: Max 1024 characters
+- Header: Optional (TEXT, IMAGE, VIDEO, DOCUMENT)
+- Footer: Optional (max 60 characters)
+- Buttons: Max 3 QUICK_REPLY or 2 CALL_TO_ACTION buttons
+- Language: en, hi, es, pt_BR, etc.
+
+TASK:
+1. Check if any EXISTING template matches requirements (include 1 if found)
+2. Generate 2-3 NEW template variations:
+   - Variation A: Simple text-only (no media)
+   - Variation B: With IMAGE header (suggest but mark as optional)
+   - Variation C: More detailed version with buttons
+
+OUTPUT FORMAT (JSON):
+{{
+  "templates": [
+    {{
+      "id": "generated_1",
+      "source": "generated",
+      "name": "template_name_lowercase_underscores",
+      "language": "hi" or "en",
+      "category": "UTILITY" or "MARKETING",
+      "match_score": 85 (only for existing),
+      "description": "Brief description of this template option",
+      "has_media": false,
+      "media_type": null or "IMAGE" or "VIDEO",
+      "media_optional": true/false,
+      "components": [
+        {{
+          "type": "HEADER",
+          "format": "TEXT" or "IMAGE",
+          "text": "हेडर मजकूर" (if TEXT),
+          "optional": false
+        }},
+        {{
+          "type": "BODY",
+          "text": "नमस्कार {{{{1}}}},\\n\\nमुख्य मजकूर येथे...",
+          "example": {{
+            "body_text": [["उदाहरण १", "उदाहरण २"]]
+          }}
+        }},
+        {{
+          "type": "FOOTER",
+          "text": "फूटर मजकूर",
+          "optional": true
+        }},
+        {{
+          "type": "BUTTONS",
+          "buttons": [
+            {{"type": "QUICK_REPLY", "text": "बटण १"}},
+            {{"type": "QUICK_REPLY", "text": "बटण २"}}
+          ],
+          "optional": true
+        }}
+      ],
+      "variables_needed": [
+        {{"name": "farmer_name", "description": "शेतकऱ्याचे नाव", "example": "राजू पाटील", "position": 1}},
+        {{"name": "location", "description": "स्थान", "example": "नाशिक", "position": 2}}
+      ],
+      "pros": ["फायदा १", "फायदा २"],
+      "cons": ["तोटा १", "तोटा २"]
+    }}
+  ]
+}}
+
+IMPORTANT RULES:
+1. Use Marathi देवनागरी for Indian farmers
+2. Include personalization {{{{1}}}}, {{{{2}}}} with examples
+3. Professional but friendly tone
+4. Mark media and optional components clearly
+5. Provide pros/cons for each option
+6. Generate ONLY valid JSON, no markdown.
+"""
+        
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean response
+        if response_text.startswith('```'):
+            lines = response_text.split('\n')
+            response_text = '\n'.join(lines[1:-1])
+            if response_text.startswith('json'):
+                response_text = response_text[4:].strip()
+        
+        result = json.loads(response_text)
+        return result.get('templates', [])
+        
+    except Exception as e:
+        logger.error(f"Error in template generation: {e}", exc_info=True)
+        return None
+
+
+@csrf_exempt
+def submit_customized_template(request):
+    """
+    Submits user-customized template to Meta.
+    Handles dynamic media addition/removal.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    try:
+        # Parse multipart or JSON
+        if request.content_type and request.content_type.startswith('multipart/form-data'):
+            template_data_str = request.POST.get('template_data')
+            media_file = request.FILES.get('media_file')
+        else:
+            body_data = json.loads(request.body)
+            template_data_str = body_data.get('template_data')
+            media_file = None
+
+        if not template_data_str:
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'template_data is missing'
+            }, status=400)
+        
+        template_data = json.loads(template_data_str)
+        
+        # Check if user wants to remove media
+        remove_media = template_data.get('remove_media', False)
+        
+        # Upload media if provided
+        media_id = None
+        if media_file and not remove_media:
+            media_id = upload_media_to_meta(media_file)
+            if not media_id:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Media upload failed'
+                }, status=500)
+        
+        # Build Meta API payload dynamically
+        meta_payload = build_meta_payload(template_data, media_id, remove_media)
+        
+        # Submit to Meta
+        url = f"https://graph.facebook.com/v23.0/{WABA_ID}/message_templates"
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        logger.info(f"Submitting to Meta: {json.dumps(meta_payload, indent=2)}")
+        response = requests.post(url, json=meta_payload, headers=headers)
+        response_data = response.json()
+        
+        logger.info(f"Meta Response: {json.dumps(response_data, indent=2)}")
+        
+        if response.status_code == 200 and 'id' in response_data:
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Template submitted for approval',
+                'template_id': response_data.get('id'),
+                'template_name': template_data.get('name'),
+                'meta_response': response_data
+            })
+        else:
+            error_details = response_data.get('error', {})
+            error_message = error_details.get('message', 'Submission failed')
+            
+            return JsonResponse({
+                'status': 'error',
+                'message': error_message,
+                'meta_response': response_data,
+                'suggestion': get_fix_suggestion(error_details)
+            }, status=response.status_code)
+            
+    except Exception as e:
+        logger.error(f"Error submitting template: {e}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+def build_meta_payload(template_data, media_id, remove_media):
+    """
+    Dynamically builds Meta API payload based on user customizations.
+    """
+    meta_payload = {
+        "name": template_data['name'],
+        "category": template_data['category'],
+        "language": template_data['language'],
+        "components": []
+    }
+    
+    for component in template_data['components']:
+        # Skip optional components if user removed them
+        if component.get('removed', False):
+            continue
+        
+        meta_component = {"type": component['type']}
+        
+        if component['type'] == 'HEADER':
+            header_format = component.get('format', 'TEXT')
+            
+            # If user removed media, skip HEADER with media
+            if remove_media and header_format in ['IMAGE', 'VIDEO', 'DOCUMENT']:
+                continue
+            
+            # If user wants to add media
+            if header_format in ['IMAGE', 'VIDEO', 'DOCUMENT']:
+                if media_id:
+                    meta_component['format'] = header_format
+                    meta_component['example'] = {
+                        'header_handle': [media_id]
+                    }
+                else:
+                    # No media provided, skip header
+                    continue
+            else:
+                # TEXT header
+                meta_component['format'] = 'TEXT'
+                meta_component['text'] = component.get('text', '')
+        
+        elif component['type'] == 'BODY':
+            body_text = component['text']
+            meta_component['text'] = body_text
+            
+            # Extract variables
+            variables = re.findall(r'\{\{(\d+)\}\}', body_text)
+            
+            if variables and 'example' in component:
+                example_values = component['example'].get('body_text', [[]])[0]
+                if example_values:
+                    meta_component['example'] = {'body_text': [example_values]}
+        
+        elif component['type'] == 'FOOTER':
+            meta_component['text'] = component.get('text', '')
+        
+        elif component['type'] == 'BUTTONS':
+            buttons = component.get('buttons', [])
+            if buttons:  # Only add if buttons exist
+                meta_component['buttons'] = buttons
+        
+        meta_payload['components'].append(meta_component)
+    
+    return meta_payload
+
+
+# def upload_media_to_meta(media_file):
+#     """Uploads media to Meta and returns media ID."""
+#     try:
+#         url = f"https://graph.facebook.com/v23.0/{WABA_ID}/media"
+        
+#         files = {
+#             'file': (media_file.name, media_file, media_file.content_type),
+#         }
+        
+#         data = {
+#             'messaging_product': 'whatsapp',
+#             'type': media_file.content_type.split('/')[0]
+#         }
+        
+#         headers = {
+#             "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+#         }
+        
+#         logger.info(f"Uploading media: {media_file.name}")
+        
+#         response = requests.post(url, files=files, data=data, headers=headers)
+#         response_data = response.json()
+        
+#         if response.status_code == 200 and 'id' in response_data:
+#             return response_data['id']
+#         else:
+#             logger.error(f"Media upload failed: {response_data}")
+#             return None
+            
+#     except Exception as e:
+#         logger.error(f"Error uploading media: {e}", exc_info=True)
+#         return None
+@csrf_exempt
+def upload_image_to_meta_api(request):
+    """
+    API endpoint to upload an image file directly to Meta's WhatsApp Business API
+    and return the Meta Media ID.
+    """
+    if request.method == 'POST':
+        if 'image' not in request.FILES:
+            return JsonResponse({'status': 'error', 'message': 'No image file provided.'}, status=400)
+
+        image_file: InMemoryUploadedFile = request.FILES['image']
+        
+        # Determine content type (e.g., image/jpeg, image/png)
+        content_type, _ = mimetypes.guess_type(image_file.name)
+        if not content_type or not content_type.startswith('image/'):
+            return JsonResponse({'status': 'error', 'message': 'Invalid file type. Only images are allowed.'}, status=400)
+
+        upload_url = f"{META_API_URL}/{PHONE_NUMBER_ID}/media"
+        headers = {
+            "Authorization": f"Bearer {META_ACCESS_TOKEN}",
+        }
+        files = {
+            'file': (image_file.name, image_file.read(), content_type),
+            'type': (None, content_type), # Important for Meta API
+            'messaging_product': (None, 'whatsapp'),
+        }
+
+        try:
+            response = requests.post(upload_url, headers=headers, files=files)
+            response.raise_for_status() # Raise an exception for HTTP errors
+            meta_response = response.json()
+            
+            media_id = meta_response.get('id')
+            if media_id:
+                logger.info(f"Image uploaded to Meta, Media ID: {media_id}")
+                return JsonResponse({'status': 'success', 'media_id': media_id})
+            else:
+                logger.error(f"Meta upload response missing media ID: {meta_response}")
+                return JsonResponse({'status': 'error', 'message': 'Meta did not return a media ID.'}, status=500)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error uploading image to Meta: {e}. Response: {response.text if 'response' in locals() else 'No response.'}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': f'Failed to upload image to Meta: {e}'}, status=500)
+        except Exception as e:
+            logger.error(f"Unexpected error in upload_image_to_meta_api: {e}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+
+
+
+def fetch_whatsapp_templates():
+    """Fetch approved templates from Meta."""
+    try:
+        url = f"{META_API_URL}/{WABA_ID}/message_templates"
+        params = {"fields": "name,components,status,language,category"}
+        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+        
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        
+        all_templates = response.json().get('data', [])
+        approved_templates = [t for t in all_templates if t.get('status') == 'APPROVED']
+        
+        return approved_templates
+    except Exception as e:
+        logger.error(f"Error fetching templates: {e}")
+        return []
+
+
+def get_fix_suggestion(error_details):
+    """Provides actionable fix suggestions."""
+    error_msg = error_details.get('error_user_msg', '').lower()
+    
+    if 'body_text' in error_msg and 'example' in error_msg:
+        return "Add example values for all variables in body text"
+    elif 'header_handle' in error_msg:
+        return "Upload media file and ensure media ID is valid"
+    elif 'category' in error_msg:
+        return "Specify valid category: UTILITY or MARKETING"
+    elif 'language' in error_msg:
+        return "Specify valid language code: en, hi, es, etc."
+    else:
+        return "Check Meta's template documentation for details"
 
 
 
@@ -1925,10 +2354,10 @@ def analyze_and_generate_template(request):
             }, status=400)
         
         # Step 1: Fetch existing templates
-        existing_templates = fetch_whatsapp_templates()
+        # existing_templates = fetch_whatsapp_templates()
         
         # Step 2: Analyze with Gemini
-        analysis = analyze_requirements_with_ai(user_requirements, existing_templates)
+        analysis = analyze_requirements_with_ai(user_requirements)
         
         if not analysis:
             return JsonResponse({
@@ -2109,13 +2538,13 @@ def upload_media_to_meta(media_file):
         logger.error(f"Error uploading media: {e}", exc_info=True)
         return None
 
-def analyze_requirements_with_ai(requirements, existing_templates):
+def analyze_requirements_with_ai(requirements):
     """
     Uses Gemini to analyze requirements and decide whether to use existing
     template or generate a new one.
     """
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = f"""
 You are a WhatsApp Business API template expert. Analyze the user's requirements and decide:
@@ -2125,8 +2554,6 @@ You are a WhatsApp Business API template expert. Analyze the user's requirements
 USER REQUIREMENTS:
 {requirements}
 
-EXISTING APPROVED TEMPLATES:
-{json.dumps(existing_templates, indent=2)}
 
 META'S TEMPLATE APPROVAL GUIDELINES:
 - Templates must provide value to users
@@ -2191,7 +2618,6 @@ OUTPUT FORMAT (JSON):
     "steps": ["स्टेप 1", "स्टेप 2", "स्टेप 3"]
   }}
 }}
-
 TEMPLATE WRITING GUIDELINES:
 1. Use Marathi देवनागरी script (not English)
 2. ALWAYS include personalization variables {{1}}, {{2}} etc.
@@ -2364,58 +2790,58 @@ Build the complete flow based on the original requirements and suggested structu
         }, status=500)
 
 
-def fetch_whatsapp_templates():
-    """Fetch approved WhatsApp templates from Meta API."""
-    try:
-        url = f"{META_API_URL}/{WABA_ID}/message_templates"
-        params = {"fields": "name,components,status,language,category"}
-        headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
+# def fetch_whatsapp_templates():
+#     """Fetch approved WhatsApp templates from Meta API."""
+#     try:
+#         url = f"{META_API_URL}/{WABA_ID}/message_templates"
+#         params = {"fields": "name,components,status,language,category"}
+#         headers = {"Authorization": f"Bearer {META_ACCESS_TOKEN}"}
         
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
+#         response = requests.get(url, headers=headers, params=params)
+#         response.raise_for_status()
         
-        all_templates = response.json().get('data', [])
-        approved_templates = [t for t in all_templates if t.get('status') == 'APPROVED']
+#         all_templates = response.json().get('data', [])
+#         approved_templates = [t for t in all_templates if t.get('status') == 'APPROVED']
         
-        processed_templates = []
-        for t in approved_templates:
-            buttons = []
-            for comp in t.get('components', []):
-                if comp.get('type') == 'BUTTONS':
-                    for btn in comp.get('buttons', []):
-                        if btn.get('type') == 'QUICK_REPLY':
-                            buttons.append({'text': btn.get('text')})
+#         processed_templates = []
+#         for t in approved_templates:
+#             buttons = []
+#             for comp in t.get('components', []):
+#                 if comp.get('type') == 'BUTTONS':
+#                     for btn in comp.get('buttons', []):
+#                         if btn.get('type') == 'QUICK_REPLY':
+#                             buttons.append({'text': btn.get('text')})
             
-            processed_templates.append({
-                'name': t.get('name'),
-                'components': t.get('components', []),
-                'buttons': buttons,
-                'language': t.get('language', 'en'),
-                'category': t.get('category', 'UTILITY')
-            })
+#             processed_templates.append({
+#                 'name': t.get('name'),
+#                 'components': t.get('components', []),
+#                 'buttons': buttons,
+#                 'language': t.get('language', 'en'),
+#                 'category': t.get('category', 'UTILITY')
+#             })
         
-        return processed_templates
-    except Exception as e:
-        logger.error(f"Error fetching templates: {e}")
-        return []
+#         return processed_templates
+#     except Exception as e:
+#         logger.error(f"Error fetching templates: {e}")
+#         return []
 
 
-def get_fix_suggestion(error_details):
-    """Provides actionable fix suggestions based on Meta API error."""
-    error_msg = error_details.get('error_user_msg', '').lower()
+# def get_fix_suggestion(error_details):
+#     """Provides actionable fix suggestions based on Meta API error."""
+#     error_msg = error_details.get('error_user_msg', '').lower()
     
-    if 'body_text' in error_msg and 'example' in error_msg:
-        return "Add example values: If text has {{1}} and {{2}}, add example: {'body_text': [['Example1', 'Example2']]}"
-    elif 'header_handle' in error_msg:
-        return "Upload image/video first and use the returned media ID in header_handle"
-    elif 'category' in error_msg:
-        return "Add 'category': 'UTILITY' or 'MARKETING' to template"
-    elif 'language' in error_msg:
-        return "Add 'language': 'hi' for Marathi or 'en' for English"
-    elif 'button' in error_msg:
-        return "Check button text (max 20 chars) and ensure type is 'QUICK_REPLY'"
-    else:
-        return "Check Meta's template requirements: https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates"
+#     if 'body_text' in error_msg and 'example' in error_msg:
+#         return "Add example values: If text has {{1}} and {{2}}, add example: {'body_text': [['Example1', 'Example2']]}"
+#     elif 'header_handle' in error_msg:
+#         return "Upload image/video first and use the returned media ID in header_handle"
+#     elif 'category' in error_msg:
+#         return "Add 'category': 'UTILITY' or 'MARKETING' to template"
+#     elif 'language' in error_msg:
+#         return "Add 'language': 'hi' for Marathi or 'en' for English"
+#     elif 'button' in error_msg:
+#         return "Check button text (max 20 chars) and ensure type is 'QUICK_REPLY'"
+#     else:
+#         return "Check Meta's template requirements: https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates"
 
 
 
@@ -2424,7 +2850,7 @@ def generate_flow_with_gemini(user_info, templates, flow_forms, attributes):
     Use Gemini AI to analyze user info and generate optimal flow.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Create the prompt for Gemini
         prompt = f"""
@@ -2968,7 +3394,7 @@ def analyze_all_template_needs(user_info, templates, flow_forms, attributes, lan
     Returns ALL missing templates at once, not one by one.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Language-specific instructions
         language_guide = {
@@ -3071,7 +3497,7 @@ def analyze_flow_requirements_with_template_gaps(user_info, templates, flow_form
     Analyzes flow requirements and identifies which templates exist vs which need creation.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = f"""
 You are designing WhatsApp chatbot flows for a farmer-labor connection platform. 
@@ -3359,7 +3785,7 @@ def batch_template_analysis(user_info, templates, language='hi'):
     Returns ALL missing templates at once, not one by one.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Language-specific instructions
         language_guide = {
