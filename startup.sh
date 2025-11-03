@@ -5,8 +5,8 @@ set -e
 
 # Run database migrations
 # echo "Applying database migrations..."
-python manage.py makemigrations
-python manage.py migrate
+# python manage.py makemigrations
+# python manage.py migrate
 
 # # Create the superuser using the custom command
 # echo "Creating initial superuser..."
